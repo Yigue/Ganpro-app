@@ -1,0 +1,72 @@
+import React from 'react';
+import { Text } from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import type { TabParamList } from './navigationTypes';
+import { ScanScreen } from '@features/scan/ScanScreen';
+import { InventoryScreen } from '@features/inventory/InventoryScreen';
+import { LotesScreen } from '@features/lotes/LotesScreen';
+import { EventHistoryScreen } from '@features/events/EventHistoryScreen';
+import { colors, spacing, typography } from '@theme/index';
+
+const Tab = createBottomTabNavigator<TabParamList>();
+
+function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
+  return (
+    <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>
+  );
+}
+
+export function TabNavigator() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          height: spacing.touchTargetLg + spacing.md,
+          paddingBottom: spacing.sm,
+        },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarLabelStyle: {
+          fontSize: typography.sizes.xs,
+          fontWeight: typography.weights.semibold,
+        },
+      }}
+    >
+      <Tab.Screen
+        name="Scan"
+        component={ScanScreen}
+        options={{
+          tabBarLabel: 'Escanear',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="📡" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="Inventory"
+        component={InventoryScreen}
+        options={{
+          tabBarLabel: 'Inventario',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="🐄" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="Lotes"
+        component={LotesScreen}
+        options={{
+          tabBarLabel: 'Lotes',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="🌿" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="History"
+        component={EventHistoryScreen}
+        options={{
+          tabBarLabel: 'Historial',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="📋" focused={focused} />,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}

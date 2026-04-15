@@ -1,0 +1,149 @@
+import { useRef, useCallback, useEffect } from 'react';
+import { TextInput, AppState, AppStateStatus, Keyboard } from 'react-native';
+import { Q } from '@nozbe/watermelondb';
+import { useScanStore } from '@store/scanStore';
+import { useDatabase } from '@shared/hooks/useDatabase';
+import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
+import { useSoundFeedback } from '@shared/hooks/useSoundFeedback';
+import { normalizeRfid, isValidRfid } from '@shared/utils/rfidUtils';
+import AnimalModel from '@data/models/AnimalModel';
+
+const SCAN_DEBOUNCE_MS = 300;    // Ignore duplicate scans within this window
+const FOCUS_RETRY_DELAY_MS = 100; // Blur → focus cycle delay
+
+export interface UseRFIDScannerReturn {
+  inputRef: React.RefObject<TextInput>;
+  ensureFocus: () => void;
+  onSubmitEditing: (event: { nativeEvent: { text: string } }) => void;
+  onChangeText: (text: string) => void;
+}
+
+/**
+ * Manages a visually-hidden TextInput that captures all HID keyboard events
+ * from a Bluetooth RFID reader operating in keyboard/HID mode.
+ *
+ * The reader sends the tag ID as a sequence of keystrokes ending with Enter.
+ * `showSoftInputOnFocus={false}` prevents the software keyboard from appearing.
+ *
+ * On each valid scan:
+ *  - Queries WatermelonDB for the RFID
+ *  - HIT  → sets phase 'found', haptic success, opens EventActionSheet
+ *  - MISS → sets phase 'not_found', haptic error, opens RegistrationModal
+ */
+export function useRFIDScanner(): UseRFIDScannerReturn {
+  const inputRef = useRef<TextInput>(null);
+  const lastScanTimeRef = useRef<number>(0);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
+  const { setRfid, setPhase, openRegistrationModal, openEventSheet } = useScanStore();
+  const database = useDatabase();
+  const { triggerSuccess, triggerError } = useHapticFeedback();
+  const { playSuccess, playError } = useSoundFeedback();
+
+  const ensureFocus = useCallback(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.blur();
+    setTimeout(() => input.focus(), FOCUS_RETRY_DELAY_MS);
+  }, []);
+
+  // Re-focus when app returns to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextState === 'active'
+      ) {
+        ensureFocus();
+      }
+      appStateRef.current = nextState;
+    });
+    return () => subscription.remove();
+  }, [ensureFocus]);
+
+  // Safety net: dismiss software keyboard if it ever appears
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      Keyboard.dismiss();
+    });
+    return () => show.remove();
+  }, []);
+
+  const processRfid = useCallback(
+    async (rawId: string) => {
+      const rfid = normalizeRfid(rawId);
+
+      if (!isValidRfid(rfid)) {
+        console.warn('[RFID] Invalid tag:', rfid);
+        return;
+      }
+
+      // Debounce — some readers fire twice on a single scan
+      const now = Date.now();
+      if (now - lastScanTimeRef.current < SCAN_DEBOUNCE_MS) {
+        return;
+      }
+      lastScanTimeRef.current = now;
+
+      setRfid(rfid);
+      setPhase('scanning');
+
+      try {
+        const results = await database
+          .get<AnimalModel>('animals')
+          .query(Q.where('id_caravana', rfid))
+          .fetch();
+
+        if (results.length > 0) {
+          setPhase('found');
+          triggerSuccess();
+          playSuccess();
+          setTimeout(() => openEventSheet(), 50);
+        } else {
+          setPhase('not_found');
+          triggerError();
+          playError();
+          setTimeout(() => openRegistrationModal(), 50);
+        }
+      } catch (error) {
+        console.error('[RFID] DB query error:', error);
+        setPhase('error');
+        triggerError();
+      }
+    },
+    [
+      database,
+      setRfid,
+      setPhase,
+      openRegistrationModal,
+      openEventSheet,
+      triggerSuccess,
+      triggerError,
+      playSuccess,
+      playError,
+    ]
+  );
+
+  /**
+   * Primary handler: fires when the reader sends Enter after the RFID string.
+   * `blurOnSubmit={false}` keeps the TextInput focused for the next scan.
+   */
+  const onSubmitEditing = useCallback(
+    (event: { nativeEvent: { text: string } }) => {
+      const rfid = event.nativeEvent.text;
+      inputRef.current?.clear();
+      if (rfid) processRfid(rfid);
+    },
+    [processRfid]
+  );
+
+  /**
+   * Accumulates characters as they arrive (fallback buffer).
+   * Most HID readers terminate with Enter, so onSubmitEditing is primary.
+   */
+  const onChangeText = useCallback((_text: string) => {
+    // Buffer is read directly from nativeEvent.text in onSubmitEditing
+  }, []);
+
+  return { inputRef, ensureFocus, onSubmitEditing, onChangeText };
+}

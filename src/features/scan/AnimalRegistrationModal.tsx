@@ -1,0 +1,367 @@
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+} from 'react-native';
+import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { useDatabase } from '@shared/hooks/useDatabase';
+import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
+import { Button } from '@shared/components/Button';
+import { colors, spacing, typography } from '@theme/index';
+import {
+  SEXO,
+  CATEGORIAS_MACHO,
+  CATEGORIAS_HEMBRA,
+  ESTADO,
+  type SexoType,
+  type CategoriaType,
+} from '@core/constants/categories';
+import LoteModel from '@data/models/LoteModel';
+import AnimalModel from '@data/models/AnimalModel';
+
+interface Props {
+  visible: boolean;
+  rfid: string;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Props) {
+  const bottomSheetRef = useRef<BottomSheetModal>(null);
+  const snapPoints = useMemo(() => ['75%', '95%'], []);
+
+  const database = useDatabase();
+  const { triggerSelection, triggerSuccess } = useHapticFeedback();
+
+  const [sexo, setSexo] = useState<SexoType | null>(null);
+  const [categoria, setCategoria] = useState<CategoriaType | null>(null);
+  const [loteId, setLoteId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [lotes, setLotes] = useState<LoteModel[]>([]);
+
+  useEffect(() => {
+    if (visible) {
+      bottomSheetRef.current?.present();
+      setSexo(null);
+      setCategoria(null);
+      setLoteId(null);
+      // Load lotes
+      database
+        .get<LoteModel>('lotes')
+        .query()
+        .fetch()
+        .then(setLotes)
+        .catch(console.error);
+    } else {
+      bottomSheetRef.current?.dismiss();
+    }
+  }, [visible, database]);
+
+  const handleSexoSelect = useCallback(
+    (value: SexoType) => {
+      triggerSelection();
+      setSexo(value);
+      setCategoria(null); // Reset category when sex changes
+    },
+    [triggerSelection]
+  );
+
+  const handleCategoriaSelect = useCallback(
+    (value: CategoriaType) => {
+      triggerSelection();
+      setCategoria(value);
+    },
+    [triggerSelection]
+  );
+
+  const handleLoteSelect = useCallback(
+    (id: string) => {
+      triggerSelection();
+      setLoteId(id);
+    },
+    [triggerSelection]
+  );
+
+  const isFormValid = sexo !== null && categoria !== null && loteId !== null;
+
+  const handleSave = useCallback(async () => {
+    if (!isFormValid) return;
+    setSaving(true);
+    try {
+      await database.write(async () => {
+        await database.get<AnimalModel>('animals').create((animal) => {
+          animal.idCaravana = rfid;
+          animal.sexo = sexo!;
+          animal.categoria = categoria!;
+          animal.raza = '';
+          animal.estado = ESTADO.ACTIVO;
+          animal.loteId = loteId!;
+          animal.syncedAt = null;
+        });
+      });
+      triggerSuccess();
+      onSaved();
+    } catch (error) {
+      console.error('[Registration] Save error:', error);
+      Alert.alert('Error', 'No se pudo guardar el animal. Intente nuevamente.');
+    } finally {
+      setSaving(false);
+    }
+  }, [isFormValid, database, rfid, sexo, categoria, loteId, triggerSuccess, onSaved]);
+
+  const categoriasDisponibles =
+    sexo === SEXO.MACHO ? CATEGORIAS_MACHO : CATEGORIAS_HEMBRA;
+
+  return (
+    <BottomSheetModal
+      ref={bottomSheetRef}
+      index={0}
+      snapPoints={snapPoints}
+      backgroundStyle={styles.sheet}
+      handleIndicatorStyle={styles.indicator}
+      onDismiss={onClose}
+      enablePanDownToClose
+    >
+      <BottomSheetScrollView contentContainerStyle={styles.content}>
+        {/* Header */}
+        <Text style={styles.title}>Registrar Animal</Text>
+        <Text style={styles.subtitle}>
+          Caravana: <Text style={styles.rfidText}>{rfid}</Text>
+        </Text>
+
+        {/* SEXO */}
+        <Text style={styles.sectionLabel}>SEXO</Text>
+        <View style={styles.row}>
+          {([SEXO.MACHO, SEXO.HEMBRA] as SexoType[]).map((s) => (
+            <TouchableOpacity
+              key={s}
+              style={[styles.bigButton, sexo === s && styles.bigButtonSelected]}
+              onPress={() => handleSexoSelect(s)}
+              activeOpacity={0.8}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: sexo === s }}
+            >
+              <Text style={styles.bigButtonIcon}>
+                {s === SEXO.MACHO ? '♂' : '♀'}
+              </Text>
+              <Text
+                style={[
+                  styles.bigButtonText,
+                  sexo === s && styles.bigButtonTextSelected,
+                ]}
+              >
+                {s === SEXO.MACHO ? 'Macho' : 'Hembra'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* CATEGORIA — visible only after sex is selected */}
+        {sexo !== null && (
+          <>
+            <Text style={styles.sectionLabel}>CATEGORÍA</Text>
+            <View style={styles.categoryGrid}>
+              {categoriasDisponibles.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.categoryButton,
+                    categoria === cat && styles.categoryButtonSelected,
+                  ]}
+                  onPress={() => handleCategoriaSelect(cat)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.categoryButtonText,
+                      categoria === cat && styles.categoryButtonTextSelected,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* LOTE */}
+        <Text style={styles.sectionLabel}>LOTE / POTRERO</Text>
+        {lotes.length === 0 ? (
+          <Text style={styles.noLotesText}>
+            No hay lotes configurados. Creá uno en la pestaña Lotes.
+          </Text>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.loteList}
+          >
+            {lotes.map((lote) => (
+              <TouchableOpacity
+                key={lote.id}
+                style={[
+                  styles.loteChip,
+                  loteId === lote.id && styles.loteChipSelected,
+                ]}
+                onPress={() => handleLoteSelect(lote.id)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.loteChipText,
+                    loteId === lote.id && styles.loteChipTextSelected,
+                  ]}
+                >
+                  {lote.nombre}
+                </Text>
+                {lote.ubicacion ? (
+                  <Text style={styles.loteChipUbicacion}>{lote.ubicacion}</Text>
+                ) : null}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Save */}
+        <Button
+          label="GUARDAR Y CONTINUAR"
+          onPress={handleSave}
+          size="lg"
+          disabled={!isFormValid}
+          loading={saving}
+          style={styles.saveButton}
+        />
+      </BottomSheetScrollView>
+    </BottomSheetModal>
+  );
+}
+
+const styles = StyleSheet.create({
+  sheet: { backgroundColor: colors.surfaceElevated },
+  indicator: { backgroundColor: colors.border, width: 40 },
+  content: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+  },
+  title: {
+    color: colors.textPrimary,
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold,
+  },
+  subtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.md,
+  },
+  rfidText: {
+    color: colors.primary,
+    fontWeight: typography.weights.bold,
+    fontVariant: ['tabular-nums'],
+  },
+  sectionLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginTop: spacing.sm,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  bigButton: {
+    flex: 1,
+    height: spacing.touchTargetLg,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  bigButtonSelected: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0, 214, 143, 0.12)',
+  },
+  bigButtonIcon: { fontSize: 28 },
+  bigButtonText: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+  },
+  bigButtonTextSelected: { color: colors.primary },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  categoryButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    minHeight: spacing.touchTarget,
+    justifyContent: 'center',
+  },
+  categoryButtonSelected: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0, 214, 143, 0.12)',
+  },
+  categoryButtonText: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.medium,
+  },
+  categoryButtonTextSelected: {
+    color: colors.primary,
+    fontWeight: typography.weights.bold,
+  },
+  noLotesText: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.md,
+    textAlign: 'center',
+    paddingVertical: spacing.md,
+  },
+  loteList: {
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  loteChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    minHeight: spacing.touchTarget,
+    justifyContent: 'center',
+  },
+  loteChipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0, 214, 143, 0.12)',
+  },
+  loteChipText: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.medium,
+  },
+  loteChipTextSelected: {
+    color: colors.primary,
+    fontWeight: typography.weights.bold,
+  },
+  loteChipUbicacion: {
+    color: colors.textDisabled,
+    fontSize: typography.sizes.xs,
+  },
+  saveButton: { marginTop: spacing.lg },
+});
