@@ -25,6 +25,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     package: 'com.ganpro.app',
   },
+  extra: {
+    eas: {
+      projectId: 'c2e8d3b8-222e-4018-b1e3-5082fe43bd1b',
+    },
+  },
   plugins: [
     [
       'expo-build-properties',

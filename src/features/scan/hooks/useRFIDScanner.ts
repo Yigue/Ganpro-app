@@ -34,6 +34,8 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
   const inputRef = useRef<TextInput>(null);
   const lastScanTimeRef = useRef<number>(0);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const eventSheetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const registrationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { setRfid, setPhase, openRegistrationModal, openEventSheet } = useScanStore();
   const database = useDatabase();
@@ -58,7 +60,11 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
       }
       appStateRef.current = nextState;
     });
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      if (eventSheetTimeoutRef.current) clearTimeout(eventSheetTimeoutRef.current);
+      if (registrationTimeoutRef.current) clearTimeout(registrationTimeoutRef.current);
+    };
   }, [ensureFocus]);
 
   // Safety net: dismiss software keyboard if it ever appears
@@ -98,12 +104,14 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
           setPhase('found');
           triggerSuccess();
           playSuccess();
-          setTimeout(() => openEventSheet(), 50);
+          if (eventSheetTimeoutRef.current) clearTimeout(eventSheetTimeoutRef.current);
+          eventSheetTimeoutRef.current = setTimeout(() => openEventSheet(), 50);
         } else {
           setPhase('not_found');
           triggerError();
           playError();
-          setTimeout(() => openRegistrationModal(), 50);
+          if (registrationTimeoutRef.current) clearTimeout(registrationTimeoutRef.current);
+          registrationTimeoutRef.current = setTimeout(() => openRegistrationModal(), 50);
         }
       } catch (error) {
         console.error('[RFID] DB query error:', error);

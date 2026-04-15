@@ -24,12 +24,12 @@ export function useSoundFeedback(): SoundFeedback {
 
       const { sound: successSound } = await Audio.Sound.createAsync(
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        require('../../assets/sounds/scan_success.mp3'),
+        require('../../../assets/sounds/scan_success.mp3'),
         { shouldPlay: false, volume: 0.8 }
       );
       const { sound: errorSound } = await Audio.Sound.createAsync(
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        require('../../assets/sounds/scan_error.mp3'),
+        require('../../../assets/sounds/scan_error.mp3'),
         { shouldPlay: false, volume: 0.8 }
       );
 
