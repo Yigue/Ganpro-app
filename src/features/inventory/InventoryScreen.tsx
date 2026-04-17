@@ -12,6 +12,7 @@ import { Q } from '@nozbe/watermelondb';
 import { useDatabase } from '@shared/hooks/useDatabase';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
 import { colors, spacing, typography } from '@theme/index';
 import {
   CATEGORIA,
@@ -22,10 +23,19 @@ import AnimalModel from '@data/models/AnimalModel';
 const ALL_CATEGORIES = [null, ...Object.values(CATEGORIA)] as (CategoriaType | null)[];
 
 export function InventoryScreen() {
+  return (
+    <ObservableErrorBoundary fallbackTitle="Error al cargar inventario">
+      <InventoryScreenBody />
+    </ObservableErrorBoundary>
+  );
+}
+
+function InventoryScreenBody() {
   const database = useDatabase();
   const [filterCategory, setFilterCategory] = useState<CategoriaType | null>(null);
   const [animals, setAnimals] = useState<AnimalModel[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [error, setError] = useState<string | null>(null);
 
   // Reactive subscription to animal list
   useEffect(() => {
@@ -35,7 +45,16 @@ export function InventoryScreen() {
           .query(Q.where('estado', 'ACTIVO'), Q.where('categoria', filterCategory))
       : database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO'));
 
-    const subscription = query.observe().subscribe(setAnimals);
+    const subscription = query.observe().subscribe({
+      next: (rows) => {
+        setAnimals(rows);
+        setError(null);
+      },
+      error: (err: Error) => {
+        console.error('[Inventory] animals query error:', err);
+        setError(err.message);
+      },
+    });
     return () => subscription.unsubscribe();
   }, [database, filterCategory]);
 
@@ -45,18 +64,28 @@ export function InventoryScreen() {
       .get<AnimalModel>('animals')
       .query(Q.where('estado', 'ACTIVO'))
       .observe()
-      .subscribe((all) => {
-        const c: Record<string, number> = {};
-        all.forEach((a) => {
-          c[a.categoria] = (c[a.categoria] ?? 0) + 1;
-        });
-        setCounts(c);
+      .subscribe({
+        next: (all) => {
+          const c: Record<string, number> = {};
+          all.forEach((a) => {
+            c[a.categoria] = (c[a.categoria] ?? 0) + 1;
+          });
+          setCounts(c);
+        },
+        error: (err: Error) => {
+          console.error('[Inventory] counts query error:', err);
+        },
       });
     return () => subscription.unsubscribe();
   }, [database]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>⚠ {error}</Text>
+        </View>
+      )}
       <View style={styles.header}>
         <Text style={styles.title}>Inventario</Text>
         <Text style={styles.subtitle}>{animals.length} animales activos</Text>
@@ -223,4 +252,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   separator: { height: 1, backgroundColor: colors.border },
+  errorBanner: {
+    backgroundColor: colors.scanError,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.error,
+    padding: spacing.sm,
+  },
+  errorBannerText: {
+    color: colors.error,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    textAlign: 'center',
+  },
 });

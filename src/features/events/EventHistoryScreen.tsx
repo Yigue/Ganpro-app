@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Q } from '@nozbe/watermelondb';
 import { useDatabase } from '@shared/hooks/useDatabase';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
 import { colors, spacing, typography } from '@theme/index';
 import { EVENTO_TIPO, type EventoTipoType } from '@core/constants/eventTypes';
 import EventoModel from '@data/models/EventoModel';
@@ -31,9 +32,18 @@ const TIPO_META: Record<
 const FILTER_OPTIONS = [null, ...Object.values(EVENTO_TIPO)] as (EventoTipoType | null)[];
 
 export function EventHistoryScreen() {
+  return (
+    <ObservableErrorBoundary fallbackTitle="Error al cargar historial">
+      <EventHistoryScreenBody />
+    </ObservableErrorBoundary>
+  );
+}
+
+function EventHistoryScreenBody() {
   const database = useDatabase();
   const [eventos, setEventos] = useState<EventoModel[]>([]);
   const [filter, setFilter] = useState<EventoTipoType | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const query = filter
@@ -44,12 +54,26 @@ export function EventHistoryScreen() {
           .get<EventoModel>('eventos')
           .query(Q.sortBy('timestamp', Q.desc), Q.take(100));
 
-    const subscription = query.observe().subscribe(setEventos);
+    const subscription = query.observe().subscribe({
+      next: (rows) => {
+        setEventos(rows);
+        setError(null);
+      },
+      error: (err: Error) => {
+        console.error('[History] query error:', err);
+        setError(err.message);
+      },
+    });
     return () => subscription.unsubscribe();
   }, [database, filter]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>⚠ {error}</Text>
+        </View>
+      )}
       <View style={styles.header}>
         <Text style={styles.title}>Historial</Text>
         <Text style={styles.subtitle}>{eventos.length} eventos recientes</Text>
@@ -216,5 +240,17 @@ const styles = StyleSheet.create({
     color: colors.textDisabled,
     fontSize: typography.sizes.xs,
     fontVariant: ['tabular-nums'],
+  },
+  errorBanner: {
+    backgroundColor: colors.scanError,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.error,
+    padding: spacing.sm,
+  },
+  errorBannerText: {
+    color: colors.error,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    textAlign: 'center',
   },
 });
