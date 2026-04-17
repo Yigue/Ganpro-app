@@ -1,5 +1,7 @@
 import { Database, Q } from '@nozbe/watermelondb';
 import AnimalModel from '../models/AnimalModel';
+import EventoModel from '../models/EventoModel';
+import { EVENTO_TIPO } from '@core/constants/eventTypes';
 
 /**
  * Repository encapsulates all DB access for animals.
@@ -36,6 +38,31 @@ export class AnimalRepository {
         animal.raza = params.raza ?? '';
         animal.estado = params.estado;
         animal.loteId = params.loteId;
+      });
+    });
+  }
+
+  /**
+   * Atomically moves an animal to a new lote and records the CAMBIO_LOTE evento
+   * inside a single database.write() — guarantees inventory stays consistent
+   * even if the operation is interrupted.
+   */
+  async transferToLote(
+    animal: AnimalModel,
+    toLoteId: string,
+    notas: string = ''
+  ): Promise<void> {
+    await this.database.write(async () => {
+      await this.database.get<EventoModel>('eventos').create((evento) => {
+        evento.animalId = animal.id;
+        evento.tipo = EVENTO_TIPO.CAMBIO_LOTE;
+        evento.valor = null;
+        evento.notas = notas;
+        evento.loteDestinoId = toLoteId;
+        evento.timestamp = Date.now();
+      });
+      await animal.update((a) => {
+        a.loteId = toLoteId;
       });
     });
   }

@@ -12,23 +12,42 @@ import { useDatabase } from '@shared/hooks/useDatabase';
 import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
 import { colors, spacing, typography } from '@theme/index';
 import LoteModel from '@data/models/LoteModel';
 import { LoteFormModal } from './LoteFormModal';
 
 export function LotesScreen() {
+  return (
+    <ObservableErrorBoundary fallbackTitle="Error al cargar lotes">
+      <LotesScreenBody />
+    </ObservableErrorBoundary>
+  );
+}
+
+function LotesScreenBody() {
   const database = useDatabase();
   const { triggerHeavy } = useHapticFeedback();
   const [lotes, setLotes] = useState<LoteModel[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingLote, setEditingLote] = useState<LoteModel | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const subscription = database
       .get<LoteModel>('lotes')
       .query()
       .observe()
-      .subscribe(setLotes);
+      .subscribe({
+        next: (rows) => {
+          setLotes(rows);
+          setError(null);
+        },
+        error: (err: Error) => {
+          console.error('[Lotes] query error:', err);
+          setError(err.message);
+        },
+      });
     return () => subscription.unsubscribe();
   }, [database]);
 
@@ -55,6 +74,11 @@ export function LotesScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>⚠ {error}</Text>
+        </View>
+      )}
       <View style={styles.header}>
         <Text style={styles.title}>Lotes</Text>
         <Button
@@ -197,4 +221,16 @@ const styles = StyleSheet.create({
   },
   deleteBtn: { backgroundColor: 'rgba(255,61,113,0.15)' },
   actionBtnText: { fontSize: 20 },
+  errorBanner: {
+    backgroundColor: colors.scanError,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.error,
+    padding: spacing.sm,
+  },
+  errorBannerText: {
+    color: colors.error,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    textAlign: 'center',
+  },
 });

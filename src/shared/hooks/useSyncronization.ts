@@ -5,8 +5,10 @@ import { useDatabase } from './useDatabase';
 import { useSyncStore } from '@store/syncStore';
 import { useSettingsStore } from '@store/settingsStore';
 
-const SYNC_DEBOUNCE_MS = 5_000;   // Prevent sync storms: min 5s between syncs
-const SYNC_RETRY_DELAY_MS = 30_000; // Retry after error: 30s
+const SYNC_DEBOUNCE_MS = 5_000; // Prevent sync storms: min 5s between syncs
+
+// Exponential backoff: 5s → 15s → 30s → 1m → 5m (cap).
+const BACKOFF_SCHEDULE_MS = [5_000, 15_000, 30_000, 60_000, 300_000] as const;
 
 /**
  * Monitors network connectivity and triggers WatermelonDB sync whenever
@@ -14,6 +16,9 @@ const SYNC_RETRY_DELAY_MS = 30_000; // Retry after error: 30s
  *
  * Mount once at the app root (App.tsx → AppInner).
  * When syncApiUrl is empty, sync is skipped — app runs 100% offline.
+ *
+ * On error, retries with exponential backoff. On offline→online transition,
+ * resets the retry counter and fires an immediate sync attempt.
  */
 export function useSyncronization(): void {
   const database = useDatabase();
@@ -22,6 +27,7 @@ export function useSyncronization(): void {
 
   const lastSyncAttemptRef = useRef<number>(0);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = useRef<number>(0);
 
   const runSync = useCallback(async () => {
     if (!syncApiUrl) return; // No backend configured → offline mode
@@ -70,36 +76,54 @@ export function useSyncronization(): void {
         },
       });
 
+      retryCountRef.current = 0;
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
       setSyncSuccess();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown sync error';
-      console.error('[Sync] Error:', message);
+      const delay =
+        BACKOFF_SCHEDULE_MS[
+          Math.min(retryCountRef.current, BACKOFF_SCHEDULE_MS.length - 1)
+        ];
+      console.error(`[Sync] Error (retry in ${delay}ms):`, message);
       setSyncError(message);
 
-      // Schedule automatic retry
+      retryCountRef.current += 1;
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = setTimeout(runSync, SYNC_RETRY_DELAY_MS);
+      retryTimeoutRef.current = setTimeout(runSync, delay);
     }
   }, [database, syncApiUrl, setStatus, setSyncSuccess, setSyncError]);
 
   useEffect(() => {
     let previouslyOnline = false;
 
+    const handleOnlineRecovery = () => {
+      retryCountRef.current = 0;
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+      lastSyncAttemptRef.current = 0;
+      runSync();
+    };
+
     const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
       const isOnline = !!(state.isConnected && state.isInternetReachable);
       setOnline(isOnline);
 
-      // Only sync on offline → online transition
       if (isOnline && !previouslyOnline) {
-        runSync();
+        handleOnlineRecovery();
       }
       previouslyOnline = isOnline;
     });
 
-    // Check current network state on mount
     NetInfo.fetch().then((state) => {
       const isOnline = !!(state.isConnected && state.isInternetReachable);
       setOnline(isOnline);
+      previouslyOnline = isOnline;
       if (isOnline) runSync();
     });
 

@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  TextInput as RNTextInput,
 } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useDatabase } from '@shared/hooks/useDatabase';
@@ -40,6 +41,7 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
 
   const [sexo, setSexo] = useState<SexoType | null>(null);
   const [categoria, setCategoria] = useState<CategoriaType | null>(null);
+  const [raza, setRaza] = useState('');
   const [loteId, setLoteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [lotes, setLotes] = useState<LoteModel[]>([]);
@@ -49,6 +51,7 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
       bottomSheetRef.current?.present();
       setSexo(null);
       setCategoria(null);
+      setRaza('');
       setLoteId(null);
       // Load lotes
       database
@@ -98,7 +101,7 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
           animal.idCaravana = rfid;
           animal.sexo = sexo!;
           animal.categoria = categoria!;
-          animal.raza = '';
+          animal.raza = raza.trim();
           animal.estado = ESTADO.ACTIVO;
           animal.loteId = loteId!;
           animal.syncedAt = null;
@@ -112,7 +115,7 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
     } finally {
       setSaving(false);
     }
-  }, [isFormValid, database, rfid, sexo, categoria, loteId, triggerSuccess, onSaved]);
+  }, [isFormValid, database, rfid, sexo, categoria, raza, loteId, triggerSuccess, onSaved]);
 
   const categoriasDisponibles =
     sexo === SEXO.MACHO ? CATEGORIAS_MACHO : CATEGORIAS_HEMBRA;
@@ -189,6 +192,19 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
             </View>
           </>
         )}
+
+        {/* RAZA (opcional) */}
+        <Text style={styles.sectionLabel}>RAZA (opcional)</Text>
+        <RNTextInput
+          style={styles.razaInput}
+          placeholder="Ej: Angus, Hereford, Brangus"
+          placeholderTextColor={colors.textDisabled}
+          value={raza}
+          onChangeText={setRaza}
+          autoCapitalize="words"
+          autoCorrect={false}
+          returnKeyType="done"
+        />
 
         {/* LOTE */}
         <Text style={styles.sectionLabel}>LOTE / POTRERO</Text>
@@ -325,6 +341,17 @@ const styles = StyleSheet.create({
   categoryButtonTextSelected: {
     color: colors.primary,
     fontWeight: typography.weights.bold,
+  },
+  razaInput: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    color: colors.textPrimary,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    paddingHorizontal: spacing.md,
+    height: spacing.touchTarget,
   },
   noLotesText: {
     color: colors.textSecondary,

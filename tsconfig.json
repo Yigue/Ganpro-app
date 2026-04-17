@@ -14,5 +14,6 @@
       "@store/*": ["src/store/*"],
       "@theme/*": ["src/theme/*"]
     }
-  }
+  },
+  "exclude": ["node_modules", "**/__tests__/**"]
 }

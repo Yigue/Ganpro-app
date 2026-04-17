@@ -6,6 +6,7 @@ import { ScanScreen } from '@features/scan/ScanScreen';
 import { InventoryScreen } from '@features/inventory/InventoryScreen';
 import { LotesScreen } from '@features/lotes/LotesScreen';
 import { EventHistoryScreen } from '@features/events/EventHistoryScreen';
+import { SettingsScreen } from '@features/settings/SettingsScreen';
 import { colors, spacing, typography } from '@theme/index';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -65,6 +66,14 @@ export function TabNavigator() {
         options={{
           tabBarLabel: 'Historial',
           tabBarIcon: ({ focused }) => <TabIcon emoji="📋" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarLabel: 'Ajustes',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" focused={focused} />,
         }}
       />
     </Tab.Navigator>

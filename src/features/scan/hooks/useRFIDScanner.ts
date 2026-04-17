@@ -37,7 +37,13 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
   const eventSheetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const registrationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { setRfid, setPhase, openRegistrationModal, openEventSheet } = useScanStore();
+  const {
+    setRfid,
+    setPhase,
+    openRegistrationModal,
+    openEventSheet,
+    enqueueScan,
+  } = useScanStore();
   const database = useDatabase();
   const { triggerSuccess, triggerError } = useHapticFeedback();
   const { playSuccess, playError } = useSoundFeedback();
@@ -100,7 +106,24 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
           .query(Q.where('id_caravana', rfid))
           .fetch();
 
-        if (results.length > 0) {
+        const animal = results[0];
+        const batchMode = useScanStore.getState().batchMode;
+
+        if (batchMode) {
+          // Batch mode — queue the scan and give feedback but do not open sheets.
+          enqueueScan(rfid, animal?.id);
+          if (animal) {
+            triggerSuccess();
+            playSuccess();
+          } else {
+            triggerError();
+            playError();
+          }
+          setPhase('idle');
+          return;
+        }
+
+        if (animal) {
           setPhase('found');
           triggerSuccess();
           playSuccess();
@@ -125,6 +148,7 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
       setPhase,
       openRegistrationModal,
       openEventSheet,
+      enqueueScan,
       triggerSuccess,
       triggerError,
       playSuccess,

@@ -18,6 +18,7 @@ import { EVENTO_TIPO, type EventoTipoType } from '@core/constants/eventTypes';
 import AnimalModel from '@data/models/AnimalModel';
 import EventoModel from '@data/models/EventoModel';
 import LoteModel from '@data/models/LoteModel';
+import { AnimalRepository } from '@data/repositories/AnimalRepository';
 
 interface Props {
   visible: boolean;
@@ -80,25 +81,22 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
     if (!selectedAction || !animal) return;
     setSaving(true);
     try {
-      await database.write(async () => {
-        // Create event
-        await database.get<EventoModel>('eventos').create((evento) => {
-          evento.animalId = animal.id;
-          evento.tipo = selectedAction;
-          evento.valor = selectedAction === EVENTO_TIPO.PESAJE ? parseFloat(peso) || null : null;
-          evento.notas = notas;
-          evento.loteDestinoId =
-            selectedAction === EVENTO_TIPO.CAMBIO_LOTE ? loteDestinoId : null;
-          evento.timestamp = Date.now();
-        });
-
-        // If CAMBIO_LOTE, update animal's lote_id
-        if (selectedAction === EVENTO_TIPO.CAMBIO_LOTE && loteDestinoId) {
-          await animal.update((a) => {
-            a.loteId = loteDestinoId;
+      if (selectedAction === EVENTO_TIPO.CAMBIO_LOTE && loteDestinoId) {
+        const animalRepo = new AnimalRepository(database);
+        await animalRepo.transferToLote(animal, loteDestinoId, notas);
+      } else {
+        await database.write(async () => {
+          await database.get<EventoModel>('eventos').create((evento) => {
+            evento.animalId = animal.id;
+            evento.tipo = selectedAction;
+            evento.valor =
+              selectedAction === EVENTO_TIPO.PESAJE ? parseFloat(peso) || null : null;
+            evento.notas = notas;
+            evento.loteDestinoId = null;
+            evento.timestamp = Date.now();
           });
-        }
-      });
+        });
+      }
 
       triggerSuccess();
       onClose();
