@@ -10,6 +10,7 @@ export class EventoRepository {
     valor?: number;
     notas?: string;
     loteDestinoId?: string;
+    timestamp?: number;
   }): Promise<EventoModel> {
     return this.database.write(async () => {
       return this.database.get<EventoModel>('eventos').create((evento) => {
@@ -18,7 +19,7 @@ export class EventoRepository {
         evento.valor = params.valor ?? null;
         evento.notas = params.notas ?? '';
         evento.loteDestinoId = params.loteDestinoId ?? null;
-        evento.timestamp = Date.now();
+        evento.timestamp = params.timestamp ?? Date.now();
       });
     });
   }
