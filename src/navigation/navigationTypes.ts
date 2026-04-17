@@ -5,6 +5,7 @@ export type TabParamList = {
   Inventory: undefined;
   Lotes: undefined;
   History: undefined;
+  Settings: undefined;
 };
 
 export type RootStackParamList = {
