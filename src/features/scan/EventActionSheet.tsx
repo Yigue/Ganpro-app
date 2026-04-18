@@ -9,16 +9,15 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { Q } from '@nozbe/watermelondb';
 import { useDatabase } from '@shared/hooks/useDatabase';
 import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { colors, spacing, typography } from '@theme/index';
 import { EVENTO_TIPO, type EventoTipoType } from '@core/constants/eventTypes';
-import AnimalModel from '@data/models/AnimalModel';
-import EventoModel from '@data/models/EventoModel';
-import LoteModel from '@data/models/LoteModel';
+import type AnimalModel from '@data/models/AnimalModel';
+import type LoteModel from '@data/models/LoteModel';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
+import { EventoRepository } from '@data/repositories/EventoRepository';
 
 interface Props {
   visible: boolean;
@@ -57,21 +56,15 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
       setNotas('');
       setLoteDestinoId(null);
 
-      // Load animal
-      database
-        .get<AnimalModel>('animals')
-        .query(Q.where('id_caravana', rfid))
-        .fetch()
-        .then((r) => setAnimal(r[0] ?? null))
-        .catch(console.error);
-
-      // Load lotes for CAMBIO_LOTE
-      database
-        .get<LoteModel>('lotes')
-        .query()
-        .fetch()
-        .then(setLotes)
-        .catch(console.error);
+      void (async () => {
+        try {
+          const repo = new AnimalRepository(database);
+          setAnimal(await repo.findByRfid(rfid));
+          setLotes(await database.get<LoteModel>('lotes').query().fetch());
+        } catch (e) {
+          console.error('[EventActionSheet] load error:', e);
+        }
+      })();
     } else {
       bottomSheetRef.current?.dismiss();
     }
@@ -85,16 +78,12 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
         const animalRepo = new AnimalRepository(database);
         await animalRepo.transferToLote(animal, loteDestinoId, notas);
       } else {
-        await database.write(async () => {
-          await database.get<EventoModel>('eventos').create((evento) => {
-            evento.animalId = animal.id;
-            evento.tipo = selectedAction;
-            evento.valor =
-              selectedAction === EVENTO_TIPO.PESAJE ? parseFloat(peso) || null : null;
-            evento.notas = notas;
-            evento.loteDestinoId = null;
-            evento.timestamp = Date.now();
-          });
+        const eventoRepo = new EventoRepository(database);
+        await eventoRepo.create({
+          animalId: animal.id,
+          tipo: selectedAction,
+          valor: selectedAction === EVENTO_TIPO.PESAJE ? parseFloat(peso) || undefined : undefined,
+          notas,
         });
       }
 

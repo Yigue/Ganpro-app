@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { DatabaseProvider } from '@data/database/DatabaseProvider';
 import { RootNavigator } from '@navigation/RootNavigator';
 import { useSyncronization } from '@shared/hooks/useSyncronization';
+import { useSettingsStore } from '@store/settingsStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,7 +23,9 @@ const queryClient = new QueryClient({
  * useSyncronization is initialized here once at the root level.
  */
 function AppInner() {
+  const hydrated = useSettingsStore(s => s._hydrated);
   useSyncronization();
+  if (!hydrated) return null;
   return <RootNavigator />;
 }
 

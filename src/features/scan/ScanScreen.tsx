@@ -34,23 +34,22 @@ const PHASE_COLORS: Record<ScanPhase, string> = {
 };
 
 export function ScanScreen() {
-  const {
-    currentRfid,
-    phase,
-    isRegistrationModalOpen,
-    isEventSheetOpen,
-    closeRegistrationModal,
-    closeEventSheet,
-    reset,
-    batchMode,
-    queue,
-    isBatchSheetOpen,
-    toggleBatchMode,
-    openBatchSheet,
-    closeBatchSheet,
-    clearQueue,
-  } = useScanStore();
-  const { isOnline, status: syncStatus } = useSyncStore();
+  const currentRfid = useScanStore(s => s.currentRfid);
+  const phase = useScanStore(s => s.phase);
+  const isRegistrationModalOpen = useScanStore(s => s.isRegistrationModalOpen);
+  const isEventSheetOpen = useScanStore(s => s.isEventSheetOpen);
+  const closeRegistrationModal = useScanStore(s => s.closeRegistrationModal);
+  const closeEventSheet = useScanStore(s => s.closeEventSheet);
+  const reset = useScanStore(s => s.reset);
+  const batchMode = useScanStore(s => s.batchMode);
+  const queue = useScanStore(s => s.queue);
+  const isBatchSheetOpen = useScanStore(s => s.isBatchSheetOpen);
+  const toggleBatchMode = useScanStore(s => s.toggleBatchMode);
+  const openBatchSheet = useScanStore(s => s.openBatchSheet);
+  const closeBatchSheet = useScanStore(s => s.closeBatchSheet);
+  const clearQueue = useScanStore(s => s.clearQueue);
+  const isOnline = useSyncStore(s => s.isOnline);
+  const syncStatus = useSyncStore(s => s.status);
   const { inputRef, ensureFocus, onSubmitEditing, onChangeText } = useRFIDScanner();
 
   const flashAnim = useRef(new Animated.Value(0)).current;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -8,8 +8,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import withObservables from '@nozbe/with-observables';
 import { Q } from '@nozbe/watermelondb';
-import { useDatabase } from '@shared/hooks/useDatabase';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
@@ -18,80 +18,42 @@ import {
   CATEGORIA,
   type CategoriaType,
 } from '@core/constants/categories';
-import AnimalModel from '@data/models/AnimalModel';
+import type AnimalModel from '@data/models/AnimalModel';
+import { database } from '@data/database/database';
 
 const ALL_CATEGORIES = [null, ...Object.values(CATEGORIA)] as (CategoriaType | null)[];
 
-export function InventoryScreen() {
-  return (
-    <ObservableErrorBoundary fallbackTitle="Error al cargar inventario">
-      <InventoryScreenBody />
-    </ObservableErrorBoundary>
-  );
+interface InventoryListOuterProps {
+  filterCategory: CategoriaType | null;
+  onFilterChange: (cat: CategoriaType | null) => void;
 }
 
-function InventoryScreenBody() {
-  const database = useDatabase();
-  const [filterCategory, setFilterCategory] = useState<CategoriaType | null>(null);
-  const [animals, setAnimals] = useState<AnimalModel[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [error, setError] = useState<string | null>(null);
+interface InventoryListProps extends InventoryListOuterProps {
+  animals: AnimalModel[];
+  allAnimals: AnimalModel[];
+}
 
-  // Reactive subscription to animal list
-  useEffect(() => {
-    const query = filterCategory
-      ? database
-          .get<AnimalModel>('animals')
-          .query(Q.where('estado', 'ACTIVO'), Q.where('categoria', filterCategory))
-      : database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO'));
-
-    const subscription = query.observe().subscribe({
-      next: (rows) => {
-        setAnimals(rows);
-        setError(null);
-      },
-      error: (err: Error) => {
-        console.error('[Inventory] animals query error:', err);
-        setError(err.message);
-      },
+function InventoryListInner({
+  animals,
+  allAnimals,
+  filterCategory,
+  onFilterChange,
+}: InventoryListProps) {
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    allAnimals.forEach((a) => {
+      c[a.categoria] = (c[a.categoria] ?? 0) + 1;
     });
-    return () => subscription.unsubscribe();
-  }, [database, filterCategory]);
-
-  // Category counts
-  useEffect(() => {
-    const subscription = database
-      .get<AnimalModel>('animals')
-      .query(Q.where('estado', 'ACTIVO'))
-      .observe()
-      .subscribe({
-        next: (all) => {
-          const c: Record<string, number> = {};
-          all.forEach((a) => {
-            c[a.categoria] = (c[a.categoria] ?? 0) + 1;
-          });
-          setCounts(c);
-        },
-        error: (err: Error) => {
-          console.error('[Inventory] counts query error:', err);
-        },
-      });
-    return () => subscription.unsubscribe();
-  }, [database]);
+    return c;
+  }, [allAnimals]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {error && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorBannerText}>⚠ {error}</Text>
-        </View>
-      )}
+    <>
       <View style={styles.header}>
         <Text style={styles.title}>Inventario</Text>
         <Text style={styles.subtitle}>{animals.length} animales activos</Text>
       </View>
 
-      {/* Category stats */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -109,7 +71,6 @@ function InventoryScreenBody() {
         )}
       </ScrollView>
 
-      {/* Filter chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -119,7 +80,7 @@ function InventoryScreenBody() {
           <TouchableOpacity
             key={cat ?? 'all'}
             style={[styles.filterChip, filterCategory === cat && styles.filterChipActive]}
-            onPress={() => setFilterCategory(cat)}
+            onPress={() => onFilterChange(cat)}
           >
             <Text
               style={[
@@ -133,23 +94,61 @@ function InventoryScreenBody() {
         ))}
       </ScrollView>
 
-      {/* Animal list */}
       {animals.length === 0 ? (
         <EmptyState
           icon="🐄"
           title="Sin animales"
-          subtitle={filterCategory ? `No hay ${filterCategory}s activos` : 'Registre el primer animal escaneando una caravana'}
+          subtitle={
+            filterCategory
+              ? `No hay ${filterCategory}s activos`
+              : 'Registre el primer animal escaneando una caravana'
+          }
         />
       ) : (
         <FlatList
           data={animals}
           keyExtractor={(a) => a.id}
-          renderItem={({ item }) => <AnimalListItem animal={item} />}
+          renderItem={({ item }) => (
+            <ObservableErrorBoundary key={item.id}>
+              <AnimalListItem animal={item} />
+            </ObservableErrorBoundary>
+          )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
-    </SafeAreaView>
+    </>
+  );
+}
+
+const InventoryListWithData = withObservables(
+  ['filterCategory'],
+  ({ filterCategory }: InventoryListOuterProps) => ({
+    animals: (filterCategory
+      ? database
+          .get<AnimalModel>('animals')
+          .query(Q.where('estado', 'ACTIVO'), Q.where('categoria', filterCategory))
+      : database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO'))
+    ).observe(),
+    allAnimals: database
+      .get<AnimalModel>('animals')
+      .query(Q.where('estado', 'ACTIVO'))
+      .observe(),
+  })
+)(InventoryListInner);
+
+export function InventoryScreen() {
+  const [filterCategory, setFilterCategory] = useState<CategoriaType | null>(null);
+
+  return (
+    <ObservableErrorBoundary fallbackTitle="Error al cargar inventario">
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <InventoryListWithData
+          filterCategory={filterCategory}
+          onFilterChange={setFilterCategory}
+        />
+      </SafeAreaView>
+    </ObservableErrorBoundary>
   );
 }
 
@@ -252,16 +251,4 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   separator: { height: 1, backgroundColor: colors.border },
-  errorBanner: {
-    backgroundColor: colors.scanError,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.error,
-    padding: spacing.sm,
-  },
-  errorBannerText: {
-    color: colors.error,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    textAlign: 'center',
-  },
 });

@@ -22,8 +22,8 @@ import {
   type SexoType,
   type CategoriaType,
 } from '@core/constants/categories';
-import LoteModel from '@data/models/LoteModel';
-import AnimalModel from '@data/models/AnimalModel';
+import type LoteModel from '@data/models/LoteModel';
+import { AnimalRepository } from '@data/repositories/AnimalRepository';
 
 interface Props {
   visible: boolean;
@@ -53,13 +53,13 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
       setCategoria(null);
       setRaza('');
       setLoteId(null);
-      // Load lotes
-      database
-        .get<LoteModel>('lotes')
-        .query()
-        .fetch()
-        .then(setLotes)
-        .catch(console.error);
+      void (async () => {
+        try {
+          setLotes(await database.get<LoteModel>('lotes').query().fetch());
+        } catch (e) {
+          console.error('[Registration] load lotes error:', e);
+        }
+      })();
     } else {
       bottomSheetRef.current?.dismiss();
     }
@@ -93,19 +93,17 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
   const isFormValid = sexo !== null && categoria !== null && loteId !== null;
 
   const handleSave = useCallback(async () => {
-    if (!isFormValid) return;
+    if (!isFormValid || !sexo || !categoria || !loteId) return;
     setSaving(true);
     try {
-      await database.write(async () => {
-        await database.get<AnimalModel>('animals').create((animal) => {
-          animal.idCaravana = rfid;
-          animal.sexo = sexo!;
-          animal.categoria = categoria!;
-          animal.raza = raza.trim();
-          animal.estado = ESTADO.ACTIVO;
-          animal.loteId = loteId!;
-          animal.syncedAt = null;
-        });
+      const repo = new AnimalRepository(database);
+      await repo.create({
+        rfid,
+        sexo,
+        categoria,
+        raza: raza.trim(),
+        estado: ESTADO.ACTIVO,
+        loteId,
       });
       triggerSuccess();
       onSaved();

@@ -14,9 +14,8 @@ import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { colors, spacing, typography } from '@theme/index';
 import { EVENTO_TIPO } from '@core/constants/eventTypes';
-import AnimalModel from '@data/models/AnimalModel';
-import EventoModel from '@data/models/EventoModel';
-import LoteModel from '@data/models/LoteModel';
+import type EventoModel from '@data/models/EventoModel';
+import type LoteModel from '@data/models/LoteModel';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
 import { useScanStore, type QueueItem } from '@store/scanStore';
 
@@ -40,7 +39,8 @@ export function BatchActionSheet({ visible, onClose }: Props) {
 
   const database = useDatabase();
   const { triggerSuccess, triggerSelection } = useHapticFeedback();
-  const { queue, clearQueue } = useScanStore();
+  const queue = useScanStore(s => s.queue);
+  const clearQueue = useScanStore(s => s.clearQueue);
 
   const [selectedAction, setSelectedAction] = useState<BatchAction | null>(null);
   const [vacuna, setVacuna] = useState('');
@@ -56,7 +56,11 @@ export function BatchActionSheet({ visible, onClose }: Props) {
       setVacuna('');
       setNotas('');
       setLoteDestinoId(null);
-      database.get<LoteModel>('lotes').query().fetch().then(setLotes).catch(console.error);
+      void (async () => {
+        try {
+          setLotes(await database.get<LoteModel>('lotes').query().fetch());
+        } catch (e) { console.error('[BatchActionSheet] load lotes error:', e); }
+      })();
     } else {
       bottomSheetRef.current?.dismiss();
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,14 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import withObservables from '@nozbe/with-observables';
 import { Q } from '@nozbe/watermelondb';
-import { useDatabase } from '@shared/hooks/useDatabase';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
 import { colors, spacing, typography } from '@theme/index';
 import { EVENTO_TIPO, type EventoTipoType } from '@core/constants/eventTypes';
-import EventoModel from '@data/models/EventoModel';
+import type EventoModel from '@data/models/EventoModel';
+import { database } from '@data/database/database';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -31,55 +32,23 @@ const TIPO_META: Record<
 
 const FILTER_OPTIONS = [null, ...Object.values(EVENTO_TIPO)] as (EventoTipoType | null)[];
 
-export function EventHistoryScreen() {
-  return (
-    <ObservableErrorBoundary fallbackTitle="Error al cargar historial">
-      <EventHistoryScreenBody />
-    </ObservableErrorBoundary>
-  );
+interface EventListOuterProps {
+  filter: EventoTipoType | null;
+  onFilterChange: (f: EventoTipoType | null) => void;
 }
 
-function EventHistoryScreenBody() {
-  const database = useDatabase();
-  const [eventos, setEventos] = useState<EventoModel[]>([]);
-  const [filter, setFilter] = useState<EventoTipoType | null>(null);
-  const [error, setError] = useState<string | null>(null);
+interface EventListProps extends EventListOuterProps {
+  eventos: EventoModel[];
+}
 
-  useEffect(() => {
-    const query = filter
-      ? database
-          .get<EventoModel>('eventos')
-          .query(Q.where('tipo', filter), Q.sortBy('timestamp', Q.desc), Q.take(100))
-      : database
-          .get<EventoModel>('eventos')
-          .query(Q.sortBy('timestamp', Q.desc), Q.take(100));
-
-    const subscription = query.observe().subscribe({
-      next: (rows) => {
-        setEventos(rows);
-        setError(null);
-      },
-      error: (err: Error) => {
-        console.error('[History] query error:', err);
-        setError(err.message);
-      },
-    });
-    return () => subscription.unsubscribe();
-  }, [database, filter]);
-
+function EventListInner({ eventos, filter, onFilterChange }: EventListProps) {
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {error && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorBannerText}>⚠ {error}</Text>
-        </View>
-      )}
+    <>
       <View style={styles.header}>
         <Text style={styles.title}>Historial</Text>
         <Text style={styles.subtitle}>{eventos.length} eventos recientes</Text>
       </View>
 
-      {/* Filter chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -91,7 +60,7 @@ function EventHistoryScreenBody() {
             <TouchableOpacity
               key={tipo ?? 'all'}
               style={[styles.filterChip, filter === tipo && styles.filterChipActive]}
-              onPress={() => setFilter(tipo)}
+              onPress={() => onFilterChange(tipo)}
             >
               {meta && <Text style={styles.filterChipIcon}>{meta.icon}</Text>}
               <Text
@@ -117,12 +86,42 @@ function EventHistoryScreenBody() {
         <FlatList
           data={eventos}
           keyExtractor={(e) => e.id}
-          renderItem={({ item }) => <EventListItem evento={item} />}
+          renderItem={({ item }) => (
+            <ObservableErrorBoundary key={item.id}>
+              <EventListItem evento={item} />
+            </ObservableErrorBoundary>
+          )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
-    </SafeAreaView>
+    </>
+  );
+}
+
+const EventListWithData = withObservables(
+  ['filter'],
+  ({ filter }: EventListOuterProps) => ({
+    eventos: (filter
+      ? database
+          .get<EventoModel>('eventos')
+          .query(Q.where('tipo', filter), Q.sortBy('timestamp', Q.desc), Q.take(100))
+      : database
+          .get<EventoModel>('eventos')
+          .query(Q.sortBy('timestamp', Q.desc), Q.take(100))
+    ).observe(),
+  })
+)(EventListInner);
+
+export function EventHistoryScreen() {
+  const [filter, setFilter] = useState<EventoTipoType | null>(null);
+
+  return (
+    <ObservableErrorBoundary fallbackTitle="Error al cargar historial">
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <EventListWithData filter={filter} onFilterChange={setFilter} />
+      </SafeAreaView>
+    </ObservableErrorBoundary>
   );
 }
 
@@ -240,17 +239,5 @@ const styles = StyleSheet.create({
     color: colors.textDisabled,
     fontSize: typography.sizes.xs,
     fontVariant: ['tabular-nums'],
-  },
-  errorBanner: {
-    backgroundColor: colors.scanError,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.error,
-    padding: spacing.sm,
-  },
-  errorBannerText: {
-    color: colors.error,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    textAlign: 'center',
   },
 });

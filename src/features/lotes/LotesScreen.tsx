@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,48 +8,61 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import withObservables from '@nozbe/with-observables';
 import { useDatabase } from '@shared/hooks/useDatabase';
 import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
 import { colors, spacing, typography } from '@theme/index';
-import LoteModel from '@data/models/LoteModel';
+import type LoteModel from '@data/models/LoteModel';
+import { database } from '@data/database/database';
 import { LoteFormModal } from './LoteFormModal';
 
-export function LotesScreen() {
-  return (
-    <ObservableErrorBoundary fallbackTitle="Error al cargar lotes">
-      <LotesScreenBody />
-    </ObservableErrorBoundary>
+interface LoteListOuterProps {
+  onEdit: (lote: LoteModel) => void;
+  onDelete: (lote: LoteModel) => void;
+}
+
+interface LoteListProps extends LoteListOuterProps {
+  lotes: LoteModel[];
+}
+
+function LoteListInner({ lotes, onEdit, onDelete }: LoteListProps) {
+  return lotes.length === 0 ? (
+    <EmptyState
+      icon="🌿"
+      title="Sin lotes"
+      subtitle="Creá el primer lote para poder registrar animales"
+    />
+  ) : (
+    <FlatList
+      data={lotes}
+      keyExtractor={(l) => l.id}
+      renderItem={({ item }) => (
+        <ObservableErrorBoundary key={item.id}>
+          <LoteCard
+            lote={item}
+            onEdit={() => onEdit(item)}
+            onDelete={() => onDelete(item)}
+          />
+        </ObservableErrorBoundary>
+      )}
+      contentContainerStyle={styles.list}
+      ItemSeparatorComponent={() => <View style={styles.separator} />}
+    />
   );
 }
 
-function LotesScreenBody() {
+const LoteListWithData = withObservables([], () => ({
+  lotes: database.get<LoteModel>('lotes').query().observe(),
+}))(LoteListInner);
+
+export function LotesScreen() {
   const database = useDatabase();
   const { triggerHeavy } = useHapticFeedback();
-  const [lotes, setLotes] = useState<LoteModel[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingLote, setEditingLote] = useState<LoteModel | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const subscription = database
-      .get<LoteModel>('lotes')
-      .query()
-      .observe()
-      .subscribe({
-        next: (rows) => {
-          setLotes(rows);
-          setError(null);
-        },
-        error: (err: Error) => {
-          console.error('[Lotes] query error:', err);
-          setError(err.message);
-        },
-      });
-    return () => subscription.unsubscribe();
-  }, [database]);
 
   const handleDelete = useCallback(
     (lote: LoteModel) => {
@@ -61,9 +74,9 @@ function LotesScreenBody() {
           {
             text: 'Eliminar',
             style: 'destructive',
-            onPress: async () => {
+            onPress: () => {
               triggerHeavy();
-              await database.write(() => lote.destroyPermanently());
+              void database.write(() => lote.destroyPermanently());
             },
           },
         ]
@@ -72,60 +85,39 @@ function LotesScreenBody() {
     [database, triggerHeavy]
   );
 
+  const handleEdit = useCallback((lote: LoteModel) => {
+    setEditingLote(lote);
+    setShowModal(true);
+  }, []);
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {error && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorBannerText}>⚠ {error}</Text>
+    <ObservableErrorBoundary fallbackTitle="Error al cargar lotes">
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Lotes</Text>
+          <Button
+            label="+ Nuevo"
+            onPress={() => {
+              setEditingLote(null);
+              setShowModal(true);
+            }}
+            size="sm"
+            style={styles.newButton}
+          />
         </View>
-      )}
-      <View style={styles.header}>
-        <Text style={styles.title}>Lotes</Text>
-        <Button
-          label="+ Nuevo"
-          onPress={() => {
+
+        <LoteListWithData onEdit={handleEdit} onDelete={handleDelete} />
+
+        <LoteFormModal
+          visible={showModal}
+          lote={editingLote}
+          onClose={() => {
+            setShowModal(false);
             setEditingLote(null);
-            setShowModal(true);
           }}
-          size="sm"
-          style={styles.newButton}
         />
-      </View>
-
-      {lotes.length === 0 ? (
-        <EmptyState
-          icon="🌿"
-          title="Sin lotes"
-          subtitle="Creá el primer lote para poder registrar animales"
-        />
-      ) : (
-        <FlatList
-          data={lotes}
-          keyExtractor={(l) => l.id}
-          renderItem={({ item }) => (
-            <LoteCard
-              lote={item}
-              onEdit={() => {
-                setEditingLote(item);
-                setShowModal(true);
-              }}
-              onDelete={() => handleDelete(item)}
-            />
-          )}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-
-      <LoteFormModal
-        visible={showModal}
-        lote={editingLote}
-        onClose={() => {
-          setShowModal(false);
-          setEditingLote(null);
-        }}
-      />
-    </SafeAreaView>
+      </SafeAreaView>
+    </ObservableErrorBoundary>
   );
 }
 
@@ -221,16 +213,4 @@ const styles = StyleSheet.create({
   },
   deleteBtn: { backgroundColor: 'rgba(255,61,113,0.15)' },
   actionBtnText: { fontSize: 20 },
-  errorBanner: {
-    backgroundColor: colors.scanError,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.error,
-    padding: spacing.sm,
-  },
-  errorBannerText: {
-    color: colors.error,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    textAlign: 'center',
-  },
 });

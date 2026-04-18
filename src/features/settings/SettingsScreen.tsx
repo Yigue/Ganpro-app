@@ -14,16 +14,14 @@ import { testSyncConnection, type ConnectionTestResult } from './testConnection'
 import { colors, spacing, typography } from '@theme/index';
 
 export function SettingsScreen() {
-  const {
-    syncApiUrl,
-    hapticEnabled,
-    soundEnabled,
-    autoFocusRFID,
-    setSyncApiUrl,
-    setHapticEnabled,
-    setSoundEnabled,
-    setAutoFocusRFID,
-  } = useSettingsStore();
+  const syncApiUrl = useSettingsStore(s => s.syncApiUrl);
+  const hapticEnabled = useSettingsStore(s => s.hapticEnabled);
+  const soundEnabled = useSettingsStore(s => s.soundEnabled);
+  const autoFocusRFID = useSettingsStore(s => s.autoFocusRFID);
+  const setSyncApiUrl = useSettingsStore(s => s.setSyncApiUrl);
+  const setHapticEnabled = useSettingsStore(s => s.setHapticEnabled);
+  const setSoundEnabled = useSettingsStore(s => s.setSoundEnabled);
+  const setAutoFocusRFID = useSettingsStore(s => s.setAutoFocusRFID);
 
   const [urlDraft, setUrlDraft] = useState(syncApiUrl);
   const [testing, setTesting] = useState(false);

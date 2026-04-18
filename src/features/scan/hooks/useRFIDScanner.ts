@@ -6,7 +6,7 @@ import { useDatabase } from '@shared/hooks/useDatabase';
 import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { useSoundFeedback } from '@shared/hooks/useSoundFeedback';
 import { normalizeRfid, isValidRfid } from '@shared/utils/rfidUtils';
-import AnimalModel from '@data/models/AnimalModel';
+import type AnimalModel from '@data/models/AnimalModel';
 
 const SCAN_DEBOUNCE_MS = 300;    // Ignore duplicate scans within this window
 const FOCUS_RETRY_DELAY_MS = 100; // Blur → focus cycle delay
@@ -37,13 +37,11 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
   const eventSheetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const registrationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const {
-    setRfid,
-    setPhase,
-    openRegistrationModal,
-    openEventSheet,
-    enqueueScan,
-  } = useScanStore();
+  const setRfid = useScanStore(s => s.setRfid);
+  const setPhase = useScanStore(s => s.setPhase);
+  const openRegistrationModal = useScanStore(s => s.openRegistrationModal);
+  const openEventSheet = useScanStore(s => s.openEventSheet);
+  const enqueueScan = useScanStore(s => s.enqueueScan);
   const database = useDatabase();
   const { triggerSuccess, triggerError } = useHapticFeedback();
   const { playSuccess, playError } = useSoundFeedback();

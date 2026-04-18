@@ -5,8 +5,8 @@ module.exports = function (api) {
     plugins: [
       // WatermelonDB requires legacy decorator mode
       ['@babel/plugin-proposal-decorators', { legacy: true }],
-      // Reanimated plugin MUST be last
-      'react-native-reanimated/plugin',
+      // Reanimated 4.x: plugin moved to react-native-worklets/plugin (MUST be last)
+      'react-native-worklets/plugin',
     ],
   };
 };
