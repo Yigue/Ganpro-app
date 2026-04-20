@@ -1,5 +1,6 @@
-import { Database } from '@nozbe/watermelondb';
+import { Database, Q } from '@nozbe/watermelondb';
 import LoteModel from '../models/LoteModel';
+import AnimalModel from '../models/AnimalModel';
 
 export class LoteRepository {
   constructor(private database: Database) {}

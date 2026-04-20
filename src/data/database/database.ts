@@ -2,7 +2,22 @@ import { Database } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 import { schema } from '../schema/schema';
 import { migrations } from '../schema/migrations';
-import { AnimalModel, LoteModel, EventoModel, SyncLogModel } from '../models';
+import {
+  AnimalModel,
+  LoteModel,
+  EventoModel,
+  SyncLogModel,
+  MedicamentoModel,
+  TratamientoSanidadModel,
+  ProtocoloIATFModel,
+  EtapaProtocoloModel,
+  CondicionCorporalModel,
+  SuplementoModel,
+  RacionModel,
+  MovimientoFinancieroModel,
+  PrecioMercadoModel,
+  AgregadoFinancieroModel,
+} from '../models';
 
 const adapter = new SQLiteAdapter({
   schema,
@@ -15,5 +30,20 @@ const adapter = new SQLiteAdapter({
 
 export const database = new Database({
   adapter,
-  modelClasses: [AnimalModel, LoteModel, EventoModel, SyncLogModel],
+  modelClasses: [
+    AnimalModel,
+    LoteModel,
+    EventoModel,
+    SyncLogModel,
+    MedicamentoModel,
+    TratamientoSanidadModel,
+    ProtocoloIATFModel,
+    EtapaProtocoloModel,
+    CondicionCorporalModel,
+    SuplementoModel,
+    RacionModel,
+    MovimientoFinancieroModel,
+    PrecioMercadoModel,
+    AgregadoFinancieroModel,
+  ],
 });
