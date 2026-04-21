@@ -6,6 +6,7 @@ import { StatusBadge } from '@shared/components/StatusBadge';
 import { colors, spacing, typography } from '@theme/index';
 import AnimalModel from '@data/models/AnimalModel';
 import LoteModel from '@data/models/LoteModel';
+import { SanidadRepository } from '@data/repositories/SanidadRepository';
 import type { CategoriaType } from '@core/constants/categories';
 import { format } from 'date-fns';
 
@@ -17,6 +18,7 @@ export function AnimalCard({ rfid }: Props) {
   const database = useDatabase();
   const [animal, setAnimal] = useState<AnimalModel | null>(null);
   const [lote, setLote] = useState<LoteModel | null>(null);
+  const [enCarencia, setEnCarencia] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,6 +40,10 @@ export function AnimalCard({ rfid }: Props) {
             const l = await database.get<LoteModel>('lotes').find(a.loteId);
             if (!cancelled) setLote(l);
           }
+
+          const sanidadRepo = new SanidadRepository(database);
+          const carencia = await sanidadRepo.isAnimalEnCarencia(a.id);
+          if (!cancelled) setEnCarencia(carencia);
         }
       } catch (error) {
         console.error('[AnimalCard] Load error:', error);
@@ -66,6 +72,12 @@ export function AnimalCard({ rfid }: Props) {
 
   return (
     <View style={styles.card}>
+      {enCarencia && (
+        <View style={styles.carenciaBanner}>
+          <Text style={styles.carenciaBannerText}>⚠️ EN PERÍODO DE CARENCIA</Text>
+        </View>
+      )}
+
       <View style={styles.header}>
         <Text style={styles.rfid}>{animal.idCaravana}</Text>
         <StatusBadge
@@ -171,5 +183,20 @@ const styles = StyleSheet.create({
     color: colors.textDisabled,
     fontSize: typography.sizes.xs,
     textAlign: 'right',
+  },
+  carenciaBanner: {
+    backgroundColor: 'rgba(255,170,0,0.15)',
+    borderRadius: 10,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    alignItems: 'center',
+  },
+  carenciaBannerText: {
+    color: colors.warning,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.5,
   },
 });

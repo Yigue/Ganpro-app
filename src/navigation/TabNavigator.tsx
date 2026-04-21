@@ -4,8 +4,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { TabParamList } from './navigationTypes';
 import { ScanScreen } from '@features/scan/ScanScreen';
 import { InventoryScreen } from '@features/inventory/InventoryScreen';
-import { LotesScreen } from '@features/lotes/LotesScreen';
-import { EventHistoryScreen } from '@features/events/EventHistoryScreen';
+import { SanidadScreen } from '@features/sanidad/SanidadScreen';
+import { PotrerosScreen } from '@features/potreros/PotrerosScreen';
+import { DashboardScreen } from '@features/dashboard/DashboardScreen';
 import { SettingsScreen } from '@features/settings/SettingsScreen';
 import { colors, spacing, typography } from '@theme/index';
 
@@ -13,7 +14,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return (
-    <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>
+    <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>
   );
 }
 
@@ -53,19 +54,27 @@ export function TabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Lotes"
-        component={LotesScreen}
+        name="Sanidad"
+        component={SanidadScreen}
         options={{
-          tabBarLabel: 'Lotes',
+          tabBarLabel: 'Sanidad',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="💉" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="Potreros"
+        component={PotrerosScreen}
+        options={{
+          tabBarLabel: 'Potreros',
           tabBarIcon: ({ focused }) => <TabIcon emoji="🌿" focused={focused} />,
         }}
       />
       <Tab.Screen
-        name="History"
-        component={EventHistoryScreen}
+        name="Dashboard"
+        component={DashboardScreen}
         options={{
-          tabBarLabel: 'Historial',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📋" focused={focused} />,
+          tabBarLabel: 'Dashboard',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="📊" focused={focused} />,
         }}
       />
       <Tab.Screen
