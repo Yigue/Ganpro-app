@@ -16,6 +16,8 @@ export default class EventoModel extends Model {
   @text('notas') notas!: string;
   @field('lote_destino_id') loteDestinoId!: string | null;
   @field('timestamp') timestamp!: number;
+  // v2 fields
+  @text('dte_numero') dteNumero!: string;
   @readonly @date('created_at') createdAt!: Date;
   @date('updated_at') updatedAt!: Date;
 

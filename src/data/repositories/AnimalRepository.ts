@@ -84,4 +84,30 @@ export class AnimalRepository {
       .get<AnimalModel>('animals')
       .query(Q.where('categoria', categoria), Q.where('estado', 'ACTIVO'));
   }
+
+  async updateCategoria(animal: AnimalModel, newCategoria: string): Promise<void> {
+    await this.database.write(async () => {
+      await animal.update((a) => {
+        a.categoria = newCategoria;
+      });
+    });
+  }
+
+  async updateEstado(
+    animal: AnimalModel,
+    newEstado: string,
+    notas?: string
+  ): Promise<void> {
+    await this.database.write(async () => {
+      await this.database.get<EventoModel>('eventos').create((evento) => {
+        evento.animalId = animal.id;
+        evento.tipo = 'BAJA';
+        evento.notas = notas ?? '';
+        evento.timestamp = Date.now();
+      });
+      await animal.update((a) => {
+        a.estado = newEstado;
+      });
+    });
+  }
 }

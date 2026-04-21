@@ -12,7 +12,7 @@ const SCAN_DEBOUNCE_MS = 300;    // Ignore duplicate scans within this window
 const FOCUS_RETRY_DELAY_MS = 100; // Blur → focus cycle delay
 
 export interface UseRFIDScannerReturn {
-  inputRef: React.RefObject<TextInput>;
+  inputRef: React.RefObject<TextInput | null>;
   ensureFocus: () => void;
   onSubmitEditing: (event: { nativeEvent: { text: string } }) => void;
   onChangeText: (text: string) => void;

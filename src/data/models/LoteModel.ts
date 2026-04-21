@@ -13,6 +13,11 @@ export default class LoteModel extends Model {
   @text('nombre') nombre!: string;
   @text('ubicacion') ubicacion!: string;
   @text('descripcion') descripcion!: string;
+  // v2 fields
+  @field('hectareas') hectareas!: number | null;
+  @field('costo_alquiler_ha') costoAlquilerHa!: number | null;
+  @text('geo_json') geoJson!: string;
+  @field('densidad_carga') densidadCarga!: number | null;
   @readonly @date('created_at') createdAt!: Date;
   @date('updated_at') updatedAt!: Date;
 
