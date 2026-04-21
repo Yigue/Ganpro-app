@@ -79,6 +79,25 @@ export class SanidadRepository {
   }
 
   /**
+   * Returns the most recent active tratamiento for the animal (fechaFinCarencia > now),
+   * or null if the animal has no active quarantine period.
+   */
+  async getCarenciaActivaDetalle(
+    animalId: string
+  ): Promise<TratamientoSanidadModel | null> {
+    const results = await this.database
+      .get<TratamientoSanidadModel>('tratamientos_sanidad')
+      .query(
+        Q.where('animal_id', animalId),
+        Q.where('fecha_fin_carencia', Q.gt(Date.now())),
+        Q.sortBy('fecha_fin_carencia', Q.desc),
+        Q.take(1)
+      )
+      .fetch();
+    return results[0] ?? null;
+  }
+
+  /**
    * Returns true if the animal currently has any active quarantine period
    * (fechaFinCarencia > now).
    */

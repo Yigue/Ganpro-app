@@ -34,6 +34,14 @@ export const colors = {
   scanSuccess: 'rgba(0, 214, 143, 0.15)',
   scanError: 'rgba(255, 61, 113, 0.15)',
 
+  // Semantic alpha variants (use instead of inline rgba)
+  primaryAlpha: 'rgba(0, 214, 143, 0.12)',
+  errorAlpha:   'rgba(255, 61, 113, 0.12)',
+  warningAlpha: 'rgba(255, 170, 0, 0.12)',
+  infoAlpha:    'rgba(0, 149, 255, 0.12)',
+  purple:       '#C35BD0',
+  purpleAlpha:  'rgba(195, 91, 208, 0.12)',
+
   // Category badge colors
   category: {
     Ternero: '#FFAA00',

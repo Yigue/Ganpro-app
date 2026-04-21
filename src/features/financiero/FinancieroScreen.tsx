@@ -8,6 +8,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import withObservables from '@nozbe/with-observables';
@@ -16,6 +17,7 @@ import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
 import { Button } from '@shared/components/Button';
+import { TrendBadge } from '@shared/components/TrendBadge';
 import { colors, spacing, typography } from '@theme/index';
 import { database } from '@data/database/database';
 import { useDatabase } from '@shared/hooks/useDatabase';
@@ -46,6 +48,8 @@ interface FinancieroOuterProps {
   onFilterChange: (c: string | null) => void;
   onAdd: () => void;
   onEditPrecios: () => void;
+  refreshing: boolean;
+  onRefresh: () => void;
 }
 
 interface FinancieroProps extends FinancieroOuterProps {
@@ -53,7 +57,7 @@ interface FinancieroProps extends FinancieroOuterProps {
   ultimoPrecio: PrecioMercadoModel[];
 }
 
-function FinancieroInner({ movimientos, ultimoPrecio, filterCategoria, onFilterChange, onAdd, onEditPrecios }: FinancieroProps) {
+function FinancieroInner({ movimientos, ultimoPrecio, filterCategoria, onFilterChange, onAdd, onEditPrecios, refreshing, onRefresh }: FinancieroProps) {
   const precio = ultimoPrecio[0];
 
   const gastos = movimientos.filter((m) => m.tipo === TIPO_MOVIMIENTO.GASTO);
@@ -69,16 +73,19 @@ function FinancieroInner({ movimientos, ultimoPrecio, filterCategoria, onFilterC
         <View style={[styles.summaryCard, styles.summaryGasto]}>
           <Text style={styles.summaryAmount}>${totalGastos.toLocaleString('es-AR')}</Text>
           <Text style={styles.summaryLabel}>Gastos</Text>
+          <TrendBadge value={0} />
         </View>
         <View style={[styles.summaryCard, styles.summaryIngreso]}>
           <Text style={[styles.summaryAmount, { color: colors.primary }]}>${totalIngresos.toLocaleString('es-AR')}</Text>
           <Text style={styles.summaryLabel}>Ingresos</Text>
+          <TrendBadge value={0} />
         </View>
         <View style={[styles.summaryCard, { borderColor: balance >= 0 ? colors.primary : colors.error }]}>
           <Text style={[styles.summaryAmount, { color: balance >= 0 ? colors.primary : colors.error }]}>
             ${Math.abs(balance).toLocaleString('es-AR')}
           </Text>
           <Text style={styles.summaryLabel}>{balance >= 0 ? 'Superávit' : 'Déficit'}</Text>
+          <TrendBadge value={balance >= 0 ? 0 : 0} />
         </View>
       </View>
 
@@ -130,6 +137,14 @@ function FinancieroInner({ movimientos, ultimoPrecio, filterCategoria, onFilterC
           )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       )}
 
@@ -142,7 +157,7 @@ function FinancieroInner({ movimientos, ultimoPrecio, filterCategoria, onFilterC
 }
 
 const FinancieroWithData = withObservables(
-  ['filterCategoria'],
+  ['filterCategoria', 'refreshing', 'onRefresh'],
   ({ filterCategoria }: FinancieroOuterProps) => ({
     movimientos: (filterCategoria
       ? database
@@ -418,6 +433,13 @@ export function FinancieroScreen() {
   const [filterCategoria, setFilterCategoria] = useState<string | null>(null);
   const [showGastoModal, setShowGastoModal] = useState(false);
   const [showPrecioModal, setShowPrecioModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    // WatermelonDB observables are reactive — spinner is pure UX feedback
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
 
   return (
     <ObservableErrorBoundary fallbackTitle="Error al cargar finanzas">
@@ -431,6 +453,8 @@ export function FinancieroScreen() {
           onFilterChange={setFilterCategoria}
           onAdd={() => setShowGastoModal(true)}
           onEditPrecios={() => setShowPrecioModal(true)}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
 
         <GastoFormModal visible={showGastoModal} onClose={() => setShowGastoModal(false)} />
@@ -512,7 +536,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     gap: spacing.xs,
   },
-  filterChipActive: { borderColor: colors.primary, backgroundColor: 'rgba(0,214,143,0.12)' },
+  filterChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryAlpha },
   filterChipIcon: { fontSize: 14 },
   filterChipText: { color: colors.textSecondary, fontSize: typography.sizes.sm },
   filterChipTextActive: { color: colors.primary, fontWeight: typography.weights.bold },
@@ -591,8 +615,8 @@ const sheetStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  toggleGastoActive: { borderColor: colors.error, backgroundColor: 'rgba(255,61,113,0.12)' },
-  toggleIngresoActive: { borderColor: colors.primary, backgroundColor: 'rgba(0,214,143,0.12)' },
+  toggleGastoActive: { borderColor: colors.error, backgroundColor: colors.errorAlpha },
+  toggleIngresoActive: { borderColor: colors.primary, backgroundColor: colors.primaryAlpha },
   toggleText: { color: colors.textSecondary, fontSize: typography.sizes.md, fontWeight: typography.weights.medium },
   toggleTextActive: { fontWeight: typography.weights.bold },
   chips: { flexDirection: 'row', gap: spacing.xs },

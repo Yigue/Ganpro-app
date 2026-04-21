@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import withObservables from '@nozbe/with-observables';
@@ -31,9 +32,11 @@ type Tab = 'vademecum' | 'tratamientos' | 'iatf';
 interface VademecumProps {
   medicamentos: MedicamentoModel[];
   onAdd: () => void;
+  refreshing: boolean;
+  onRefresh: () => void;
 }
 
-function VademecumInner({ medicamentos, onAdd }: VademecumProps) {
+function VademecumInner({ medicamentos, onAdd, refreshing, onRefresh }: VademecumProps) {
   return (
     <>
       <View style={styles.tabHeader}>
@@ -53,13 +56,21 @@ function VademecumInner({ medicamentos, onAdd }: VademecumProps) {
           )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       )}
     </>
   );
 }
 
-const VademecumWithData = withObservables(['onAdd'], () => ({
+const VademecumWithData = withObservables(['onAdd', 'refreshing', 'onRefresh'], () => ({
   medicamentos: database.get<MedicamentoModel>('medicamentos').query(Q.sortBy('nombre', Q.asc)).observe(),
 }))(VademecumInner);
 
@@ -90,9 +101,11 @@ function MedicamentoCard({ med }: { med: MedicamentoModel }) {
 interface TratamientosProps {
   tratamientos: TratamientoSanidadModel[];
   onAdd: () => void;
+  refreshing: boolean;
+  onRefresh: () => void;
 }
 
-function TratamientosInner({ tratamientos, onAdd }: TratamientosProps) {
+function TratamientosInner({ tratamientos, onAdd, refreshing, onRefresh }: TratamientosProps) {
   return (
     <>
       <View style={styles.tabHeader}>
@@ -112,13 +125,21 @@ function TratamientosInner({ tratamientos, onAdd }: TratamientosProps) {
           )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       )}
     </>
   );
 }
 
-const TratamientosWithData = withObservables(['onAdd'], () => ({
+const TratamientosWithData = withObservables(['onAdd', 'refreshing', 'onRefresh'], () => ({
   tratamientos: database
     .get<TratamientoSanidadModel>('tratamientos_sanidad')
     .query(Q.sortBy('fecha_aplicacion', Q.desc), Q.take(100))
@@ -158,9 +179,11 @@ function TratamientoCard({ tratamiento }: { tratamiento: TratamientoSanidadModel
 interface ProtocolosProps {
   protocolos: ProtocoloIATFModel[];
   onAdd: () => void;
+  refreshing: boolean;
+  onRefresh: () => void;
 }
 
-function ProtocolosInner({ protocolos, onAdd }: ProtocolosProps) {
+function ProtocolosInner({ protocolos, onAdd, refreshing, onRefresh }: ProtocolosProps) {
   return (
     <>
       <View style={styles.tabHeader}>
@@ -180,13 +203,21 @@ function ProtocolosInner({ protocolos, onAdd }: ProtocolosProps) {
           )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       )}
     </>
   );
 }
 
-const ProtocolosWithData = withObservables(['onAdd'], () => ({
+const ProtocolosWithData = withObservables(['onAdd', 'refreshing', 'onRefresh'], () => ({
   protocolos: database
     .get<ProtocoloIATFModel>('protocolos_iatf')
     .query(Q.where('estado', 'ACTIVO'), Q.sortBy('fecha_inicio', Q.desc))
@@ -196,7 +227,7 @@ const ProtocolosWithData = withObservables(['onAdd'], () => ({
 function ProtocoloCard({ protocolo }: { protocolo: ProtocoloIATFModel }) {
   return (
     <View style={styles.card}>
-      <View style={[styles.protocoloDot, { backgroundColor: '#C35BD0' }]} />
+      <View style={[styles.protocoloDot, { backgroundColor: colors.purple }]} />
       <View style={styles.cardMain}>
         <Text style={styles.cardName}>{protocolo.nombre}</Text>
         <Text style={styles.cardSub}>
@@ -217,6 +248,13 @@ export function SanidadScreen() {
   const [showMedModal, setShowMedModal] = useState(false);
   const [showTratModal, setShowTratModal] = useState(false);
   const [showProtModal, setShowProtModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    // WatermelonDB observables are reactive — spinner is pure UX feedback
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
 
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'vademecum', label: 'Vademécum', icon: '💊' },
@@ -252,13 +290,13 @@ export function SanidadScreen() {
 
         <View style={styles.tabContent}>
           {activeTab === 'vademecum' && (
-            <VademecumWithData onAdd={() => setShowMedModal(true)} />
+            <VademecumWithData onAdd={() => setShowMedModal(true)} refreshing={refreshing} onRefresh={onRefresh} />
           )}
           {activeTab === 'tratamientos' && (
-            <TratamientosWithData onAdd={() => setShowTratModal(true)} />
+            <TratamientosWithData onAdd={() => setShowTratModal(true)} refreshing={refreshing} onRefresh={onRefresh} />
           )}
           {activeTab === 'iatf' && (
-            <ProtocolosWithData onAdd={() => setShowProtModal(true)} />
+            <ProtocolosWithData onAdd={() => setShowProtModal(true)} refreshing={refreshing} onRefresh={onRefresh} />
           )}
         </View>
 
@@ -365,6 +403,6 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
-  iatfBadge: { backgroundColor: 'rgba(195,91,208,0.15)' },
-  iatfBadgeText: { color: '#C35BD0' },
+  iatfBadge: { backgroundColor: colors.purpleAlpha },
+  iatfBadgeText: { color: colors.purple },
 });

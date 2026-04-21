@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   FlatList,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import withObservables from '@nozbe/with-observables';
@@ -26,6 +27,8 @@ const ALL_CATEGORIES = [null, ...Object.values(CATEGORIA)] as (CategoriaType | n
 interface InventoryListOuterProps {
   filterCategory: CategoriaType | null;
   onFilterChange: (cat: CategoriaType | null) => void;
+  refreshing: boolean;
+  onRefresh: () => void;
 }
 
 interface InventoryListProps extends InventoryListOuterProps {
@@ -38,6 +41,8 @@ function InventoryListInner({
   allAnimals,
   filterCategory,
   onFilterChange,
+  refreshing,
+  onRefresh,
 }: InventoryListProps) {
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -115,6 +120,14 @@ function InventoryListInner({
           )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       )}
     </>
@@ -139,6 +152,13 @@ const InventoryListWithData = withObservables(
 
 export function InventoryScreen() {
   const [filterCategory, setFilterCategory] = useState<CategoriaType | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    // WatermelonDB observables are reactive — spinner is pure UX feedback
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
 
   return (
     <ObservableErrorBoundary fallbackTitle="Error al cargar inventario">
@@ -146,6 +166,8 @@ export function InventoryScreen() {
         <InventoryListWithData
           filterCategory={filterCategory}
           onFilterChange={setFilterCategory}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       </SafeAreaView>
     </ObservableErrorBoundary>

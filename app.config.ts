@@ -45,5 +45,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     '@morrowdigital/watermelondb-expo-plugin',
     ['expo-av', { microphonePermission: false }],
+    [
+      'expo-notifications',
+      {
+        icon: './assets/icon.png',
+        color: '#00D68F',
+        sounds: [],
+      },
+    ],
   ],
 });

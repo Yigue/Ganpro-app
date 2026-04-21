@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
   },
   tabBtnActive: {
     borderColor: colors.primary,
-    backgroundColor: 'rgba(0,214,143,0.12)',
+    backgroundColor: colors.primaryAlpha,
   },
   tabBtnIcon: { fontSize: 16 },
   tabBtnText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: typography.weights.medium },
@@ -645,9 +645,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
   },
   badgeText: { color: colors.textSecondary, fontSize: typography.sizes.xs, fontWeight: typography.weights.medium },
-  badgeDensidad: { backgroundColor: 'rgba(0,149,255,0.12)' },
+  badgeDensidad: { backgroundColor: colors.infoAlpha },
   badgeTextDensidad: { color: colors.info },
-  badgeActive: { backgroundColor: 'rgba(0,214,143,0.12)' },
+  badgeActive: { backgroundColor: colors.primaryAlpha },
   badgeTextActive: { color: colors.primary, fontWeight: typography.weights.bold },
   cardActions: { flexDirection: 'row', gap: spacing.sm },
   actionBtn: {
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteBtn: { backgroundColor: 'rgba(255,61,113,0.15)' },
+  deleteBtn: { backgroundColor: colors.errorAlpha },
   actionBtnText: { fontSize: 20 },
   scoreCircle: {
     width: 44,
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  chipActive: { borderColor: colors.primary, backgroundColor: 'rgba(0,214,143,0.12)' },
+  chipActive: { borderColor: colors.primary, backgroundColor: colors.primaryAlpha },
   chipText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: typography.weights.medium },
   chipTextActive: { color: colors.primary, fontWeight: typography.weights.bold },
   input: {

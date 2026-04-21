@@ -14,7 +14,12 @@ import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { colors, spacing, typography } from '@theme/index';
 import { SanidadRepository } from '@data/repositories/SanidadRepository';
+import {
+  requestNotificationPermissions,
+  scheduleIATFNotification,
+} from '@shared/services/notificationsService';
 import type LoteModel from '@data/models/LoteModel';
+import type EtapaProtocoloModel from '@data/models/EtapaProtocoloModel';
 
 interface EtapaInput {
   nombre: string;
@@ -79,14 +84,55 @@ export function ProtocoloFormModal({ visible, onClose }: Props) {
     }
     setSaving(true);
     try {
+      // Request notification permissions (non-blocking — app works without them)
+      await requestNotificationPermissions().catch(() => {});
+
       const repo = new SanidadRepository(database);
-      await repo.createProtocolo({
+      const fechaInicio = Date.now();
+
+      const protocolo = await repo.createProtocolo({
         nombre: nombre.trim(),
         loteId: selectedLoteId,
-        fechaInicio: Date.now(),
+        fechaInicio,
         notas: notas.trim(),
         etapas: IATF_DEFAULT_ETAPAS,
       });
+
+      // Schedule a notification per etapa and persist the notification IDs
+      const etapas = await repo.queryEtapasByProtocolo(protocolo.id).fetch();
+
+      const notifResults = await Promise.allSettled(
+        etapas.map((etapa: EtapaProtocoloModel) => {
+          const scheduledDate = new Date(
+            fechaInicio + etapa.diasDesdeInicio * 86_400_000
+          );
+          return scheduleIATFNotification({
+            etapaId: etapa.id,
+            title: `IATF: ${etapa.nombre}`,
+            body: etapa.descripcion || etapa.nombre,
+            scheduledDate,
+          });
+        })
+      );
+
+      // Persist notification IDs on each etapa (best-effort — skip failures)
+      const updates = etapas
+        .map((etapa: EtapaProtocoloModel, i: number) => {
+          const result = notifResults[i];
+          return result?.status === 'fulfilled' ? { etapa, notifId: result.value } : null;
+        })
+        .filter(Boolean) as Array<{ etapa: EtapaProtocoloModel; notifId: string }>;
+
+      if (updates.length > 0) {
+        await database.write(async () => {
+          await Promise.all(
+            updates.map(({ etapa, notifId }) =>
+              etapa.update((e) => { e.notificacionId = notifId; })
+            )
+          );
+        });
+      }
+
       triggerSuccess();
       onClose();
     } catch (error) {
@@ -211,9 +257,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  chipActive: { borderColor: '#C35BD0', backgroundColor: 'rgba(195,91,208,0.12)' },
+  chipActive: { borderColor: colors.purple, backgroundColor: colors.purpleAlpha },
   chipText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: typography.weights.medium },
-  chipTextActive: { color: '#C35BD0', fontWeight: typography.weights.bold },
+  chipTextActive: { color: colors.purple, fontWeight: typography.weights.bold },
   sectionTitle: {
     color: colors.textPrimary,
     fontSize: typography.sizes.md,
@@ -230,7 +276,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#C35BD0',
+    backgroundColor: colors.purple,
     marginTop: 5,
   },
   etapaInfo: { flex: 1 },
