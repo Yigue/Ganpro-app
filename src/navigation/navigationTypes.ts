@@ -3,8 +3,9 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type TabParamList = {
   Scan: undefined;
   Inventory: undefined;
-  Lotes: undefined;
-  History: undefined;
+  Sanidad: undefined;
+  Potreros: undefined;
+  Dashboard: undefined;
   Settings: undefined;
 };
 

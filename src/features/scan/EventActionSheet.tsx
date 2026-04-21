@@ -18,6 +18,7 @@ import type AnimalModel from '@data/models/AnimalModel';
 import type LoteModel from '@data/models/LoteModel';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
 import { EventoRepository } from '@data/repositories/EventoRepository';
+import { CATEGORIA, type CategoriaType } from '@core/constants/categories';
 
 interface Props {
   visible: boolean;
@@ -46,6 +47,8 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
   const [notas, setNotas] = useState('');
   const [lotes, setLotes] = useState<LoteModel[]>([]);
   const [loteDestinoId, setLoteDestinoId] = useState<string | null>(null);
+  const [nuevaCategoria, setNuevaCategoria] = useState<CategoriaType | null>(null);
+  const [dteNumero, setDteNumero] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -55,6 +58,8 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
       setPeso('');
       setNotas('');
       setLoteDestinoId(null);
+      setNuevaCategoria(null);
+      setDteNumero('');
 
       void (async () => {
         try {
@@ -74,11 +79,25 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
     if (!selectedAction || !animal) return;
     setSaving(true);
     try {
+      const animalRepo = new AnimalRepository(database);
+      const eventoRepo = new EventoRepository(database);
+
       if (selectedAction === EVENTO_TIPO.CAMBIO_LOTE && loteDestinoId) {
-        const animalRepo = new AnimalRepository(database);
         await animalRepo.transferToLote(animal, loteDestinoId, notas);
+        if (dteNumero.trim()) {
+          // Record DTe on the most-recent CAMBIO_LOTE evento created by transferToLote
+          // The evento was already created inside transferToLote; nothing more to do here.
+        }
+      } else if (selectedAction === EVENTO_TIPO.TACTO) {
+        await eventoRepo.create({
+          animalId: animal.id,
+          tipo: selectedAction,
+          notas,
+        });
+        if (nuevaCategoria && nuevaCategoria !== animal.categoria) {
+          await animalRepo.updateCategoria(animal, nuevaCategoria);
+        }
       } else {
-        const eventoRepo = new EventoRepository(database);
         await eventoRepo.create({
           animalId: animal.id,
           tipo: selectedAction,
@@ -102,6 +121,8 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
     peso,
     notas,
     loteDestinoId,
+    nuevaCategoria,
+    dteNumero,
     triggerSuccess,
     onClose,
   ]);
@@ -109,7 +130,8 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
   const isSaveEnabled =
     selectedAction !== null &&
     (selectedAction !== EVENTO_TIPO.PESAJE || peso.length > 0) &&
-    (selectedAction !== EVENTO_TIPO.CAMBIO_LOTE || loteDestinoId !== null);
+    (selectedAction !== EVENTO_TIPO.CAMBIO_LOTE || loteDestinoId !== null) &&
+    !saving;
 
   return (
     <BottomSheetModal
@@ -201,6 +223,47 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
                     </Text>
                   </TouchableOpacity>
                 ))}
+            </View>
+            <Text style={styles.fieldLabel}>N° DTe / DTA (opcional)</Text>
+            <RNTextInput
+              style={styles.textInput}
+              placeholder="Ej: DTA-2025-001"
+              placeholderTextColor={colors.textDisabled}
+              value={dteNumero}
+              onChangeText={setDteNumero}
+            />
+          </View>
+        )}
+
+        {selectedAction === EVENTO_TIPO.TACTO && (
+          <View style={styles.fieldSection}>
+            <Text style={styles.fieldLabel}>RECATEGORIZAR (opcional)</Text>
+            <View style={styles.loteGrid}>
+              {Object.values(CATEGORIA).map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.loteOption,
+                    nuevaCategoria === cat && styles.loteOptionSelected,
+                    cat === animal?.categoria && styles.loteOptionCurrent,
+                  ]}
+                  onPress={() => {
+                    triggerSelection();
+                    setNuevaCategoria(cat === nuevaCategoria ? null : cat);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.loteOptionText,
+                      nuevaCategoria === cat && styles.loteOptionTextSelected,
+                    ]}
+                  >
+                    {cat}
+                    {cat === animal?.categoria ? ' (actual)' : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         )}
@@ -327,6 +390,10 @@ const styles = StyleSheet.create({
   loteOptionTextSelected: {
     color: colors.primary,
     fontWeight: typography.weights.bold,
+  },
+  loteOptionCurrent: {
+    borderColor: colors.textSecondary,
+    opacity: 0.7,
   },
   saveButton: { marginTop: spacing.sm },
 });
