@@ -10,12 +10,14 @@ import type AnimalModel from '@data/models/AnimalModel';
 
 const SCAN_DEBOUNCE_MS = 300;    // Ignore duplicate scans within this window
 const FOCUS_RETRY_DELAY_MS = 100; // Blur → focus cycle delay
+const MOCK_RFID = 'MOCK-0001-TEST';
 
 export interface UseRFIDScannerReturn {
   inputRef: React.RefObject<TextInput | null>;
   ensureFocus: () => void;
   onSubmitEditing: (event: { nativeEvent: { text: string } }) => void;
   onChangeText: (text: string) => void;
+  injectMock: (rfid?: string) => void;
 }
 
 /**
@@ -175,5 +177,20 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
     // Buffer is read directly from nativeEvent.text in onSubmitEditing
   }, []);
 
-  return { inputRef, ensureFocus, onSubmitEditing, onChangeText };
+  /**
+   * Dev/staging mock injection — simulates a physical HID scan without hardware.
+   * Calls processRfid with the provided RFID (or the hardcoded MOCK_RFID default),
+   * then synchronously re-focuses the hidden TextInput so HID capture is unbroken.
+   *
+   * The caller does NOT need to call ensureFocus after this; the hook owns focus.
+   */
+  const injectMock = useCallback(
+    (rfid: string = MOCK_RFID) => {
+      processRfid(rfid);
+      ensureFocus();
+    },
+    [processRfid, ensureFocus]
+  );
+
+  return { inputRef, ensureFocus, onSubmitEditing, onChangeText, injectMock };
 }
