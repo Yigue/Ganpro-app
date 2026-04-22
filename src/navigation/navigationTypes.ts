@@ -6,6 +6,7 @@ export type TabParamList = {
   Sanidad: undefined;
   Potreros: undefined;
   Dashboard: undefined;
+  Financiero: undefined;
   Settings: undefined;
 };
 

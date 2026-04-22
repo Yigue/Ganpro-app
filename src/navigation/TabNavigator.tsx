@@ -7,6 +7,7 @@ import { InventoryScreen } from '@features/inventory/InventoryScreen';
 import { SanidadScreen } from '@features/sanidad/SanidadScreen';
 import { PotrerosScreen } from '@features/potreros/PotrerosScreen';
 import { DashboardScreen } from '@features/dashboard/DashboardScreen';
+import { FinancieroScreen } from '@features/financiero/FinancieroScreen';
 import { SettingsScreen } from '@features/settings/SettingsScreen';
 import { colors, spacing, typography } from '@theme/index';
 
@@ -75,6 +76,14 @@ export function TabNavigator() {
         options={{
           tabBarLabel: 'Dashboard',
           tabBarIcon: ({ focused }) => <TabIcon emoji="📊" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="Financiero"
+        component={FinancieroScreen}
+        options={{
+          tabBarLabel: 'Finanzas',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="💰" focused={focused} />,
         }}
       />
       <Tab.Screen
