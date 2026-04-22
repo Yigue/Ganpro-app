@@ -7,8 +7,6 @@ import {
   LoteModel,
   EventoModel,
   SyncLogModel,
-  MedicamentoModel,
-  TratamientoSanidadModel,
   ProtocoloIATFModel,
   EtapaProtocoloModel,
   CondicionCorporalModel,
@@ -18,6 +16,13 @@ import {
   PrecioMercadoModel,
   AgregadoFinancieroModel,
 } from '../models';
+import { OperationCatalogModel } from '../models/OperationCatalogModel';
+import { OperationLogModel } from '../models/OperationLogModel';
+import { ScheduledOperationModel } from '../models/ScheduledOperationModel';
+import { AnimalMovementModel } from '../models/AnimalMovementModel';
+import { MangaActionQueueModel } from '../models/MangaActionQueueModel';
+import PotreroModel from '../models/PotreroModel';
+import { PotreroFeedingLogModel } from '../models/PotreroFeedingLogModel';
 
 const adapter = new SQLiteAdapter({
   schema,
@@ -35,8 +40,6 @@ export const database = new Database({
     LoteModel,
     EventoModel,
     SyncLogModel,
-    MedicamentoModel,
-    TratamientoSanidadModel,
     ProtocoloIATFModel,
     EtapaProtocoloModel,
     CondicionCorporalModel,
@@ -45,5 +48,14 @@ export const database = new Database({
     MovimientoFinancieroModel,
     PrecioMercadoModel,
     AgregadoFinancieroModel,
+    // V3 models
+    OperationCatalogModel,
+    OperationLogModel,
+    ScheduledOperationModel,
+    AnimalMovementModel,
+    MangaActionQueueModel,
+    PotreroModel,
+    PotreroFeedingLogModel,
   ],
 });
+

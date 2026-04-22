@@ -17,7 +17,7 @@ import { EVENTO_TIPO, type EventoTipoType } from '@core/constants/eventTypes';
 import { calcularDensidadCarga } from '@core/utils/gisEngine';
 import type AnimalModel from '@data/models/AnimalModel';
 import type LoteModel from '@data/models/LoteModel';
-import type TratamientoSanidadModel from '@data/models/TratamientoSanidadModel';
+import { OperationLogModel } from '@data/models/OperationLogModel';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
 import { EventoRepository } from '@data/repositories/EventoRepository';
 import { SanidadRepository } from '@data/repositories/SanidadRepository';
@@ -61,7 +61,7 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
   const [saving, setSaving] = useState(false);
 
   // Carencia state
-  const [carenciaDetalle, setCarenciaDetalle] = useState<TratamientoSanidadModel | null>(null);
+  const [carenciaDetalle, setCarenciaDetalle] = useState<OperationLogModel | null>(null);
   const enCarencia = carenciaDetalle != null;
 
   useEffect(() => {

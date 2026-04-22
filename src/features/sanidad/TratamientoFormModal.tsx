@@ -15,7 +15,7 @@ import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { colors, spacing, typography } from '@theme/index';
 import { SanidadRepository } from '@data/repositories/SanidadRepository';
-import type MedicamentoModel from '@data/models/MedicamentoModel';
+import { OperationCatalogModel } from '@data/models/OperationCatalogModel';
 import type AnimalModel from '@data/models/AnimalModel';
 
 interface Props {
@@ -32,9 +32,9 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
 
   const [rfid, setRfid] = useState('');
   const [animal, setAnimal] = useState<AnimalModel | null>(null);
-  const [medicamentos, setMedicamentos] = useState<MedicamentoModel[]>([]);
-  const [selectedMedId, setSelectedMedId] = useState<string | null>(null);
-  const [dosisAplicada, setDosisAplicada] = useState('');
+  const [operations, setOperations] = useState<OperationCatalogModel[]>([]);
+  const [selectedOpId, setSelectedOpId] = useState<string | null>(null);
+  const [dosis, setDosis] = useState('');
   const [responsable, setResponsable] = useState('');
   const [notas, setNotas] = useState('');
   const [saving, setSaving] = useState(false);
@@ -44,18 +44,18 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
       bottomSheetRef.current?.present();
       setRfid('');
       setAnimal(null);
-      setSelectedMedId(null);
-      setDosisAplicada('');
+      setSelectedOpId(null);
+      setDosis('');
       setResponsable('');
       setNotas('');
 
       void (async () => {
         try {
           const repo = new SanidadRepository(database);
-          const meds = await repo.queryMedicamentos().fetch();
-          setMedicamentos(meds);
+          const ops = await repo.queryOperations().fetch();
+          setOperations(ops);
         } catch (e) {
-          console.error('[TratamientoForm] load meds error:', e);
+          console.error('[TratamientoForm] load ops error:', e);
         }
       })();
     } else {
@@ -86,21 +86,20 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
       Alert.alert('Error', 'Buscá un animal primero');
       return;
     }
-    if (!selectedMedId) {
-      Alert.alert('Error', 'Seleccioná un medicamento');
+    if (!selectedOpId) {
+      Alert.alert('Error', 'Seleccioná una operación');
       return;
     }
     setSaving(true);
     try {
       const repo = new SanidadRepository(database);
-      await repo.createTratamiento({
+      await repo.createOperationLog({
         animalId: animal.id,
-        medicamentoId: selectedMedId,
+        operationId: selectedOpId,
         loteId: animal.loteId ?? undefined,
         fechaAplicacion: Date.now(),
-        dosisAplicada: dosisAplicada ? parseFloat(dosisAplicada) : undefined,
+        dosis: dosis.trim(),
         responsable: responsable.trim(),
-        notas: notas.trim(),
       });
       triggerSuccess();
       onClose();
@@ -110,9 +109,9 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [animal, selectedMedId, dosisAplicada, responsable, notas, database, triggerSuccess, onClose]);
+  }, [animal, selectedOpId, dosis, responsable, notas, database, triggerSuccess, onClose]);
 
-  const selectedMed = medicamentos.find((m) => m.id === selectedMedId);
+  const selectedOp = operations.find((o) => o.id === selectedOpId);
 
   return (
     <BottomSheetModal
@@ -151,23 +150,23 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
           </View>
         )}
 
-        <Text style={styles.fieldLabel}>MEDICAMENTO</Text>
-        {medicamentos.length === 0 ? (
-          <Text style={styles.noMeds}>Sin medicamentos. Agregá desde el Vademécum.</Text>
+        <Text style={styles.fieldLabel}>OPERACIÓN / MEDICAMENTO</Text>
+        {operations.length === 0 ? (
+          <Text style={styles.noMeds}>Sin operaciones en catálogo. Agregá desde Sanidad.</Text>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
             <View style={styles.chips}>
-              {medicamentos.map((m) => (
+              {operations.map((op) => (
                 <TouchableOpacity
-                  key={m.id}
-                  style={[styles.chip, selectedMedId === m.id && styles.chipActive]}
-                  onPress={() => setSelectedMedId(m.id)}
+                  key={op.id}
+                  style={[styles.chip, selectedOpId === op.id && styles.chipActive]}
+                  onPress={() => setSelectedOpId(op.id)}
                 >
-                  <Text style={[styles.chipText, selectedMedId === m.id && styles.chipTextActive]}>
-                    {m.nombre}
+                  <Text style={[styles.chipText, selectedOpId === op.id && styles.chipTextActive]}>
+                    {op.nombre}
                   </Text>
-                  {m.diasCarencia > 0 && (
-                    <Text style={styles.chipSub}>{m.diasCarencia}d carencia</Text>
+                  {op.diasCarencia > 0 && (
+                    <Text style={styles.chipSub}>{op.diasCarencia}d carencia</Text>
                   )}
                 </TouchableOpacity>
               ))}
@@ -175,27 +174,21 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
           </ScrollView>
         )}
 
-        {selectedMed && (
+        {selectedOp && (
           <View style={styles.medInfo}>
             <Text style={styles.medInfoText}>
-              Carencia: {selectedMed.diasCarencia} días · Vía: {selectedMed.viaAdministracion}
+              Carencia: {selectedOp.diasCarencia} días
             </Text>
-            {selectedMed.dosisDefault && (
-              <Text style={styles.medInfoText}>
-                Dosis sugerida: {selectedMed.dosisDefault} {selectedMed.unidadDosis}
-              </Text>
-            )}
           </View>
         )}
 
         <Text style={styles.fieldLabel}>DOSIS APLICADA</Text>
         <TextInput
           style={styles.input}
-          placeholder={selectedMed?.dosisDefault ? String(selectedMed.dosisDefault) : 'ml / comprimidos'}
+          placeholder="Ej: 5ml"
           placeholderTextColor={colors.textDisabled}
-          keyboardType="numeric"
-          value={dosisAplicada}
-          onChangeText={setDosisAplicada}
+          value={dosis}
+          onChangeText={setDosis}
         />
 
         <Text style={styles.fieldLabel}>RESPONSABLE</Text>
@@ -222,7 +215,7 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
           label="REGISTRAR TRATAMIENTO"
           onPress={handleSave}
           size="lg"
-          disabled={!animal || !selectedMedId}
+          disabled={!animal || !selectedOpId}
           loading={saving}
           style={styles.saveButton}
         />

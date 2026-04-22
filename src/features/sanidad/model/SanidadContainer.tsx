@@ -1,5 +1,7 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, SectionList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
+import type { SectionListData } from 'react-native';
+import { Model } from '@nozbe/watermelondb';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import withObservables from '@nozbe/with-observables';
 import { Q } from '@nozbe/watermelondb';
@@ -76,13 +78,13 @@ function SanidadView({
     });
   }, [scheduledOps, selectedDate]);
 
-  const sections = useMemo(() => {
-    const result = [];
+  const sections = useMemo((): ReadonlyArray<SectionListData<Model, { title: string; type: 'scheduled' | 'log' }>> => {
+    const result: Array<SectionListData<Model, { title: string; type: 'scheduled' | 'log' }>> = [];
     if (filteredScheduled.length > 0) {
-      result.push({ title: 'Programadas', data: filteredScheduled, type: 'scheduled' as const });
+      result.push({ title: 'Programadas', data: filteredScheduled as Model[], type: 'scheduled' as const });
     }
     if (filteredLogs.length > 0) {
-      result.push({ title: 'Historial', data: filteredLogs, type: 'log' as const });
+      result.push({ title: 'Historial', data: filteredLogs as Model[], type: 'log' as const });
     }
     return result;
   }, [filteredScheduled, filteredLogs]);

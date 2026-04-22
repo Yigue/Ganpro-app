@@ -14,7 +14,14 @@ import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { colors, spacing, typography } from '@theme/index';
 import { SanidadRepository } from '@data/repositories/SanidadRepository';
-import { VIA_ADMINISTRACION } from '@core/constants/sanidad';
+// VIA_ADMINISTRACION kept for UI chip display; backend stores it in notas field
+const VIA_ADMINISTRACION: Record<string, string> = {
+  IM: 'Intramuscular',
+  IV: 'Intravenosa',
+  SC: 'Subcutánea',
+  VO: 'Vía Oral',
+  TOP: 'Tópica',
+};
 
 interface Props {
   visible: boolean;
@@ -62,14 +69,13 @@ export function MedicamentoFormModal({ visible, onClose }: Props) {
     setSaving(true);
     try {
       const repo = new SanidadRepository(database);
-      await repo.createMedicamento({
+      // V3: Medicamentos → OperationCatalog (tipo = 'SANIDAD')
+      await repo.createOperation({
         nombre: nombre.trim(),
-        principioActivo: principioActivo.trim(),
+        tipo: 'SANIDAD',
         diasCarencia: parseInt(diasCarencia, 10) || 0,
-        viaAdministracion: viaAdmin,
-        dosisDefault: dosisDefault ? parseFloat(dosisDefault) : undefined,
-        unidadDosis: unidadDosis.trim(),
         costoUnitario: costoUnitario ? parseFloat(costoUnitario) : undefined,
+        notas: `via:${viaAdmin} dosis:${dosisDefault || '?'}${unidadDosis} pa:${principioActivo.trim()}`,
       });
       triggerSuccess();
       onClose();
@@ -92,7 +98,7 @@ export function MedicamentoFormModal({ visible, onClose }: Props) {
       enablePanDownToClose
     >
       <BottomSheetScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Nuevo Medicamento</Text>
+        <Text style={styles.title}>Nueva Operación Sanidad</Text>
 
         <Text style={styles.fieldLabel}>NOMBRE *</Text>
         <TextInput
