@@ -25,7 +25,12 @@ export const schema = appSchema({
       name: 'lotes',
       columns: [
         { name: 'nombre', type: 'string' },
+        { name: 'ubicacion', type: 'string', isOptional: true },
         { name: 'descripcion', type: 'string', isOptional: true },
+        { name: 'hectareas', type: 'number', isOptional: true },
+        { name: 'costo_alquiler_ha', type: 'number', isOptional: true },
+        { name: 'geo_json', type: 'string', isOptional: true },
+        { name: 'densidad_carga', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
@@ -69,6 +74,7 @@ export const schema = appSchema({
         { name: 'valor', type: 'number', isOptional: true },  // kg for PESAJE
         { name: 'notas', type: 'string', isOptional: true },
         { name: 'timestamp', type: 'number' }, // Unix ms of event
+        { name: 'lote_destino_id', type: 'string', isOptional: true },
         { name: 'dte_numero', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
