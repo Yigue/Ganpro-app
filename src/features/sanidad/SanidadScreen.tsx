@@ -1,285 +1,201 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import withObservables from '@nozbe/with-observables';
 import { Q } from '@nozbe/watermelondb';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
-import { Button } from '@shared/components/Button';
 import { colors, spacing, typography } from '@theme/index';
 import { database } from '@data/database/database';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type MedicamentoModel from '@data/models/MedicamentoModel';
-import type TratamientoSanidadModel from '@data/models/TratamientoSanidadModel';
-import type ProtocoloIATFModel from '@data/models/ProtocoloIATFModel';
-import { MedicamentoFormModal } from './MedicamentoFormModal';
-import { TratamientoFormModal } from './TratamientoFormModal';
-import { ProtocoloFormModal } from './ProtocoloFormModal';
+import ScheduledOperationModel from '@data/models/ScheduledOperationModel';
+import OperationCatalogModel from '@data/models/OperationCatalogModel';
+import LoteModel from '@data/models/LoteModel';
 
-type Tab = 'vademecum' | 'tratamientos' | 'iatf';
+type TabType = 'calendario' | 'vademecum';
 
-// ── Vademécum ────────────────────────────────────────────────────────────────
+// ── Componentes UI ────────────────────────────────────────────────────────────
 
-interface VademecumProps {
-  medicamentos: MedicamentoModel[];
-  onAdd: () => void;
-}
+const SegmentedControl = ({ active, onChange }: { active: TabType, onChange: (v: TabType) => void }) => (
+  <View style={styles.segmentContainer}>
+    <TouchableOpacity 
+      style={[styles.segmentBtn, active === 'calendario' && styles.segmentBtnActive]}
+      onPress={() => onChange('calendario')}
+      activeOpacity={0.8}
+    >
+      <Ionicons name="calendar-outline" size={18} color={active === 'calendario' ? colors.background : colors.textSecondary} />
+      <Text style={[styles.segmentText, active === 'calendario' && styles.segmentTextActive]}>Calendario</Text>
+    </TouchableOpacity>
+    <TouchableOpacity 
+      style={[styles.segmentBtn, active === 'vademecum' && styles.segmentBtnActive]}
+      onPress={() => onChange('vademecum')}
+      activeOpacity={0.8}
+    >
+      <Ionicons name="flask-outline" size={18} color={active === 'vademecum' ? colors.background : colors.textSecondary} />
+      <Text style={[styles.segmentText, active === 'vademecum' && styles.segmentTextActive]}>Vademécum</Text>
+    </TouchableOpacity>
+  </View>
+);
 
-function VademecumInner({ medicamentos, onAdd }: VademecumProps) {
+// ── Calendario (Eventos Sanitarios) ──────────────────────────────────────────
+
+const ScheduledItemInner = ({ scheduled, operation, lote, onPress }: any) => {
+  const isPending = scheduled.estado === 'PENDIENTE';
+  const dateStr = format(new Date(scheduled.fechaProgramada), "EEEE d 'de' MMMM", { locale: es });
+  
   return (
-    <>
-      <View style={styles.tabHeader}>
-        <Text style={styles.tabSubtitle}>{medicamentos.length} medicamentos</Text>
-        <Button label="+ Agregar" onPress={onAdd} size="sm" />
-      </View>
-      {medicamentos.length === 0 ? (
-        <EmptyState icon="💊" title="Vademécum vacío" subtitle="Agregá medicamentos para registrar tratamientos" />
-      ) : (
-        <FlatList
-          data={medicamentos}
-          keyExtractor={(m) => m.id}
-          renderItem={({ item }) => (
-            <ObservableErrorBoundary key={item.id}>
-              <MedicamentoCard med={item} />
-            </ObservableErrorBoundary>
-          )}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-    </>
-  );
-}
-
-const VademecumWithData = withObservables(['onAdd'], () => ({
-  medicamentos: database.get<MedicamentoModel>('medicamentos').query(Q.sortBy('nombre', Q.asc)).observe(),
-}))(VademecumInner);
-
-function MedicamentoCard({ med }: { med: MedicamentoModel }) {
-  return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={() => onPress(scheduled, operation, lote)} activeOpacity={0.7}>
       <View style={styles.cardMain}>
-        <Text style={styles.cardName}>{med.nombre}</Text>
-        {med.principioActivo ? (
-          <Text style={styles.cardSub}>{med.principioActivo}</Text>
-        ) : null}
-      </View>
-      {med.diasCarencia > 0 ? (
-        <View style={styles.carenciaBadge}>
-          <Text style={styles.carenciaBadgeText}>{med.diasCarencia}d</Text>
+        <Text style={styles.dateText}>{dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}</Text>
+        <Text style={styles.cardTitle}>{operation?.nombre || 'Cargando Operación...'}</Text>
+        
+        <View style={styles.badgeRow}>
+          <View style={styles.loteBadge}>
+            <Ionicons name="layers-outline" size={12} color={colors.textSecondary} />
+            <Text style={styles.loteText}>{lote?.nombre || 'Cargando Lote...'}</Text>
+          </View>
+          <View style={[styles.statusBadge, !isPending && styles.statusBadgeSafe]}>
+            <Text style={[styles.statusText, !isPending && styles.statusTextSafe]}>{scheduled.estado}</Text>
+          </View>
         </View>
-      ) : (
-        <View style={[styles.carenciaBadge, styles.carenciaBadgeSafe]}>
-          <Text style={[styles.carenciaBadgeText, styles.carenciaBadgeTextSafe]}>Sin carencia</Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
-// ── Tratamientos ─────────────────────────────────────────────────────────────
-
-interface TratamientosProps {
-  tratamientos: TratamientoSanidadModel[];
-  onAdd: () => void;
-}
-
-function TratamientosInner({ tratamientos, onAdd }: TratamientosProps) {
-  return (
-    <>
-      <View style={styles.tabHeader}>
-        <Text style={styles.tabSubtitle}>{tratamientos.length} recientes</Text>
-        <Button label="+ Registrar" onPress={onAdd} size="sm" />
       </View>
-      {tratamientos.length === 0 ? (
-        <EmptyState icon="💉" title="Sin tratamientos" subtitle="Registrá aplicaciones de medicamentos aquí" />
-      ) : (
-        <FlatList
-          data={tratamientos}
-          keyExtractor={(t) => t.id}
-          renderItem={({ item }) => (
-            <ObservableErrorBoundary key={item.id}>
-              <TratamientoCard tratamiento={item} />
-            </ObservableErrorBoundary>
-          )}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-    </>
+      <Ionicons name="chevron-forward" size={20} color={colors.textDisabled} />
+    </TouchableOpacity>
   );
-}
+};
 
-const TratamientosWithData = withObservables(['onAdd'], () => ({
-  tratamientos: database
-    .get<TratamientoSanidadModel>('tratamientos_sanidad')
-    .query(Q.sortBy('fecha_aplicacion', Q.desc), Q.take(100))
-    .observe(),
-}))(TratamientosInner);
+const ScheduledItem = withObservables(['scheduled'], ({ scheduled }: { scheduled: ScheduledOperationModel }) => ({
+  scheduled: scheduled.observe(),
+  operation: scheduled.operation.observe(),
+  lote: scheduled.lote.observe(),
+}))(ScheduledItemInner);
 
-function TratamientoCard({ tratamiento }: { tratamiento: TratamientoSanidadModel }) {
-  const enCarencia = tratamiento.fechaFinCarencia > Date.now();
-  const diasRestantes = enCarencia
-    ? Math.ceil((tratamiento.fechaFinCarencia - Date.now()) / 86_400_000)
-    : 0;
+const CalendarioListInner = ({ schedules, onAdd, onSelect }: any) => (
+  <View style={styles.flex}>
+    {schedules.length === 0 ? (
+      <EmptyState icon="📅" title="Sin programación" subtitle="No hay eventos sanitarios agendados" />
+    ) : (
+      <FlatList
+        data={schedules}
+        keyExtractor={s => s.id}
+        renderItem={({ item }) => <ScheduledItem scheduled={item} onPress={onSelect} />}
+        contentContainerStyle={styles.list}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+      />
+    )}
+    <TouchableOpacity style={styles.fab} onPress={onAdd}>
+      <Ionicons name="add" size={28} color="white" />
+    </TouchableOpacity>
+  </View>
+);
 
+const CalendarioList = withObservables([], () => ({
+  schedules: database.get<ScheduledOperationModel>('scheduled_operations').query(Q.sortBy('fecha_programada', Q.asc)).observe(),
+}))(CalendarioListInner);
+
+// ── Vademécum (Gestión de Tratamientos) ──────────────────────────────────────
+
+const VademecumItem = ({ item, onPress }: { item: OperationCatalogModel, onPress: (o: OperationCatalogModel) => void }) => {
+  const isVacuna = item.tipo === 'VACUNA';
+  
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={() => onPress(item)} activeOpacity={0.7}>
+      <View style={styles.cardIcon}>
+        <Ionicons name={isVacuna ? "medical" : "flask"} size={22} color={colors.primary} />
+      </View>
       <View style={styles.cardMain}>
-        <Text style={styles.cardName}>Animal: {tratamiento.animalId.slice(0, 8)}…</Text>
-        <Text style={styles.cardSub}>
-          {format(new Date(tratamiento.fechaAplicacion), 'dd/MM/yyyy', { locale: es })}
-          {tratamiento.responsable ? ` · ${tratamiento.responsable}` : ''}
+        <Text style={styles.cardTitle}>{item.nombre}</Text>
+        <Text style={styles.cardSubtitle}>
+          {item.tipo} · {item.diasCarencia > 0 ? `${item.diasCarencia} días de carencia` : 'Sin carencia'}
         </Text>
       </View>
-      {enCarencia ? (
-        <View style={styles.carenciaBadge}>
-          <Text style={styles.carenciaBadgeText}>{diasRestantes}d</Text>
-        </View>
-      ) : (
-        <View style={[styles.carenciaBadge, styles.carenciaBadgeSafe]}>
-          <Text style={[styles.carenciaBadgeText, styles.carenciaBadgeTextSafe]}>Libre</Text>
-        </View>
-      )}
-    </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.textDisabled} />
+    </TouchableOpacity>
   );
-}
+};
 
-// ── Protocolos IATF ──────────────────────────────────────────────────────────
+const VademecumListInner = ({ operations, onAdd, onSelect }: any) => (
+  <View style={styles.flex}>
+    {operations.length === 0 ? (
+      <EmptyState icon="💊" title="Catálogo vacío" subtitle="Agregá tratamientos o protocolos" />
+    ) : (
+      <FlatList
+        data={operations}
+        keyExtractor={o => o.id}
+        renderItem={({ item }) => <VademecumItem item={item} onPress={onSelect} />}
+        contentContainerStyle={styles.list}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+      />
+    )}
+    <TouchableOpacity style={styles.fab} onPress={onAdd}>
+      <Ionicons name="add" size={28} color="white" />
+    </TouchableOpacity>
+  </View>
+);
 
-interface ProtocolosProps {
-  protocolos: ProtocoloIATFModel[];
-  onAdd: () => void;
-}
+const VademecumList = withObservables([], () => ({
+  operations: database.get<OperationCatalogModel>('operations_catalog').query(Q.sortBy('nombre', Q.asc)).observe(),
+}))(VademecumListInner);
 
-function ProtocolosInner({ protocolos, onAdd }: ProtocolosProps) {
-  return (
-    <>
-      <View style={styles.tabHeader}>
-        <Text style={styles.tabSubtitle}>{protocolos.length} activos</Text>
-        <Button label="+ Nuevo" onPress={onAdd} size="sm" />
-      </View>
-      {protocolos.length === 0 ? (
-        <EmptyState icon="🔬" title="Sin protocolos" subtitle="Iniciá un protocolo IATF para el lote" />
-      ) : (
-        <FlatList
-          data={protocolos}
-          keyExtractor={(p) => p.id}
-          renderItem={({ item }) => (
-            <ObservableErrorBoundary key={item.id}>
-              <ProtocoloCard protocolo={item} />
-            </ObservableErrorBoundary>
-          )}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-    </>
-  );
-}
-
-const ProtocolosWithData = withObservables(['onAdd'], () => ({
-  protocolos: database
-    .get<ProtocoloIATFModel>('protocolos_iatf')
-    .query(Q.where('estado', 'ACTIVO'), Q.sortBy('fecha_inicio', Q.desc))
-    .observe(),
-}))(ProtocolosInner);
-
-function ProtocoloCard({ protocolo }: { protocolo: ProtocoloIATFModel }) {
-  return (
-    <View style={styles.card}>
-      <View style={[styles.protocoloDot, { backgroundColor: '#C35BD0' }]} />
-      <View style={styles.cardMain}>
-        <Text style={styles.cardName}>{protocolo.nombre}</Text>
-        <Text style={styles.cardSub}>
-          Inicio: {format(new Date(protocolo.fechaInicio), 'dd/MM/yyyy', { locale: es })}
-        </Text>
-      </View>
-      <View style={[styles.carenciaBadge, styles.iatfBadge]}>
-        <Text style={[styles.carenciaBadgeText, styles.iatfBadgeText]}>ACTIVO</Text>
-      </View>
-    </View>
-  );
-}
-
-// ── Main Screen ──────────────────────────────────────────────────────────────
+// ── Pantalla Principal ───────────────────────────────────────────────────────
 
 export function SanidadScreen() {
-  const [activeTab, setActiveTab] = useState<Tab>('vademecum');
-  const [showMedModal, setShowMedModal] = useState(false);
-  const [showTratModal, setShowTratModal] = useState(false);
-  const [showProtModal, setShowProtModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('calendario');
 
-  const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: 'vademecum', label: 'Vademécum', icon: '💊' },
-    { key: 'tratamientos', label: 'Tratamientos', icon: '💉' },
-    { key: 'iatf', label: 'IATF', icon: '🔬' },
-  ];
+  const handleAddCalendario = () => {
+    Alert.alert('Nuevo Evento', 'Acá se abrirá el modal para programar un tratamiento a un lote.');
+  };
+
+  const handleAddVademecum = () => {
+    Alert.alert('Nuevo Tratamiento', 'Acá se abrirá el formulario para crear un medicamento o protocolo.');
+  };
+
+  const handleSelectSchedule = (scheduled: any, op: any, lote: any) => {
+    Alert.alert(
+      'Detalle Programación',
+      `Operación: ${op?.nombre}\nLote: ${lote?.nombre}\nEstado: ${scheduled.estado}\n\n[Próximamente CRUD contextual]`
+    );
+  };
+
+  const handleSelectOperation = (op: any) => {
+    Alert.alert(
+      'Detalle Tratamiento',
+      `Nombre: ${op.nombre}\nTipo: ${op.tipo}\nCarencia: ${op.diasCarencia} días\n\n[Próximamente edición e historial]`
+    );
+  };
 
   return (
     <ObservableErrorBoundary fallbackTitle="Error al cargar sanidad">
       <SafeAreaView style={styles.container} edges={['top']}>
+        
+        {/* Header Fijo */}
         <View style={styles.header}>
           <Text style={styles.title}>Sanidad</Text>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabBar}
-        >
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.key}
-              style={[styles.tabBtn, activeTab === tab.key && styles.tabBtnActive]}
-              onPress={() => setActiveTab(tab.key)}
-            >
-              <Text style={styles.tabBtnIcon}>{tab.icon}</Text>
-              <Text style={[styles.tabBtnText, activeTab === tab.key && styles.tabBtnTextActive]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* Navegación (Tabs) */}
+        <SegmentedControl active={activeTab} onChange={setActiveTab} />
 
-        <View style={styles.tabContent}>
-          {activeTab === 'vademecum' && (
-            <VademecumWithData onAdd={() => setShowMedModal(true)} />
-          )}
-          {activeTab === 'tratamientos' && (
-            <TratamientosWithData onAdd={() => setShowTratModal(true)} />
-          )}
-          {activeTab === 'iatf' && (
-            <ProtocolosWithData onAdd={() => setShowProtModal(true)} />
+        {/* Contenido (MVP) */}
+        <View style={styles.flex}>
+          {activeTab === 'calendario' ? (
+            <CalendarioList onAdd={handleAddCalendario} onSelect={handleSelectSchedule} />
+          ) : (
+            <VademecumList onAdd={handleAddVademecum} onSelect={handleSelectOperation} />
           )}
         </View>
 
-        <MedicamentoFormModal
-          visible={showMedModal}
-          onClose={() => setShowMedModal(false)}
-        />
-        <TratamientoFormModal
-          visible={showTratModal}
-          onClose={() => setShowTratModal(false)}
-        />
-        <ProtocoloFormModal
-          visible={showProtModal}
-          onClose={() => setShowProtModal(false)}
-        />
       </SafeAreaView>
     </ObservableErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   header: {
     paddingHorizontal: spacing.md,
@@ -291,80 +207,130 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold,
   },
-  tabBar: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  tabBtn: {
+  segmentContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 20,
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: 12,
+    padding: 4,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
-    gap: spacing.xs,
   },
-  tabBtnActive: {
-    borderColor: colors.warning,
-    backgroundColor: 'rgba(255,170,0,0.12)',
-  },
-  tabBtnIcon: { fontSize: 16 },
-  tabBtnText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: typography.weights.medium },
-  tabBtnTextActive: { color: colors.warning, fontWeight: typography.weights.bold },
-  tabContent: { flex: 1 },
-  tabHeader: {
+  segmentBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
     paddingVertical: spacing.sm,
+    borderRadius: 8,
+    gap: spacing.xs,
   },
-  tabSubtitle: { color: colors.textSecondary, fontSize: typography.sizes.sm },
-  list: { paddingBottom: spacing.xxl },
-  separator: { height: 1, backgroundColor: colors.border },
+  segmentBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  segmentText: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+  },
+  segmentTextActive: {
+    color: colors.background,
+  },
+  list: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: 100,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-    minHeight: spacing.touchTarget,
+    padding: spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  cardMain: { flex: 1 },
-  cardName: {
-    color: colors.textPrimary,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semibold,
-  },
-  cardSub: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.sm,
-    marginTop: 2,
-  },
-  carenciaBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,61,113,0.15)',
-    minWidth: 60,
+  cardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0,214,143,0.12)',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
   },
-  carenciaBadgeSafe: { backgroundColor: 'rgba(0,214,143,0.12)' },
-  carenciaBadgeText: {
-    color: colors.error,
-    fontSize: typography.sizes.xs,
+  cardMain: {
+    flex: 1,
+  },
+  dateText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  cardTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
     fontWeight: typography.weights.bold,
   },
-  carenciaBadgeTextSafe: { color: colors.primary },
-  protocoloDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  cardSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: 4,
   },
-  iatfBadge: { backgroundColor: 'rgba(195,91,208,0.15)' },
-  iatfBadgeText: { color: '#C35BD0' },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: spacing.sm,
+  },
+  loteBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
+  },
+  loteText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: typography.weights.medium,
+  },
+  statusBadge: {
+    backgroundColor: 'rgba(255,170,0,0.15)', // Pending/Warning style
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusBadgeSafe: {
+    backgroundColor: 'rgba(0,214,143,0.15)', // Completed/Success style
+  },
+  statusText: {
+    color: colors.warning,
+    fontSize: 11,
+    fontWeight: typography.weights.bold,
+  },
+  statusTextSafe: {
+    color: colors.primary,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
 });
