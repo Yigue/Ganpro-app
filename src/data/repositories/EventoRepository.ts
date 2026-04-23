@@ -18,7 +18,12 @@ export class EventoRepository {
         evento.tipo = params.tipo;
         evento.valor = params.valor ?? null;
         evento.notas = params.notas ?? '';
-        evento.loteDestinoId = params.loteDestinoId ?? null;
+        
+        // Solo intentamos asignar si el objeto tiene la propiedad (evita crash por esquema viejo)
+        if ('loteDestinoId' in evento) {
+          evento.loteDestinoId = params.loteDestinoId ?? null;
+        }
+        
         evento.timestamp = params.timestamp ?? Date.now();
       });
     });
