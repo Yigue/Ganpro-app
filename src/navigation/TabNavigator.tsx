@@ -107,7 +107,7 @@ const tabStyles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingTop: spacing.xs,
     alignItems: 'flex-end',
-    height: 65,
+    height: 75,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -164,7 +164,7 @@ const tabStyles = StyleSheet.create({
     marginTop: 2,
   },
   scanLabel: {
-    marginTop: 28,
+    marginTop: 20,
     color: colors.primary,
     fontWeight: typography.weights.bold,
   },
