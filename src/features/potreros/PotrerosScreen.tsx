@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import withObservables from '@nozbe/with-observables';
 import { Q } from '@nozbe/watermelondb';
+import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
 import { Button } from '@shared/components/Button';
@@ -25,20 +26,44 @@ import type LoteModel from '@data/models/LoteModel';
 import type RacionModel from '@data/models/RacionModel';
 import type CondicionCorporalModel from '@data/models/CondicionCorporalModel';
 import type SuplementoModel from '@data/models/SuplementoModel';
+import type AnimalModel from '@data/models/AnimalModel';
 
 type Tab = 'potreros' | 'nutricion' | 'cc';
 
-// ── Potreros Tab ─────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function evHa(animalesCount: number, hectareas: number | null): string {
+  if (!hectareas || hectareas <= 0) return '—';
+  return (animalesCount / hectareas).toFixed(1);
+}
+
+// CC score color for 1-5 scale
+function ccColor(score: number): string {
+  if (score <= 1) return colors.error;
+  if (score <= 2) return '#FF6B35';
+  if (score === 3) return colors.warning;
+  if (score === 4) return '#8BC34A';
+  return colors.primary;
+}
+
+function ccLabel(score: number): string {
+  const labels = ['', 'Muy Flaco', 'Flaco', 'Normal', 'Buena', 'Excelente'];
+  return labels[score] ?? '';
+}
+
+// ── Potreros Tab ──────────────────────────────────────────────────────────────
 
 interface LoteListOuterProps {
   onEdit: (lote: LoteModel) => void;
   onDelete: (lote: LoteModel) => void;
 }
+
 interface LoteListProps extends LoteListOuterProps {
   lotes: LoteModel[];
+  animalesByLote: Record<string, number>;
 }
 
-function LoteListInner({ lotes, onEdit, onDelete }: LoteListProps) {
+function LoteListInner({ lotes, onEdit, onDelete, animalesByLote }: LoteListProps) {
   return lotes.length === 0 ? (
     <EmptyState icon="🌿" title="Sin potreros" subtitle="Creá el primer potrero para registrar animales" />
   ) : (
@@ -47,7 +72,12 @@ function LoteListInner({ lotes, onEdit, onDelete }: LoteListProps) {
       keyExtractor={(l) => l.id}
       renderItem={({ item }) => (
         <ObservableErrorBoundary key={item.id}>
-          <LoteCard lote={item} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />
+          <LoteCard
+            lote={item}
+            animalCount={animalesByLote[item.id] ?? 0}
+            onEdit={() => onEdit(item)}
+            onDelete={() => onDelete(item)}
+          />
         </ObservableErrorBoundary>
       )}
       contentContainerStyle={styles.list}
@@ -56,27 +86,77 @@ function LoteListInner({ lotes, onEdit, onDelete }: LoteListProps) {
   );
 }
 
+interface LoteListWithAnimalsOuterProps extends LoteListOuterProps {}
+interface LoteListWithAnimalsProps extends LoteListWithAnimalsOuterProps {
+  lotes: LoteModel[];
+  activeAnimals: AnimalModel[];
+}
+
+function LoteListWithAnimalsInner({ lotes, activeAnimals, onEdit, onDelete }: LoteListWithAnimalsProps) {
+  const animalesByLote = useMemo(() => {
+    const map: Record<string, number> = {};
+    activeAnimals.forEach((a) => {
+      if (a.loteId) map[a.loteId] = (map[a.loteId] ?? 0) + 1;
+    });
+    return map;
+  }, [activeAnimals]);
+
+  return (
+    <LoteListInner
+      lotes={lotes}
+      animalesByLote={animalesByLote}
+      onEdit={onEdit}
+      onDelete={onDelete}
+    />
+  );
+}
+
 const LoteListWithData = withObservables([], () => ({
   lotes: database.get<LoteModel>('lotes').query().observe(),
-}))(LoteListInner);
+  activeAnimals: database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO')).observe(),
+}))(LoteListWithAnimalsInner);
 
-function LoteCard({ lote, onEdit, onDelete }: { lote: LoteModel; onEdit: () => void; onDelete: () => void }) {
+function LoteCard({
+  lote,
+  animalCount,
+  onEdit,
+  onDelete,
+}: {
+  lote: LoteModel;
+  animalCount: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const ev = evHa(animalCount, lote.hectareas);
+  const evStatus: 'ok' | 'warn' | 'over' =
+    lote.hectareas && lote.hectareas > 0
+      ? animalCount / lote.hectareas > 1.2
+        ? 'over'
+        : animalCount / lote.hectareas > 0.8
+        ? 'ok'
+        : 'warn'
+      : 'ok';
+
+  const evColor =
+    evStatus === 'over' ? colors.error : evStatus === 'warn' ? colors.warning : colors.primary;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardInfo}>
         <Text style={styles.cardName}>{lote.nombre}</Text>
         {lote.ubicacion ? <Text style={styles.cardSub}>{lote.ubicacion}</Text> : null}
         <View style={styles.cardBadges}>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>🐄 {animalCount} animales</Text>
+          </View>
           {lote.hectareas != null && lote.hectareas > 0 ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{lote.hectareas} ha</Text>
             </View>
           ) : null}
-          {lote.densidadCarga != null && lote.densidadCarga > 0 ? (
-            <View style={[styles.badge, styles.badgeDensidad]}>
-              <Text style={[styles.badgeText, styles.badgeTextDensidad]}>
-                {lote.densidadCarga.toFixed(1)} an/ha
-              </Text>
+          {lote.hectareas != null && lote.hectareas > 0 ? (
+            <View style={[styles.badge, { borderColor: `${evColor}60`, backgroundColor: `${evColor}15` }]}>
+              <Text style={[styles.badgeText, { color: evColor }]}>{ev} EV/ha</Text>
             </View>
           ) : null}
         </View>
@@ -93,7 +173,7 @@ function LoteCard({ lote, onEdit, onDelete }: { lote: LoteModel; onEdit: () => v
   );
 }
 
-// ── Nutrición Tab ─────────────────────────────────────────────────────────────
+// ── Nutrición Tab ──────────────────────────────────────────────────────────────
 
 interface RacionesProps {
   raciones: RacionModel[];
@@ -127,22 +207,22 @@ function RacionesInner({ raciones, onAdd }: RacionesProps) {
 }
 
 const RacionesWithData = withObservables(['onAdd'], () => ({
-  raciones: database
-    .get<RacionModel>('raciones')
-    .query(Q.where('activa', true))
-    .observe(),
+  raciones: database.get<RacionModel>('raciones').query(Q.where('activa', true)).observe(),
 }))(RacionesInner);
 
 function RacionCard({ racion }: { racion: RacionModel }) {
   return (
     <View style={styles.card}>
+      <View style={styles.racionIcon}>
+        <Text style={{ fontSize: 24 }}>🌾</Text>
+      </View>
       <View style={styles.cardInfo}>
         <Text style={styles.cardName}>{racion.kgDiaAnimal} kg/día/animal</Text>
-        <Text style={styles.cardSub}>Lote ID: {racion.loteId.slice(0, 8)}…</Text>
+        <Text style={styles.cardSub}>Lote: {racion.loteId.slice(0, 8)}…</Text>
         {racion.notas ? <Text style={styles.cardSub}>{racion.notas}</Text> : null}
       </View>
-      <View style={[styles.badge, styles.badgeActive]}>
-        <Text style={[styles.badgeText, styles.badgeTextActive]}>ACTIVA</Text>
+      <View style={[styles.badge, { borderColor: `${colors.primary}60`, backgroundColor: `${colors.primary}15` }]}>
+        <Text style={[styles.badgeText, { color: colors.primary }]}>ACTIVA</Text>
       </View>
     </View>
   );
@@ -156,26 +236,56 @@ interface CCProps {
 }
 
 function CCInner({ registros, onAdd }: CCProps) {
+  // Aggregate: latest score per lote
+  const latestByLote = useMemo(() => {
+    const map = new Map<string, CondicionCorporalModel>();
+    registros.forEach((r) => {
+      const existing = map.get(r.loteId);
+      if (!existing || r.fecha > existing.fecha) map.set(r.loteId, r);
+    });
+    return Array.from(map.values());
+  }, [registros]);
+
   return (
     <>
       <View style={styles.tabHeader}>
-        <Text style={styles.tabSubtitle}>{registros.length} registros</Text>
+        <Text style={styles.tabSubtitle}>
+          {latestByLote.length} potreros evaluados
+        </Text>
         <Button label="+ CC" onPress={onAdd} size="sm" />
       </View>
       {registros.length === 0 ? (
-        <EmptyState icon="📊" title="Sin registros CC" subtitle="Registrá la condición corporal del lote" />
+        <EmptyState icon="📊" title="Sin registros CC" subtitle="Registrá la condición corporal del potrero" />
       ) : (
-        <FlatList
-          data={registros}
-          keyExtractor={(r) => r.id}
-          renderItem={({ item }) => (
-            <ObservableErrorBoundary key={item.id}>
-              <CCCard registro={item} />
-            </ObservableErrorBoundary>
+        <>
+          {/* Latest summary */}
+          {latestByLote.length > 0 && (
+            <View style={styles.ccSummary}>
+              {latestByLote.map((r) => (
+                <View key={r.id} style={[styles.ccSummaryCard, { borderColor: `${ccColor(r.score)}50` }]}>
+                  <View style={[styles.ccScore, { backgroundColor: ccColor(r.score) }]}>
+                    <Text style={styles.ccScoreText}>{r.score}</Text>
+                  </View>
+                  <Text style={styles.ccLabel}>{ccLabel(r.score)}</Text>
+                </View>
+              ))}
+            </View>
           )}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
+
+          {/* Full history */}
+          <Text style={styles.historySectionTitle}>Historial</Text>
+          <FlatList
+            data={registros}
+            keyExtractor={(r) => r.id}
+            renderItem={({ item }) => (
+              <ObservableErrorBoundary key={item.id}>
+                <CCCard registro={item} />
+              </ObservableErrorBoundary>
+            )}
+            contentContainerStyle={styles.list}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+          />
+        </>
       )}
     </>
   );
@@ -189,30 +299,24 @@ const CCWithData = withObservables(['onAdd'], () => ({
 }))(CCInner);
 
 function CCCard({ registro }: { registro: CondicionCorporalModel }) {
-  const scoreColor =
-    registro.score <= 3 ? colors.error : registro.score <= 6 ? colors.warning : colors.primary;
-
+  const color = ccColor(registro.score);
   return (
     <View style={styles.card}>
-      <View style={[styles.scoreCircle, { borderColor: scoreColor }]}>
-        <Text style={[styles.scoreText, { color: scoreColor }]}>{registro.score}</Text>
+      <View style={[styles.ccScore, { backgroundColor: color, width: 40, height: 40, borderRadius: 20 }]}>
+        <Text style={styles.ccScoreText}>{registro.score}</Text>
       </View>
       <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>Score CC: {registro.score}/9</Text>
+        <Text style={styles.cardName}>{ccLabel(registro.score)}</Text>
         <Text style={styles.cardSub}>
           {new Date(registro.fecha).toLocaleDateString('es-AR')}
           {registro.evaluador ? ` · ${registro.evaluador}` : ''}
         </Text>
-        {registro.notas ? <Text style={styles.cardSub}>{registro.notas}</Text> : null}
       </View>
     </View>
   );
 }
 
-// ── Racion Form (inline) ─────────────────────────────────────────────────────
-
-import { useMemo, useRef, useEffect } from 'react';
-import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+// ── Racion Form Modal (inline) ────────────────────────────────────────────────
 
 function RacionFormModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
@@ -262,7 +366,7 @@ function RacionFormModal({ visible, onClose }: { visible: boolean; onClose: () =
       });
       triggerSuccess();
       onClose();
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'No se pudo guardar la ración.');
     } finally {
       setSaving(false);
@@ -274,24 +378,24 @@ function RacionFormModal({ visible, onClose }: { visible: boolean; onClose: () =
       ref={bottomSheetRef}
       index={0}
       snapPoints={snapPoints}
-      backgroundStyle={styles.sheet}
-      handleIndicatorStyle={styles.indicator}
+      backgroundStyle={modalStyles.sheet}
+      handleIndicatorStyle={modalStyles.indicator}
       onDismiss={onClose}
       enablePanDownToClose
     >
-      <BottomSheetScrollView contentContainerStyle={styles.modalContent}>
-        <Text style={styles.modalTitle}>Nueva Ración</Text>
+      <BottomSheetScrollView contentContainerStyle={modalStyles.content}>
+        <Text style={modalStyles.title}>Nueva Ración</Text>
 
-        <Text style={styles.fieldLabel}>POTRERO</Text>
+        <Text style={modalStyles.fieldLabel}>POTRERO</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.chips}>
+          <View style={modalStyles.chips}>
             {lotes.map((l) => (
               <TouchableOpacity
                 key={l.id}
-                style={[styles.chip, selectedLoteId === l.id && styles.chipActive]}
+                style={[modalStyles.chip, selectedLoteId === l.id && modalStyles.chipActive]}
                 onPress={() => setSelectedLoteId(l.id)}
               >
-                <Text style={[styles.chipText, selectedLoteId === l.id && styles.chipTextActive]}>
+                <Text style={[modalStyles.chipText, selectedLoteId === l.id && modalStyles.chipTextActive]}>
                   {l.nombre}
                 </Text>
               </TouchableOpacity>
@@ -299,19 +403,19 @@ function RacionFormModal({ visible, onClose }: { visible: boolean; onClose: () =
           </View>
         </ScrollView>
 
-        <Text style={styles.fieldLabel}>SUPLEMENTO</Text>
+        <Text style={modalStyles.fieldLabel}>SUPLEMENTO</Text>
         {suplementos.length === 0 ? (
-          <Text style={styles.emptyText}>Sin suplementos registrados</Text>
+          <Text style={modalStyles.emptyText}>Sin suplementos registrados</Text>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.chips}>
+            <View style={modalStyles.chips}>
               {suplementos.map((s) => (
                 <TouchableOpacity
                   key={s.id}
-                  style={[styles.chip, selectedSupId === s.id && styles.chipActive]}
+                  style={[modalStyles.chip, selectedSupId === s.id && modalStyles.chipActive]}
                   onPress={() => setSelectedSupId(s.id)}
                 >
-                  <Text style={[styles.chipText, selectedSupId === s.id && styles.chipTextActive]}>
+                  <Text style={[modalStyles.chipText, selectedSupId === s.id && modalStyles.chipTextActive]}>
                     {s.nombre}
                   </Text>
                 </TouchableOpacity>
@@ -320,9 +424,9 @@ function RacionFormModal({ visible, onClose }: { visible: boolean; onClose: () =
           </ScrollView>
         )}
 
-        <Text style={styles.fieldLabel}>KG / DÍA / ANIMAL</Text>
+        <Text style={modalStyles.fieldLabel}>KG / DÍA / ANIMAL</Text>
         <TextInput
-          style={styles.input}
+          style={modalStyles.input}
           placeholder="Ej: 3.5"
           placeholderTextColor={colors.textDisabled}
           keyboardType="numeric"
@@ -330,9 +434,9 @@ function RacionFormModal({ visible, onClose }: { visible: boolean; onClose: () =
           onChangeText={setKgDia}
         />
 
-        <Text style={styles.fieldLabel}>NOTAS (opcional)</Text>
+        <Text style={modalStyles.fieldLabel}>NOTAS (opcional)</Text>
         <TextInput
-          style={[styles.input, styles.inputMultiline]}
+          style={[modalStyles.input, modalStyles.inputMultiline]}
           placeholder="Observaciones..."
           placeholderTextColor={colors.textDisabled}
           multiline
@@ -347,14 +451,14 @@ function RacionFormModal({ visible, onClose }: { visible: boolean; onClose: () =
           size="lg"
           disabled={!selectedLoteId || !selectedSupId || !kgDia}
           loading={saving}
-          style={styles.saveButton}
+          style={modalStyles.saveButton}
         />
       </BottomSheetScrollView>
     </BottomSheetModal>
   );
 }
 
-// ── CC Form (inline) ──────────────────────────────────────────────────────────
+// ── CC Form Modal (inline — scale 1-5 per spec) ───────────────────────────────
 
 function CCFormModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
@@ -366,6 +470,7 @@ function CCFormModal({ visible, onClose }: { visible: boolean; onClose: () => vo
   const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
   const [score, setScore] = useState<number | null>(null);
   const [evaluador, setEvaluador] = useState('');
+  const [notas, setNotas] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -374,6 +479,7 @@ function CCFormModal({ visible, onClose }: { visible: boolean; onClose: () => vo
       setSelectedLoteId(null);
       setScore(null);
       setEvaluador('');
+      setNotas('');
       void db.get<LoteModel>('lotes').query().fetch().then(setLotes);
     } else {
       bottomSheetRef.current?.dismiss();
@@ -390,39 +496,40 @@ function CCFormModal({ visible, onClose }: { visible: boolean; onClose: () => vo
         fecha: Date.now(),
         score,
         evaluador: evaluador.trim(),
+        notas: notas.trim(),
       });
       triggerSuccess();
       onClose();
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'No se pudo registrar la CC.');
     } finally {
       setSaving(false);
     }
-  }, [selectedLoteId, score, evaluador, db, triggerSuccess, onClose]);
+  }, [selectedLoteId, score, evaluador, notas, db, triggerSuccess, onClose]);
 
   return (
     <BottomSheetModal
       ref={bottomSheetRef}
       index={0}
       snapPoints={snapPoints}
-      backgroundStyle={styles.sheet}
-      handleIndicatorStyle={styles.indicator}
+      backgroundStyle={modalStyles.sheet}
+      handleIndicatorStyle={modalStyles.indicator}
       onDismiss={onClose}
       enablePanDownToClose
     >
-      <BottomSheetScrollView contentContainerStyle={styles.modalContent}>
-        <Text style={styles.modalTitle}>Condición Corporal</Text>
+      <BottomSheetScrollView contentContainerStyle={modalStyles.content}>
+        <Text style={modalStyles.title}>Condición Corporal</Text>
 
-        <Text style={styles.fieldLabel}>POTRERO</Text>
+        <Text style={modalStyles.fieldLabel}>POTRERO</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.chips}>
+          <View style={modalStyles.chips}>
             {lotes.map((l) => (
               <TouchableOpacity
                 key={l.id}
-                style={[styles.chip, selectedLoteId === l.id && styles.chipActive]}
+                style={[modalStyles.chip, selectedLoteId === l.id && modalStyles.chipActive]}
                 onPress={() => setSelectedLoteId(l.id)}
               >
-                <Text style={[styles.chipText, selectedLoteId === l.id && styles.chipTextActive]}>
+                <Text style={[modalStyles.chipText, selectedLoteId === l.id && modalStyles.chipTextActive]}>
                   {l.nombre}
                 </Text>
               </TouchableOpacity>
@@ -430,29 +537,50 @@ function CCFormModal({ visible, onClose }: { visible: boolean; onClose: () => vo
           </View>
         </ScrollView>
 
-        <Text style={styles.fieldLabel}>SCORE (1–9)</Text>
-        <View style={styles.scoreRow}>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => {
-            const c = n <= 3 ? colors.error : n <= 6 ? colors.warning : colors.primary;
+        {/* CC scale 1-5 */}
+        <Text style={modalStyles.fieldLabel}>SCORE CC (1–5)</Text>
+        <View style={modalStyles.ccScaleRow}>
+          {[1, 2, 3, 4, 5].map((n) => {
+            const c = ccColor(n);
+            const selected = score === n;
             return (
               <TouchableOpacity
                 key={n}
-                style={[styles.scoreBtn, score === n && { backgroundColor: c, borderColor: c }]}
+                style={[
+                  modalStyles.ccScaleBtn,
+                  { borderColor: c },
+                  selected && { backgroundColor: c },
+                ]}
                 onPress={() => setScore(n)}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.scoreBtnText, score === n && { color: '#fff' }]}>{n}</Text>
+                <Text style={[modalStyles.ccScaleBtnNum, selected && { color: '#fff' }]}>{n}</Text>
+                <Text style={[modalStyles.ccScaleBtnLabel, selected && { color: 'rgba(255,255,255,0.85)' }]}>
+                  {ccLabel(n)}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <Text style={styles.fieldLabel}>EVALUADOR</Text>
+        <Text style={modalStyles.fieldLabel}>EVALUADOR</Text>
         <TextInput
-          style={styles.input}
-          placeholder="Nombre"
+          style={modalStyles.input}
+          placeholder="Nombre del evaluador"
           placeholderTextColor={colors.textDisabled}
           value={evaluador}
           onChangeText={setEvaluador}
+        />
+
+        <Text style={modalStyles.fieldLabel}>NOTAS (opcional)</Text>
+        <TextInput
+          style={[modalStyles.input, modalStyles.inputMultiline]}
+          placeholder="Observaciones..."
+          placeholderTextColor={colors.textDisabled}
+          multiline
+          textAlignVertical="top"
+          value={notas}
+          onChangeText={setNotas}
         />
 
         <Button
@@ -461,7 +589,7 @@ function CCFormModal({ visible, onClose }: { visible: boolean; onClose: () => vo
           size="lg"
           disabled={!selectedLoteId || score === null}
           loading={saving}
-          style={styles.saveButton}
+          style={modalStyles.saveButton}
         />
       </BottomSheetScrollView>
     </BottomSheetModal>
@@ -525,11 +653,8 @@ export function PotrerosScreen() {
           )}
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabBar}
-        >
+        {/* Tab bar */}
+        <View style={styles.tabBar}>
           {tabs.map((tab) => (
             <TouchableOpacity
               key={tab.key}
@@ -542,7 +667,7 @@ export function PotrerosScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         <View style={styles.tabContent}>
           {activeTab === 'potreros' && (
@@ -568,6 +693,8 @@ export function PotrerosScreen() {
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
@@ -576,7 +703,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.xs,
   },
   title: {
     color: colors.textPrimary,
@@ -584,26 +711,29 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
   },
   tabBar: {
+    flexDirection: 'row',
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   tabBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: 10,
     gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   tabBtnActive: {
+    backgroundColor: 'rgba(0,214,143,0.10)',
     borderColor: colors.primary,
-    backgroundColor: 'rgba(0,214,143,0.12)',
   },
-  tabBtnIcon: { fontSize: 16 },
+  tabBtnIcon: { fontSize: 14 },
   tabBtnText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: typography.weights.medium },
   tabBtnTextActive: { color: colors.primary, fontWeight: typography.weights.bold },
   tabContent: { flex: 1 },
@@ -626,29 +756,20 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: spacing.touchTarget,
   },
+  racionIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,214,143,0.12)', alignItems: 'center', justifyContent: 'center' },
   cardInfo: { flex: 1 },
-  cardName: {
-    color: colors.textPrimary,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semibold,
-  },
-  cardSub: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.sm,
-    marginTop: 2,
-  },
-  cardBadges: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs },
+  cardName: { color: colors.textPrimary, fontSize: typography.sizes.md, fontWeight: typography.weights.semibold },
+  cardSub: { color: colors.textSecondary, fontSize: typography.sizes.sm, marginTop: 2 },
+  cardBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   badge: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
   },
   badgeText: { color: colors.textSecondary, fontSize: typography.sizes.xs, fontWeight: typography.weights.medium },
-  badgeDensidad: { backgroundColor: 'rgba(0,149,255,0.12)' },
-  badgeTextDensidad: { color: colors.info },
-  badgeActive: { backgroundColor: 'rgba(0,214,143,0.12)' },
-  badgeTextActive: { color: colors.primary, fontWeight: typography.weights.bold },
   cardActions: { flexDirection: 'row', gap: spacing.sm },
   actionBtn: {
     width: spacing.touchTarget,
@@ -660,32 +781,41 @@ const styles = StyleSheet.create({
   },
   deleteBtn: { backgroundColor: 'rgba(255,61,113,0.15)' },
   actionBtnText: { fontSize: 20 },
-  scoreCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+  ccSummary: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    flexWrap: 'wrap',
   },
-  scoreText: { fontSize: typography.sizes.lg, fontWeight: typography.weights.heavy },
-  scoreRow: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
-  scoreBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.border,
+  ccSummaryCard: {
     backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.xs,
+    minWidth: 80,
+    borderWidth: 1,
   },
-  scoreBtnText: { color: colors.textSecondary, fontSize: typography.sizes.md, fontWeight: typography.weights.bold },
-  // Modal styles
+  ccScore: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  ccScoreText: { color: '#fff', fontSize: typography.sizes.xl, fontWeight: typography.weights.heavy },
+  ccLabel: { color: colors.textSecondary, fontSize: typography.sizes.xs, textAlign: 'center' },
+  historySectionTitle: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+});
+
+const modalStyles = StyleSheet.create({
   sheet: { backgroundColor: colors.surfaceElevated },
   indicator: { backgroundColor: colors.border, width: 40 },
-  modalContent: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
-  modalTitle: {
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
+  title: {
     color: colors.textPrimary,
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold,
@@ -723,5 +853,28 @@ const styles = StyleSheet.create({
   },
   inputMultiline: { height: 80, paddingTop: spacing.sm },
   emptyText: { color: colors.textDisabled, fontSize: typography.sizes.sm, fontStyle: 'italic' },
+  // CC scale 1-5
+  ccScaleRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  ccScaleBtn: {
+    flex: 1,
+    minHeight: 60,
+    borderRadius: 12,
+    borderWidth: 2,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xs,
+  },
+  ccScaleBtnNum: {
+    color: colors.textPrimary,
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.heavy,
+  },
+  ccScaleBtnLabel: {
+    color: colors.textDisabled,
+    fontSize: typography.sizes.xs,
+    textAlign: 'center',
+    marginTop: 2,
+  },
   saveButton: { marginTop: spacing.lg },
 });
