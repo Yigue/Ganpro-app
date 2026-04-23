@@ -21,7 +21,7 @@ import { OperationLogModel } from '@data/models/OperationLogModel';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
 import { EventoRepository } from '@data/repositories/EventoRepository';
 import { SanidadRepository } from '@data/repositories/SanidadRepository';
-import { CATEGORIA, type CategoriaType } from '@core/constants/categories';
+import { CATEGORIA, CATEGORIAS_MACHO, CATEGORIAS_HEMBRA, type CategoriaType } from '@core/constants/categories';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Q } from '@nozbe/watermelondb';
@@ -41,6 +41,7 @@ const ACTIONS: { tipo: EventoTipoType; label: string; icon: string; color: strin
 ];
 
 type TactoResultado = 'prenada' | 'vacia' | null;
+type LocalAction = EventoTipoType | 'CAMBIO_CATEGORIA';
 
 export function EventActionSheet({ visible, rfid, onClose }: Props) {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
@@ -50,7 +51,7 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
   const { triggerSelection, triggerSuccess } = useHapticFeedback();
 
   const [animal, setAnimal] = useState<AnimalModel | null>(null);
-  const [selectedAction, setSelectedAction] = useState<EventoTipoType | null>(null);
+  const [selectedAction, setSelectedAction] = useState<LocalAction | null>(null);
   const [peso, setPeso] = useState('');
   const [notas, setNotas] = useState('');
   const [lotes, setLotes] = useState<LoteModel[]>([]);
@@ -109,7 +110,9 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
       const animalRepo = new AnimalRepository(database);
       const eventoRepo = new EventoRepository(database);
 
-      if (selectedAction === EVENTO_TIPO.CAMBIO_LOTE && loteDestinoId) {
+      if (selectedAction === 'CAMBIO_CATEGORIA' && nuevaCategoria) {
+        await animalRepo.updateCategoria(animal, nuevaCategoria);
+      } else if (selectedAction === EVENTO_TIPO.CAMBIO_LOTE && loteDestinoId) {
         const loteOrigenId = animal.loteId;
 
         await animalRepo.transferToLote(animal, loteDestinoId, notas);
@@ -155,7 +158,7 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
       } else {
         await eventoRepo.create({
           animalId: animal.id,
-          tipo: selectedAction,
+          tipo: selectedAction as EventoTipoType,
           valor: selectedAction === EVENTO_TIPO.PESAJE ? parseFloat(peso) || undefined : undefined,
           notas,
         });
@@ -188,6 +191,7 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
     (selectedAction !== EVENTO_TIPO.PESAJE || peso.length > 0) &&
     (selectedAction !== EVENTO_TIPO.CAMBIO_LOTE || loteDestinoId !== null) &&
     (selectedAction !== EVENTO_TIPO.VACUNACION || !enCarencia) &&
+    (selectedAction !== 'CAMBIO_CATEGORIA' || nuevaCategoria !== null) &&
     !saving;
 
   return (
@@ -201,8 +205,8 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
       enablePanDownToClose
     >
       <BottomSheetScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Acciones de Lote</Text>
-        <Text style={styles.rfidText}>{rfid}</Text>
+        <Text style={styles.title}>Registrar Evento</Text>
+        <Text style={styles.rfidText}>{animal?.idCaravana ?? rfid}</Text>
 
         {/* Carencia banner */}
         {enCarencia && carenciaDetalle != null && (
@@ -224,6 +228,33 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
 
         {/* Action buttons */}
         <View style={styles.actionsGrid}>
+          {/* Cambio de Categoría — fuera del loop de ACTIONS */}
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              selectedAction === 'CAMBIO_CATEGORIA' && {
+                borderColor: colors.success,
+                backgroundColor: `${colors.success}20`,
+              },
+            ]}
+            onPress={() => {
+              triggerSelection();
+              setSelectedAction('CAMBIO_CATEGORIA');
+            }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+          >
+            <Text style={styles.actionIcon}>🏷️</Text>
+            <Text
+              style={[
+                styles.actionLabel,
+                selectedAction === 'CAMBIO_CATEGORIA' && { color: colors.success },
+              ]}
+            >
+              Categoría
+            </Text>
+          </TouchableOpacity>
+
           {ACTIONS.map((action) => {
             const isDisabled = action.tipo === EVENTO_TIPO.VACUNACION && enCarencia;
             return (
@@ -377,8 +408,40 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
           </View>
         )}
 
+        {/* CAMBIO_CATEGORIA */}
+        {selectedAction === 'CAMBIO_CATEGORIA' && (
+          <View style={styles.fieldSection}>
+            <Text style={styles.fieldLabel}>NUEVA CATEGORÍA</Text>
+            <View style={styles.loteGrid}>
+              {(animal?.sexo === 'M' ? CATEGORIAS_MACHO : animal?.sexo === 'H' ? CATEGORIAS_HEMBRA : [...CATEGORIAS_MACHO, ...CATEGORIAS_HEMBRA]).map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.loteOption,
+                    nuevaCategoria === cat && styles.loteOptionSelected,
+                  ]}
+                  onPress={() => {
+                    triggerSelection();
+                    setNuevaCategoria(cat);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.loteOptionText,
+                      nuevaCategoria === cat && styles.loteOptionTextSelected,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* NOTAS — para todos excepto PESAJE */}
-        {selectedAction && selectedAction !== EVENTO_TIPO.PESAJE && (
+        {selectedAction && selectedAction !== EVENTO_TIPO.PESAJE && selectedAction !== 'CAMBIO_CATEGORIA' && (
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>NOTAS (opcional)</Text>
             <RNTextInput

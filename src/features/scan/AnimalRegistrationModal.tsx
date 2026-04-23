@@ -29,7 +29,7 @@ interface Props {
   visible: boolean;
   rfid: string;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (animal: import('@data/models/AnimalModel').default) => void;
 }
 
 export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Props) {
@@ -97,7 +97,7 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
     setSaving(true);
     try {
       const repo = new AnimalRepository(database);
-      await repo.create({
+      const newAnimal = await repo.create({
         rfid,
         sexo,
         categoria,
@@ -106,7 +106,7 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
         loteId,
       });
       triggerSuccess();
-      onSaved();
+      onSaved(newAnimal);
     } catch (error) {
       console.error('[Registration] Save error:', error);
       Alert.alert('Error', 'No se pudo guardar el animal. Intente nuevamente.');

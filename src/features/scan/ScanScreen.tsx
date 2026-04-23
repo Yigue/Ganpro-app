@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   TextInput,
@@ -8,17 +8,22 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { useScanStore } from '@store/scanStore';
 import { useSyncStore } from '@store/syncStore';
 import { useRFIDScanner } from './hooks/useRFIDScanner';
 import { AnimalRegistrationModal } from './AnimalRegistrationModal';
 import { EventActionSheet } from './EventActionSheet';
 import { BatchActionSheet } from './BatchActionSheet';
+import { BulkRegistrationSheet } from './BulkRegistrationSheet';
 import {
   SegmentedControl,
   IndividualModeView,
   BatchModeView,
+  SessionQueueView,
+  ItemDetailModal,
 } from './components';
+import { type QueueItem } from '@store/scanStore';
 import { colors, spacing, typography } from '@theme/index';
 
 /**
@@ -47,11 +52,31 @@ export function ScanScreen() {
   const openBatchSheet = useScanStore(s => s.openBatchSheet);
   const closeBatchSheet = useScanStore(s => s.closeBatchSheet);
   const clearQueue = useScanStore(s => s.clearQueue);
+  const sessionActive = useScanStore(s => s.sessionActive);
+  const hardwareMode = useScanStore(s => s.hardwareMode);
+  const startSession = useScanStore(s => s.startSession);
+  const endSession = useScanStore(s => s.endSession);
+  const setHardwareMode = useScanStore(s => s.setHardwareMode);
+  const isBulkRegistrationOpen = useScanStore(s => s.isBulkRegistrationOpen);
+  const openBulkRegistration = useScanStore(s => s.openBulkRegistration);
+  const closeBulkRegistration = useScanStore(s => s.closeBulkRegistration);
   const isOnline = useSyncStore(s => s.isOnline);
   const syncStatus = useSyncStore(s => s.status);
 
   const { inputRef, ensureFocus, onSubmitEditing, onChangeText, injectMock } =
     useRFIDScanner();
+
+  const [selectedQueueItem, setSelectedQueueItem] = useState<QueueItem | null>(null);
+  const itemDetailModalRef = useRef<BottomSheetModal>(null);
+
+  // Drive the ItemDetailModal via ref instead of visible prop
+  useEffect(() => {
+    if (selectedQueueItem != null) {
+      itemDetailModalRef.current?.present();
+    } else {
+      itemDetailModalRef.current?.dismiss();
+    }
+  }, [selectedQueueItem]);
 
   const flashAnim = useRef(new Animated.Value(0)).current;
 
@@ -69,8 +94,8 @@ export function ScanScreen() {
     phase === 'found'
       ? colors.scanSuccess
       : phase === 'not_found' || phase === 'error'
-      ? colors.scanError
-      : 'transparent';
+        ? colors.scanError
+        : 'transparent';
 
   const handleManualRefocus = useCallback(() => {
     reset();
@@ -85,6 +110,38 @@ export function ScanScreen() {
     },
     [batchMode, toggleBatchMode, ensureFocus]
   );
+
+  const handleHardwareModeChange = useCallback(
+    (index: 0 | 1) => {
+      setHardwareMode(index === 0 ? 'single' : 'continuous');
+      ensureFocus();
+    },
+    [setHardwareMode, ensureFocus]
+  );
+
+  const handleStartSession = useCallback(() => {
+    startSession();
+    ensureFocus();
+  }, [startSession, ensureFocus]);
+
+  const handleEndSession = useCallback(() => {
+    endSession();
+    ensureFocus();
+  }, [endSession, ensureFocus]);
+
+  const handleItemPress = useCallback((item: QueueItem) => {
+    setSelectedQueueItem(item);
+  }, []);
+
+  const handleItemProcessed = useCallback((_rfid: string) => {
+    setSelectedQueueItem(null);
+    ensureFocus();
+  }, [ensureFocus]);
+
+  const handleCloseItemModal = useCallback(() => {
+    setSelectedQueueItem(null);
+    ensureFocus();
+  }, [ensureFocus]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -146,6 +203,17 @@ export function ScanScreen() {
         />
       </View>
 
+      {sessionActive && (
+        <View style={styles.segmentedWrapper}>
+          <SegmentedControl
+            options={['Simple', 'Continuo']}
+            selectedIndex={hardwareMode === 'single' ? 0 : 1}
+            onChange={handleHardwareModeChange}
+            style={styles.segmentedControl}
+          />
+        </View>
+      )}
+
       {/* Dev/staging mock button — absent in production */}
       {SHOW_MOCK_BUTTON && (
         <TouchableOpacity
@@ -159,9 +227,40 @@ export function ScanScreen() {
         </TouchableOpacity>
       )}
 
+      {batchMode && !sessionActive && (
+        <TouchableOpacity
+          style={styles.startSessionBtn}
+          onPress={handleStartSession}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+        >
+          <Text style={styles.startSessionBtnText}>INICIAR TRABAJO EN MANGA</Text>
+        </TouchableOpacity>
+      )}
+
+      {batchMode && sessionActive && (
+        <TouchableOpacity
+          style={styles.endSessionBtn}
+          onPress={handleEndSession}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+        >
+          <Text style={styles.endSessionBtnText}>FINALIZAR SESIÓN</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Center content — delegated to mode sub-components */}
       <View style={styles.centerContent}>
-        {batchMode ? (
+        {batchMode && sessionActive ? (
+          <SessionQueueView
+            queue={queue}
+            onClear={clearQueue}
+            onProcess={openBatchSheet}
+            onBulkRegister={openBulkRegistration}
+            onItemPress={handleItemPress}
+            ensureFocus={ensureFocus}
+          />
+        ) : batchMode ? (
           <BatchModeView
             queue={queue}
             onClear={clearQueue}
@@ -212,6 +311,22 @@ export function ScanScreen() {
         visible={isBatchSheetOpen}
         onClose={() => {
           closeBatchSheet();
+          ensureFocus();
+        }}
+      />
+
+      <ItemDetailModal
+        item={selectedQueueItem}
+        bottomSheetRef={itemDetailModalRef}
+        onClose={handleCloseItemModal}
+        onProcessed={handleItemProcessed}
+      />
+
+      <BulkRegistrationSheet
+        visible={isBulkRegistrationOpen}
+        unknownItems={queue.filter(i => i.status === 'pending_registration')}
+        onClose={() => {
+          closeBulkRegistration();
           ensureFocus();
         }}
       />
@@ -294,5 +409,36 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.heavy,
     letterSpacing: 2,
+  },
+  startSessionBtn: {
+    margin: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    height: spacing.touchTargetLg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startSessionBtnText: {
+    color: colors.textOnPrimary,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.heavy,
+    letterSpacing: 1.5,
+  },
+  endSessionBtn: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.error,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  endSessionBtnText: {
+    color: colors.error,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    letterSpacing: 1,
   },
 });

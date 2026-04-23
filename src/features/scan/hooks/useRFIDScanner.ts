@@ -8,8 +8,9 @@ import { useSoundFeedback } from '@shared/hooks/useSoundFeedback';
 import { normalizeRfid, isValidRfid } from '@shared/utils/rfidUtils';
 import type AnimalModel from '@data/models/AnimalModel';
 
-const SCAN_DEBOUNCE_MS = 300;    // Ignore duplicate scans within this window
-const FOCUS_RETRY_DELAY_MS = 100; // Blur → focus cycle delay
+const SINGLE_DEBOUNCE_MS = 300;
+const CONTINUOUS_DEBOUNCE_MS = 3000;
+const FOCUS_RETRY_DELAY_MS = 100;
 const MOCK_RFID = 'MOCK-0001-TEST';
 
 export interface UseRFIDScannerReturn {
@@ -28,13 +29,13 @@ export interface UseRFIDScannerReturn {
  * `showSoftInputOnFocus={false}` prevents the software keyboard from appearing.
  *
  * On each valid scan:
- *  - Queries WatermelonDB for the RFID
- *  - HIT  → sets phase 'found', haptic success, opens EventActionSheet
- *  - MISS → sets phase 'not_found', haptic error, opens RegistrationModal
+ *  - SESSION FLOW: enqueueLoading → DB query → hydrateQueueItem
+ *  - INDIVIDUAL FLOW: sets phase, opens EventActionSheet or RegistrationModal
  */
 export function useRFIDScanner(): UseRFIDScannerReturn {
   const inputRef = useRef<TextInput>(null);
   const lastScanTimeRef = useRef<number>(0);
+  const continuousFilterRef = useRef<Map<string, number>>(new Map());
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const eventSheetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const registrationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,7 +44,8 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
   const setPhase = useScanStore(s => s.setPhase);
   const openRegistrationModal = useScanStore(s => s.openRegistrationModal);
   const openEventSheet = useScanStore(s => s.openEventSheet);
-  const enqueueScan = useScanStore(s => s.enqueueScan);
+  const enqueueLoading = useScanStore(s => s.enqueueLoading);
+  const hydrateQueueItem = useScanStore(s => s.hydrateQueueItem);
   const database = useDatabase();
   const { triggerSuccess, triggerError } = useHapticFeedback();
   const { playSuccess, playError } = useSoundFeedback();
@@ -84,62 +86,84 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
   const processRfid = useCallback(
     async (rawId: string) => {
       const rfid = normalizeRfid(rawId);
+      if (!isValidRfid(rfid)) return;
 
-      if (!isValidRfid(rfid)) {
-        console.warn('[RFID] Invalid tag:', rfid);
-        return;
-      }
-
-      // Debounce — some readers fire twice on a single scan
       const now = Date.now();
-      if (now - lastScanTimeRef.current < SCAN_DEBOUNCE_MS) {
-        return;
+
+      const currentHardwareMode = useScanStore.getState().hardwareMode;
+      if (currentHardwareMode === 'continuous') {
+        const lastSeen = continuousFilterRef.current.get(rfid);
+        if (lastSeen && now - lastSeen < CONTINUOUS_DEBOUNCE_MS) return;
+        continuousFilterRef.current.set(rfid, now);
+      } else {
+        if (now - lastScanTimeRef.current < SINGLE_DEBOUNCE_MS) return;
+        lastScanTimeRef.current = now;
       }
-      lastScanTimeRef.current = now;
 
-      setRfid(rfid);
-      setPhase('scanning');
+      const currentSessionActive = useScanStore.getState().sessionActive;
+      const currentBatchMode = useScanStore.getState().batchMode;
 
-      try {
-        const results = await database
-          .get<AnimalModel>('animals')
-          .query(Q.where('id_caravana', rfid))
-          .fetch();
+      if (currentBatchMode && currentSessionActive) {
+        // ── SESSION FLOW ──────────────────────────────────────────────────────
+        enqueueLoading(rfid);
 
-        const animal = results[0];
-        const batchMode = useScanStore.getState().batchMode;
+        try {
+          const results = await database
+            .get<AnimalModel>('animals')
+            .query(Q.where('id_caravana', rfid))
+            .fetch();
 
-        if (batchMode) {
-          // Batch mode — queue the scan and give feedback but do not open sheets.
-          enqueueScan(rfid, animal?.id);
+          const animal = results[0];
+
           if (animal) {
+            hydrateQueueItem(rfid, {
+              status: 'pending',
+              animalId: animal.id,
+              categoria: animal.categoria,
+              estado: animal.estado,
+            });
             triggerSuccess();
             playSuccess();
           } else {
+            hydrateQueueItem(rfid, { status: 'pending_registration' });
             triggerError();
             playError();
           }
-          setPhase('idle');
-          return;
-        }
-
-        if (animal) {
-          setPhase('found');
-          triggerSuccess();
-          playSuccess();
-          if (eventSheetTimeoutRef.current) clearTimeout(eventSheetTimeoutRef.current);
-          eventSheetTimeoutRef.current = setTimeout(() => openEventSheet(), 50);
-        } else {
-          setPhase('not_found');
+        } catch (error) {
+          hydrateQueueItem(rfid, { status: 'pending', error: 'DB error' });
           triggerError();
-          playError();
-          if (registrationTimeoutRef.current) clearTimeout(registrationTimeoutRef.current);
-          registrationTimeoutRef.current = setTimeout(() => openRegistrationModal(), 50);
         }
-      } catch (error) {
-        console.error('[RFID] DB query error:', error);
-        setPhase('error');
-        triggerError();
+      } else {
+        // ── INDIVIDUAL FLOW (sin sesión) ─────────────────────────────────────
+        setRfid(rfid);
+        setPhase('scanning');
+
+        try {
+          const results = await database
+            .get<AnimalModel>('animals')
+            .query(Q.where('id_caravana', rfid))
+            .fetch();
+
+          const animal = results[0];
+
+          if (animal) {
+            setPhase('found');
+            triggerSuccess();
+            playSuccess();
+            if (eventSheetTimeoutRef.current) clearTimeout(eventSheetTimeoutRef.current);
+            eventSheetTimeoutRef.current = setTimeout(() => openEventSheet(), 50);
+          } else {
+            setPhase('not_found');
+            triggerError();
+            playError();
+            if (registrationTimeoutRef.current) clearTimeout(registrationTimeoutRef.current);
+            registrationTimeoutRef.current = setTimeout(() => openRegistrationModal(), 50);
+          }
+        } catch (error) {
+          console.error('[RFID] DB query error:', error);
+          setPhase('error');
+          triggerError();
+        }
       }
     },
     [
@@ -148,7 +172,8 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
       setPhase,
       openRegistrationModal,
       openEventSheet,
-      enqueueScan,
+      enqueueLoading,
+      hydrateQueueItem,
       triggerSuccess,
       triggerError,
       playSuccess,

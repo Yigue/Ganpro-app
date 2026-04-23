@@ -14,18 +14,20 @@ import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { colors, spacing, typography } from '@theme/index';
 import { EVENTO_TIPO } from '@core/constants/eventTypes';
+import { CATEGORIAS_MACHO, CATEGORIAS_HEMBRA, type CategoriaType } from '@core/constants/categories';
 import type EventoModel from '@data/models/EventoModel';
 import type LoteModel from '@data/models/LoteModel';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
 import { useScanStore, type QueueItem } from '@store/scanStore';
 
-type BatchAction = 'VACUNACION' | 'PESAJE' | 'CAMBIO_LOTE';
+type BatchAction = 'VACUNACION' | 'PESAJE' | 'CAMBIO_LOTE' | 'CAMBIO_CATEGORIA';
 
 const BATCH_ACTIONS: { tipo: BatchAction; label: string; icon: string; color: string }[] =
   [
     { tipo: 'VACUNACION', label: 'Vacunación', icon: '💉', color: colors.warning },
     { tipo: 'PESAJE', label: 'Pesaje', icon: '⚖️', color: colors.info },
     { tipo: 'CAMBIO_LOTE', label: 'Cambio de Lote', icon: '🔀', color: colors.primary },
+    { tipo: 'CAMBIO_CATEGORIA' as BatchAction, label: 'Categoría', icon: '🏷️', color: colors.success },
   ];
 
 interface Props {
@@ -47,6 +49,7 @@ export function BatchActionSheet({ visible, onClose }: Props) {
   const [notas, setNotas] = useState('');
   const [lotes, setLotes] = useState<LoteModel[]>([]);
   const [loteDestinoId, setLoteDestinoId] = useState<string | null>(null);
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<CategoriaType | null>(null);
   const [applying, setApplying] = useState(false);
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export function BatchActionSheet({ visible, onClose }: Props) {
       setVacuna('');
       setNotas('');
       setLoteDestinoId(null);
+      setCategoriaSeleccionada(null);
       void (async () => {
         try {
           setLotes(await database.get<LoteModel>('lotes').query().fetch());
@@ -69,13 +73,23 @@ export function BatchActionSheet({ visible, onClose }: Props) {
   const handleApply = useCallback(async () => {
     if (!selectedAction || queue.length === 0) return;
     if (selectedAction === 'CAMBIO_LOTE' && !loteDestinoId) return;
+    if (selectedAction === 'CAMBIO_CATEGORIA' && !categoriaSeleccionada) return;
 
     setApplying(true);
     try {
       const animalRepo = new AnimalRepository(database);
       const knownItems: QueueItem[] = queue.filter((item) => item.animalId != null);
 
-      if (selectedAction === 'CAMBIO_LOTE' && loteDestinoId) {
+      if (selectedAction === 'CAMBIO_CATEGORIA' && categoriaSeleccionada) {
+        await database.write(async () => {
+          for (const item of knownItems) {
+            const animal = await animalRepo.findById(item.animalId!);
+            await animal.update((a) => {
+              a.categoria = categoriaSeleccionada;
+            });
+          }
+        });
+      } else if (selectedAction === 'CAMBIO_LOTE' && loteDestinoId) {
         // Each transferToLote runs its own atomic write internally.
         for (const item of knownItems) {
           const animal = await animalRepo.findById(item.animalId!);
@@ -115,6 +129,7 @@ export function BatchActionSheet({ visible, onClose }: Props) {
     selectedAction,
     queue,
     loteDestinoId,
+    categoriaSeleccionada,
     vacuna,
     notas,
     database,
@@ -123,14 +138,15 @@ export function BatchActionSheet({ visible, onClose }: Props) {
     onClose,
   ]);
 
-  const isSaveEnabled =
-    selectedAction !== null &&
-    queue.length > 0 &&
-    (selectedAction !== 'CAMBIO_LOTE' || loteDestinoId !== null) &&
-    (selectedAction !== 'VACUNACION' || vacuna.trim().length > 0);
-
   const knownCount = queue.filter((i) => i.animalId != null).length;
   const unknownCount = queue.length - knownCount;
+
+  const isSaveEnabled =
+    selectedAction !== null &&
+    knownCount > 0 &&
+    (selectedAction !== 'CAMBIO_LOTE' || loteDestinoId !== null) &&
+    (selectedAction !== 'CAMBIO_CATEGORIA' || categoriaSeleccionada !== null) &&
+    !applying;
 
   return (
     <BottomSheetModal
@@ -261,6 +277,38 @@ export function BatchActionSheet({ visible, onClose }: Props) {
           </View>
         )}
 
+        {/* Cambio de Categoría: category picker */}
+        {selectedAction === 'CAMBIO_CATEGORIA' && (
+          <View style={styles.fieldSection}>
+            <Text style={styles.fieldLabel}>NUEVA CATEGORÍA</Text>
+            <View style={styles.loteGrid}>
+              {[...CATEGORIAS_MACHO, ...CATEGORIAS_HEMBRA].map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.loteOption,
+                    categoriaSeleccionada === cat && styles.loteOptionSelected,
+                  ]}
+                  onPress={() => {
+                    triggerSelection();
+                    setCategoriaSeleccionada(cat);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.loteOptionText,
+                      categoriaSeleccionada === cat && styles.loteOptionTextSelected,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Optional notes for Pesaje / Cambio de Lote */}
         {(selectedAction === 'PESAJE' || selectedAction === 'CAMBIO_LOTE') && (
           <View style={styles.fieldSection}>
@@ -276,8 +324,18 @@ export function BatchActionSheet({ visible, onClose }: Props) {
           </View>
         )}
 
+        {unknownCount > 0 && knownCount === 0 && (
+          <Text style={styles.warningText}>
+            ⚠️ Ningún animal escaneado está registrado. Registrá los animales primero tocando sobre cada uno.
+          </Text>
+        )}
+        {unknownCount > 0 && knownCount > 0 && (
+          <Text style={styles.warningText}>
+            ⚠️ {unknownCount} animal{unknownCount > 1 ? 'es' : ''} no registrado{unknownCount > 1 ? 's' : ''} serán ignorados
+          </Text>
+        )}
         <Button
-          label={applying ? 'Aplicando...' : `APLICAR A ${knownCount} ANIMALES`}
+          label={applying ? 'Aplicando...' : `APLICAR A ${knownCount} ANIMAL${knownCount !== 1 ? 'ES' : ''}`}
           onPress={handleApply}
           size="lg"
           disabled={!isSaveEnabled || applying}
@@ -443,4 +501,10 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
   },
   applyButton: { marginTop: spacing.sm },
+  warningText: {
+    color: colors.warning,
+    fontSize: typography.sizes.xs,
+    textAlign: 'center',
+    paddingHorizontal: spacing.sm,
+  },
 });

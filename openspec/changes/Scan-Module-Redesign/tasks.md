@@ -22,6 +22,19 @@
 - [x] 3.4 Pass `ensureFocus` as prop to `BatchModeView`; verify hidden `TextInput` remains unconditional and above all sub-components in JSX order
 - [x] 3.5 Import all new components from `src/features/scan/components/index.ts`; delete extracted JSX blocks from `ScanScreen`; confirm file compiles with no unused imports
 
+## Phase 5: Session & Hardware Mode (Manga Workflow)
+
+- [x] 5.1 `scanStore.ts`: add `HardwareMode`, `QueueItemStatus` (5 states), enhance `QueueItem` with `categoria`/`estado`, add `sessionActive`/`sessionStartedAt`/`hardwareMode` state, add `startSession`/`endSession`/`setHardwareMode`/`enqueueLoading`/`hydrateQueueItem` actions
+- [x] 5.2 `useRFIDScanner.ts`: rename debounce to `SINGLE_DEBOUNCE_MS=300`, add `CONTINUOUS_DEBOUNCE_MS=3000`, add `continuousFilterRef` (Map<rfid,timestamp>), bifurcate `processRfid` into session flow (enqueue+hydrate+DB) vs individual flow (existing sheets)
+- [x] 5.3 `ScanScreen.tsx`: add session selectors/handlers, hardware mode `SegmentedControl` (visible only when session active), "INICIAR TRABAJO EN MANGA" / "FINALIZAR SESIÓN" buttons gated on `batchMode && sessionActive`
+
+## Phase 6: Session Queue UI (Next)
+
+- [x] 6.1 Create `SessionQueueView.tsx`: FlatList de QueueItem con StatusIndicator (spinner para loading, dot de color por estado) y badge de texto; footer con Limpiar/Procesar Lote; tap en fila llama `onItemPress`
+- [x] 6.2 `BulkActionSheet.tsx` ya existía con Vacunación/Pesaje/Cambio de Lote + WatermelonDB transaccional — reutilizado sin cambios
+- [x] 6.3 Create `ItemDetailModal.tsx`: Modal RN nativo con 3 vistas (pending_registration placeholder, pending→form PESAJE/VACUNACION, processed→readonly); escribe Evento a WatermelonDB + marca ítem como processed
+- [x] 6.4 Wire `ScanScreen`: `sessionActive && batchMode` → SessionQueueView; `batchMode && !sessionActive` → BatchModeView; `!batchMode` → IndividualModeView; ItemDetailModal montado permanentemente con `visible={selectedQueueItem !== null}`
+
 ## Phase 4: Testing
 
 - [ ] 4.1 Unit test `injectMock`: mock `processRfid`, spy on `ensureFocus`, call `injectMock("TEST-001")` → assert both were called in order; call with no args → assert `processRfid("MOCK-0001-TEST")` called
