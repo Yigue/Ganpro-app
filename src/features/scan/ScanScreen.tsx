@@ -145,6 +145,12 @@ export function ScanScreen() {
     ensureFocus();
   }, [ensureFocus]);
 
+  const handleAction = useCallback((action: string) => {
+    Alert.alert('Acción', `Ejecutando ${action} para el animal ${currentRfid}`);
+    ensureFocus();
+  }, [currentRfid, ensureFocus]);
+
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
 
