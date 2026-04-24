@@ -406,6 +406,8 @@ function EventoRow({ evento }: { evento: EventoModel }) {
   );
 }
 
+import type SyncLogModel from '@data/models/SyncLogModel';
+
 const DashboardWithData = withObservables(
   ['selectedLoteId'],
   ({ selectedLoteId }: DashboardOuterProps) => ({
@@ -434,10 +436,36 @@ const DashboardWithData = withObservables(
       .get<AnimalModel>('animals')
       .query()
       .observe(),
+    pendingSyncs: database
+      .get<SyncLogModel>('sync_logs')
+      .query(Q.where('synced', false))
+      .observeCount(),
   })
 )(DashboardInner);
 
 // ── Main Screen ──────────────────────────────────────────────────────────────
+
+function DashboardHeader({ pendingSyncs }: { pendingSyncs: number }) {
+  return (
+    <View style={dashStyles.header}>
+      <Text style={dashStyles.title}>Dashboard</Text>
+      <View style={dashStyles.syncBadge}>
+        <Ionicons 
+          name={pendingSyncs === 0 ? "cloud-done" : "cloud-upload"} 
+          size={16} 
+          color={pendingSyncs === 0 ? colors.primary : colors.warning} 
+        />
+        <Text style={[dashStyles.syncText, pendingSyncs > 0 && { color: colors.warning }]}>
+          {pendingSyncs === 0 ? 'Sincronizado' : `${pendingSyncs} pendientes`}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const DashboardHeaderWithData = withObservables([], () => ({
+  pendingSyncs: database.get<SyncLogModel>('sync_logs').query(Q.where('synced', false)).observeCount(),
+}))(DashboardHeader);
 
 export function DashboardScreen() {
   const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
@@ -451,9 +479,7 @@ export function DashboardScreen() {
   return (
     <ObservableErrorBoundary fallbackTitle="Error al cargar dashboard">
       <SafeAreaView style={dashStyles.container} edges={['top']}>
-        <View style={dashStyles.header}>
-          <Text style={dashStyles.title}>Dashboard</Text>
-        </View>
+        <DashboardHeaderWithData />
         <DashboardWithData
           selectedLoteId={selectedLoteId}
           onSelectLote={setSelectedLoteId}
@@ -466,6 +492,9 @@ export function DashboardScreen() {
 const dashStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
@@ -474,6 +503,22 @@ const dashStyles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold,
+  },
+  syncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  syncText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   scrollContent: { paddingBottom: spacing.xxl },
   loteRow: {
