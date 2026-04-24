@@ -68,9 +68,10 @@ interface ScanState {
   setHardwareMode: (mode: HardwareMode) => void;
   enqueueLoading: (rfid: string) => void;
   hydrateQueueItem: (rfid: string, patch: Partial<Omit<QueueItem, 'rfid' | 'scannedAt'>>) => void;
+  isDuplicateScan: (rfid: string) => boolean;
 }
 
-export const useScanStore = create<ScanState>((set) => ({
+export const useScanStore = create<ScanState>()((set, get) => ({
   currentRfid: null,
   phase: 'idle',
   lastScanTime: null,
@@ -147,4 +148,5 @@ export const useScanStore = create<ScanState>((set) => ({
         item.rfid === rfid ? { ...item, ...patch } : item
       ),
     })),
+  isDuplicateScan: (rfid) => get().queue.some(item => item.rfid === rfid),
 }));

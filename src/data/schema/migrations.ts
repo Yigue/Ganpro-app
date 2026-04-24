@@ -7,6 +7,33 @@ import { schemaMigrations, addColumns, createTable } from '@nozbe/watermelondb/S
 export const migrations = schemaMigrations({
   migrations: [
     {
+      toVersion: 4,
+      steps: [
+        createTable({
+          name: 'tasks',
+          columns: [
+            { name: 'title', type: 'string' },
+            { name: 'description', type: 'string', isOptional: true },
+            { name: 'due_date', type: 'number', isOptional: true },
+            { name: 'status', type: 'string' },
+            { name: 'priority', type: 'string' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'financial_categories',
+          columns: [
+            { name: 'name', type: 'string' },
+            { name: 'type', type: 'string' },
+            { name: 'color', type: 'string', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+      ],
+    },
+    {
       toVersion: 3,
       steps: [
         addColumns({

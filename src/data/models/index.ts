@@ -12,6 +12,10 @@ export { default as RacionModel } from './RacionModel';
 export { default as SuplementoModel } from './SuplementoModel';
 export { default as SyncLogModel } from './SyncLogModel';
 
+// ─── V4 Models (named exports) ──────────────────────────────────────────────
+export { TaskModel } from './TaskModel';
+export { FinancialCategoryModel } from './FinancialCategoryModel';
+
 // ─── V3 Models (named exports) ──────────────────────────────────────────────
 export { AnimalMovementModel } from './AnimalMovementModel';
 export { MangaActionQueueModel } from './MangaActionQueueModel';

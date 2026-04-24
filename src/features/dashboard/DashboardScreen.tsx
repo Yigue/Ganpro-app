@@ -3,11 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import withObservables from '@nozbe/with-observables';
 import { Q } from '@nozbe/watermelondb';
 import { EmptyState } from '@shared/components/EmptyState';
@@ -23,12 +23,19 @@ import type LoteModel from '@data/models/LoteModel';
 import type PrecioMercadoModel from '@data/models/PrecioMercadoModel';
 import type AnimalModel from '@data/models/AnimalModel';
 
-const TIPO_META: Record<EventoTipoType, { icon: string; color: string }> = {
-  PESAJE: { icon: '⚖️', color: colors.info },
-  VACUNACION: { icon: '💉', color: colors.warning },
-  CAMBIO_LOTE: { icon: '🔀', color: colors.primary },
-  TACTO: { icon: '🔬', color: '#C35BD0' },
-  OTRO: { icon: '📋', color: colors.textSecondary },
+type DashTab = 'operativo' | 'economico';
+
+type TipoMeta = {
+  iconName: React.ComponentProps<typeof Ionicons>['name'];
+  color: string;
+};
+
+const TIPO_META: Record<EventoTipoType, TipoMeta> = {
+  PESAJE:      { iconName: 'scale-outline',             color: colors.info },
+  VACUNACION:  { iconName: 'medical-outline',           color: colors.warning },
+  CAMBIO_LOTE: { iconName: 'swap-horizontal-outline',   color: colors.primary },
+  TACTO:       { iconName: 'flask-outline',             color: '#C35BD0' },
+  OTRO:        { iconName: 'document-text-outline',     color: colors.textSecondary },
 };
 
 // ── GDP Line Chart ─────────────────────────────────────────────────────────────
@@ -44,32 +51,63 @@ function SimpleLineChart({ data }: { data: { x: number; y: number }[] }) {
     );
   }
 
-  const CHART_H = 120;
+  const CHART_H = 130;
   const maxY = Math.max(...data.map((d) => d.y));
   const minY = Math.min(...data.map((d) => d.y));
   const range = maxY - minY || 1;
 
+  const points = data.map((point, i) => ({
+    xPct: i / (data.length - 1),
+    yPct: (point.y - minY) / range,
+    ...point,
+  }));
+
   return (
     <View style={chartStyles.container}>
       <View style={[chartStyles.chart, { height: CHART_H }]}>
-        {data.map((point, i) => {
-          const xPct = i / (data.length - 1);
-          const yPct = (point.y - minY) / range;
+        {/* Connecting lines between consecutive dots */}
+        {points.slice(1).map((pt, i) => {
+          const prev = points[i];
+          const x1 = prev.xPct * 84 + 4;
+          const x2 = pt.xPct * 84 + 4;
+          const y1 = prev.yPct * (CHART_H - 32) + 12;
+          const y2 = pt.yPct * (CHART_H - 32) + 12;
+          const dy = y2 - y1;
+          const dxPx = (x2 - x1) * 3; // ~3px per 1%
+          const length = Math.sqrt(dxPx ** 2 + dy ** 2);
+          const angle = Math.atan2(dy, dxPx) * (180 / Math.PI);
+
           return (
             <View
-              key={i}
-              style={[
-                chartStyles.dot,
-                {
-                  left: `${xPct * 88 + 4}%` as `${number}%`,
-                  bottom: yPct * (CHART_H - 24) + 8,
-                },
-              ]}
+              key={`line-${i}`}
+              style={{
+                position: 'absolute',
+                left: `${x1}%` as `${number}%`,
+                bottom: y1 + 4,
+                width: length,
+                height: 1.5,
+                backgroundColor: `${colors.primary}80`,
+                transformOrigin: 'left center',
+                transform: [{ rotate: `${angle}deg` }],
+              }}
             />
           );
         })}
-        <Text style={chartStyles.maxLabel}>{maxY.toFixed(0)} kg</Text>
-        <Text style={chartStyles.minLabel}>{minY.toFixed(0)} kg</Text>
+        {/* Dots */}
+        {points.map((pt, i) => (
+          <View
+            key={i}
+            style={[
+              chartStyles.dot,
+              {
+                left: `${pt.xPct * 84 + 4}%` as `${number}%`,
+                bottom: pt.yPct * (CHART_H - 32) + 12,
+              },
+            ]}
+          />
+        ))}
+        <Text style={chartStyles.maxLabel}>{maxY.toFixed(1)} kg</Text>
+        <Text style={chartStyles.minLabel}>{minY.toFixed(1)} kg</Text>
       </View>
     </View>
   );
@@ -80,15 +118,20 @@ const chartStyles = StyleSheet.create({
   chart: {
     backgroundColor: colors.surface,
     borderRadius: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     position: 'relative',
     paddingHorizontal: spacing.sm,
   },
   dot: {
     position: 'absolute',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
   },
   maxLabel: {
     position: 'absolute',
@@ -112,10 +155,12 @@ function SemaforoCard({
   title,
   value,
   status,
+  trend,
 }: {
   title: string;
   value: string;
   status: 'green' | 'yellow' | 'red' | 'gray';
+  trend?: 'up' | 'down' | 'flat';
 }) {
   const color =
     status === 'green'
@@ -126,9 +171,25 @@ function SemaforoCard({
           ? colors.error
           : colors.textDisabled;
 
+  const trendIcon: React.ComponentProps<typeof Ionicons>['name'] | null =
+    trend === 'up' ? 'trending-up-outline'
+    : trend === 'down' ? 'trending-down-outline'
+    : trend === 'flat' ? 'remove-outline'
+    : null;
+
+  const trendColor =
+    trend === 'up' ? colors.primary
+    : trend === 'down' ? colors.error
+    : colors.textSecondary;
+
   return (
     <View style={[semaforoStyles.card, { borderColor: `${color}40` }]}>
-      <Text style={[semaforoStyles.value, { color }]}>{value}</Text>
+      <View style={semaforoStyles.valueRow}>
+        <Text style={[semaforoStyles.value, { color }]}>{value}</Text>
+        {trendIcon != null && (
+          <Ionicons name={trendIcon} size={14} color={trendColor} />
+        )}
+      </View>
       <Text style={semaforoStyles.title}>{title}</Text>
     </View>
   );
@@ -143,6 +204,11 @@ const semaforoStyles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
   },
+  valueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   value: {
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.heavy,
@@ -155,6 +221,31 @@ const semaforoStyles = StyleSheet.create({
     marginTop: 4,
   },
 });
+
+// ── Date grouping ─────────────────────────────────────────────────────────────
+
+function groupEventosByDate(eventos: EventoModel[]): { label: string; data: EventoModel[] }[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const groups = new Map<string, EventoModel[]>();
+
+  for (const evento of eventos) {
+    const d = new Date(evento.timestamp);
+    d.setHours(0, 0, 0, 0);
+    let label: string;
+    if (d.getTime() === today.getTime()) label = 'Hoy';
+    else if (d.getTime() === yesterday.getTime()) label = 'Ayer';
+    else label = format(d, "d 'de' MMMM", { locale: es });
+
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label)!.push(evento);
+  }
+
+  return Array.from(groups.entries()).map(([label, data]) => ({ label, data }));
+}
 
 // ── Dashboard Inner ───────────────────────────────────────────────────────────
 
@@ -257,6 +348,7 @@ function DashboardInner({
             title="GDP"
             value={gdp != null ? `${gdp.toFixed(1)}kg/d` : 'N/D'}
             status={gdp != null ? (gdp >= 0.8 ? 'green' : gdp >= 0.5 ? 'yellow' : 'red') : 'gray'}
+            trend={gdp != null ? (gdp >= 0.8 ? 'up' : gdp >= 0.5 ? 'flat' : 'down') : undefined}
           />
           <SemaforoCard
             title="Mortalidad"
@@ -277,10 +369,18 @@ function DashboardInner({
         {eventosRecientes.length === 0 ? (
           <EmptyState icon="📋" title="Sin eventos" subtitle="Los eventos aparecerán aquí" />
         ) : (
-          eventosRecientes.map((e) => (
-            <ObservableErrorBoundary key={e.id}>
-              <EventoRow evento={e} />
-            </ObservableErrorBoundary>
+          groupEventosByDate(eventosRecientes).map((group) => (
+            <View key={group.label}>
+              <View style={dashStyles.dateGroupHeader}>
+                <Text style={dashStyles.dateGroupLabel}>{group.label}</Text>
+                <View style={dashStyles.dateGroupLine} />
+              </View>
+              {group.data.map((e) => (
+                <ObservableErrorBoundary key={e.id}>
+                  <EventoRow evento={e} />
+                </ObservableErrorBoundary>
+              ))}
+            </View>
           ))
         )}
       </View>
@@ -292,7 +392,9 @@ function EventoRow({ evento }: { evento: EventoModel }) {
   const meta = TIPO_META[evento.tipo as EventoTipoType] ?? TIPO_META.OTRO;
   return (
     <View style={dashStyles.eventoRow}>
-      <Text style={dashStyles.eventoIcon}>{meta.icon}</Text>
+      <View style={[dashStyles.eventoIconContainer, { borderColor: `${meta.color}30` }]}>
+        <Ionicons name={meta.iconName} size={18} color={meta.color} />
+      </View>
       <View style={dashStyles.eventoInfo}>
         <Text style={[dashStyles.eventoTipo, { color: meta.color }]}>{evento.tipo}</Text>
         <Text style={dashStyles.eventoAnimal}>Animal: {evento.animalId.slice(0, 8)}…</Text>
@@ -423,9 +525,36 @@ const dashStyles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: spacing.md,
   },
-  eventoIcon: { fontSize: 22 },
+  eventoIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   eventoInfo: { flex: 1 },
   eventoTipo: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semibold },
   eventoAnimal: { color: colors.textSecondary, fontSize: typography.sizes.xs, marginTop: 2 },
   eventoTime: { color: colors.textDisabled, fontSize: typography.sizes.xs, fontVariant: ['tabular-nums'] },
+  dateGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    gap: spacing.sm,
+  },
+  dateGroupLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  dateGroupLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
 });

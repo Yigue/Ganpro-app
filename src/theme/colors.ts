@@ -33,6 +33,7 @@ export const colors = {
   // Scan feedback overlay
   scanSuccess: 'rgba(0, 214, 143, 0.15)',
   scanError: 'rgba(255, 61, 113, 0.15)',
+  scanWarning: 'rgba(255, 170, 0, 0.15)',
 
   // Semantic alpha variants (use instead of inline rgba)
   primaryAlpha: 'rgba(0, 214, 143, 0.12)',

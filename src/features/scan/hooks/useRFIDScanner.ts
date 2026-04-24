@@ -46,6 +46,7 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
   const openEventSheet = useScanStore(s => s.openEventSheet);
   const enqueueLoading = useScanStore(s => s.enqueueLoading);
   const hydrateQueueItem = useScanStore(s => s.hydrateQueueItem);
+  const isDuplicateScan = useScanStore(s => s.isDuplicateScan);
   const database = useDatabase();
   const { triggerSuccess, triggerError } = useHapticFeedback();
   const { playSuccess, playError } = useSoundFeedback();
@@ -105,6 +106,10 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
 
       if (currentBatchMode && currentSessionActive) {
         // ── SESSION FLOW ──────────────────────────────────────────────────────
+        if (isDuplicateScan(rfid)) {
+          // already in queue — do nothing
+          return;
+        }
         enqueueLoading(rfid);
 
         try {
@@ -174,6 +179,7 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
       openEventSheet,
       enqueueLoading,
       hydrateQueueItem,
+      isDuplicateScan,
       triggerSuccess,
       triggerError,
       playSuccess,

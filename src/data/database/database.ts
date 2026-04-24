@@ -23,6 +23,8 @@ import { AnimalMovementModel } from '../models/AnimalMovementModel';
 import { MangaActionQueueModel } from '../models/MangaActionQueueModel';
 import PotreroModel from '../models/PotreroModel';
 import { PotreroFeedingLogModel } from '../models/PotreroFeedingLogModel';
+import { TaskModel } from '../models/TaskModel';
+import { FinancialCategoryModel } from '../models/FinancialCategoryModel';
 
 const adapter = new SQLiteAdapter({
   schema,
@@ -56,6 +58,9 @@ export const database = new Database({
     MangaActionQueueModel,
     PotreroModel,
     PotreroFeedingLogModel,
+    // V4 models
+    TaskModel,
+    FinancialCategoryModel,
   ],
 });
 

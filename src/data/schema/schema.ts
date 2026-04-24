@@ -4,7 +4,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
  * Schema version must be incremented whenever tables or columns change.
  * Never mutate an existing schema — always add migrations.
  */
-export const DATABASE_SCHEMA_VERSION = 3;
+export const DATABASE_SCHEMA_VERSION = 4;
 
 export const schema = appSchema({
   version: DATABASE_SCHEMA_VERSION,
@@ -241,6 +241,28 @@ export const schema = appSchema({
         { name: 'vaca_kg', type: 'number', isOptional: true },
         { name: 'vaca_descarte_kg', type: 'number', isOptional: true },
         { name: 'fuente', type: 'string' }, // MANUAL | API_MAG
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'tasks',
+      columns: [
+        { name: 'title', type: 'string' },
+        { name: 'description', type: 'string', isOptional: true },
+        { name: 'due_date', type: 'number', isOptional: true },
+        { name: 'status', type: 'string' },   // PENDING | IN_PROGRESS | COMPLETED
+        { name: 'priority', type: 'string' },  // HIGH | MEDIUM | LOW
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'financial_categories',
+      columns: [
+        { name: 'name', type: 'string' },
+        { name: 'type', type: 'string' },      // INCOME | EXPENSE
+        { name: 'color', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

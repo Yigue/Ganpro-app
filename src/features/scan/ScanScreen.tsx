@@ -93,9 +93,11 @@ export function ScanScreen() {
   const flashBg =
     phase === 'found'
       ? colors.scanSuccess
-      : phase === 'not_found' || phase === 'error'
-        ? colors.scanError
-        : 'transparent';
+      : phase === 'not_found'
+        ? colors.scanWarning
+        : phase === 'error'
+          ? colors.scanError
+          : 'transparent';
 
   const handleManualRefocus = useCallback(() => {
     reset();
