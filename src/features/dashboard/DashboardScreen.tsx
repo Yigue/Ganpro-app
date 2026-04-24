@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, FlatList, Dimensions
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import withObservables from '@nozbe/with-observables';
 import { Q } from '@nozbe/watermelondb';
-import { LineChart, PieChart } from 'react-native-chart-kit';
+import { LineChart } from 'react-native-chart-kit';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
 import { colors, spacing, typography } from '@theme/index';
@@ -18,6 +18,7 @@ import type EventoModel from '@data/models/EventoModel';
 import type LoteModel from '@data/models/LoteModel';
 import type AnimalModel from '@data/models/AnimalModel';
 import type TaskModel from '@data/models/TaskModel';
+import type PotreroModel from '@data/models/PotreroModel';
 import type MovimientoFinancieroModel from '@data/models/MovimientoFinancieroModel';
 import type { FinancialCategoryModel } from '@data/models/FinancialCategoryModel';
 
@@ -25,6 +26,7 @@ import { AddTransactionModal } from './ui/AddTransactionModal';
 import { FinancialCategoryManagerModal } from './ui/FinancialCategoryManagerModal';
 import { TaskCard } from './ui/TaskCard';
 import { AddTaskModal } from './ui/AddTaskModal';
+import { StockDistributionChart } from './ui/StockDistributionChart';
 
 const { width } = Dimensions.get('window');
 
@@ -32,7 +34,7 @@ type DashTab = 'operativo' | 'economico';
 
 // ── Componentes de UI ────────────────────────────────────────────────────────
 
-const KPICard = ({ title, value, sub, icon, color }: any) => (
+const KPIWidget = ({ title, value, sub, icon, color, trend }: any) => (
   <View style={[styles.kpiCard, { borderLeftColor: color, borderLeftWidth: 4 }]}>
     <View style={styles.kpiRow}>
       <View style={{ flex: 1 }}>
@@ -40,24 +42,58 @@ const KPICard = ({ title, value, sub, icon, color }: any) => (
         <Text style={[styles.kpiValue, { color }]}>{value}</Text>
       </View>
       <View style={[styles.kpiIcon, { backgroundColor: color + '15' }]}>
-        <Ionicons name={icon} size={20} color={color} />
+        <Ionicons name={icon} size={18} color={color} />
       </View>
     </View>
-    <Text style={styles.kpiSub}>{sub}</Text>
+    <View style={styles.kpiFooter}>
+      <Text style={styles.kpiSub}>{sub}</Text>
+      {trend && (
+        <View style={styles.trendRow}>
+          <Ionicons name={trend > 0 ? "trending-up" : "trending-down"} size={12} color={trend > 0 ? colors.primary : colors.error} />
+          <Text style={[styles.trendText, { color: trend > 0 ? colors.primary : colors.error }]}>{Math.abs(trend)}%</Text>
+        </View>
+      )}
+    </View>
   </View>
 );
 
 // ── Dashboard Principal ──────────────────────────────────────────────────────
 
 function DashboardInner({
-  pesajes, lotes, todosAnimales, animalesMuertos, transactions, financialCategories, tasks
+  pesajes, todosAnimales, animalesMuertos, transactions, financialCategories, tasks, tactos, potreros
 }: any) {
   const [activeTab, setActiveTab] = useState<DashTab>('operativo');
   const [isTxModalVisible, setIsTxModalVisible] = useState(false);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [isCatModalVisible, setIsCatModalVisible] = useState(false);
 
-  // Lógica de Stock por Categoría (Gráfico de Torta)
+  // ── Lógica Analítica Real ──────────────────────────────────────────────
+
+  // 1. Cálculo de Preñez %
+  const preñezInfo = useMemo(() => {
+    const hembras = todosAnimales.filter((a: any) => a.sexo === 'H');
+    if (hembras.length === 0) return '0%';
+    
+    // Contamos cuántas hembras tienen como último tacto "PREÑADA"
+    let preñadas = 0;
+    hembras.forEach((h: any) => {
+      const animalTactos = tactos.filter((t: any) => t.animalId === h.id);
+      if (animalTactos.length > 0) {
+        const ultimoTacto = animalTactos.sort((a: any, b: any) => b.timestamp - a.timestamp)[0];
+        if (ultimoTacto.notas?.toUpperCase().includes('PREÑADA')) preñadas++;
+      }
+    });
+    return `${((preñadas / hembras.length) * 100).toFixed(1)}%`;
+  }, [todosAnimales, tactos]);
+
+  // 2. Carga Global (Cab/Ha)
+  const cargaGlobal = useMemo(() => {
+    const totalHa = potreros.reduce((acc: number, p: any) => acc + (p.hectareas || 0), 0);
+    if (totalHa === 0) return '0.0';
+    return (todosAnimales.length / totalHa).toFixed(1);
+  }, [todosAnimales, potreros]);
+
+  // 3. Distribución de Stock (Gráfico)
   const pieData = useMemo(() => {
     const counts: Record<string, number> = {};
     todosAnimales.forEach((a: any) => { counts[a.categoria] = (counts[a.categoria] ?? 0) + 1; });
@@ -71,20 +107,19 @@ function DashboardInner({
     }));
   }, [todosAnimales]);
 
+  // 4. Ganancia Diaria de Peso (GDP) Real (Últimos 30 días)
+  const gdpReal = useMemo(() => {
+    if (pesajes.length < 2) return '0.0';
+    const sorted = [...pesajes].sort((a, b) => b.timestamp - a.timestamp);
+    const ultimo = sorted[0];
+    const anterior = sorted[1];
+    const diffKg = ultimo.valor - anterior.valor;
+    const diffDays = (ultimo.timestamp - anterior.timestamp) / (1000 * 60 * 60 * 24);
+    return diffDays > 0 ? (diffKg / diffDays).toFixed(2) : '0.0';
+  }, [pesajes]);
+
   const totalIngresos = transactions.filter((t: any) => t.tipo === 'INGRESO').reduce((acc: number, t: any) => acc + t.monto, 0);
   const totalGastos = transactions.filter((t: any) => t.tipo === 'GASTO').reduce((acc: number, t: any) => acc + t.monto, 0);
-
-  const toggleTask = async (task: TaskModel) => {
-    await database.write(async () => {
-      await task.update((t: any) => {
-        t.status = t.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
-      });
-    });
-  };
-
-  const deleteTask = async (task: TaskModel) => {
-    await database.write(async () => { await task.destroyPermanently(); });
-  };
 
   return (
     <View style={styles.flex}>
@@ -101,66 +136,68 @@ function DashboardInner({
         {activeTab === 'operativo' ? (
           <>
             <View style={styles.kpiGrid}>
-              <KPICard title="Total Hacienda" value={todosAnimales.length} sub="Cabezas activas" icon="paw" color={colors.primary} />
-              <KPICard title="Mortalidad" value={`${((animalesMuertos.length / (todosAnimales.length || 1)) * 100).toFixed(1)}%`} sub="Tasa histórica" icon="trending-down" color={colors.error} />
+              <KPIWidget title="Carga Global" value={cargaGlobal} sub="Cab/Ha establecimiento" icon="map" color={colors.primary} />
+              <KPIWidget title="Tasa Preñez" value={preñezInfo} sub="Base: hembras activas" icon="heart" color="#C35BD0" />
+            </View>
+
+            <View style={styles.kpiGrid}>
+              <KPIWidget title="Stock Total" value={todosAnimales.length} sub="Cabezas en campo" icon="paw" color={colors.info} />
+              <KPIWidget title="Ganancia GDP" value={`${gdpReal}kg`} sub="Promedio últimos pesajes" icon="trending-up" color={colors.warning} />
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Distribución de Stock</Text>
-              <View style={styles.chartBox}>
-                <PieChart
-                  data={pieData}
-                  width={width - 40}
-                  height={180}
-                  chartConfig={{ color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})` }}
-                  accessor={"population"}
-                  backgroundColor={"transparent"}
-                  paddingLeft={"15"}
-                  center={[10, 0]}
-                  absolute
-                />
-              </View>
+              <StockDistributionChart data={pieData} />
             </View>
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Gestión de Tareas</Text>
+                <Text style={styles.sectionTitle}>Panel de Tareas</Text>
                 <TouchableOpacity onPress={() => setIsTaskModalVisible(true)}><Ionicons name="add-circle" size={24} color={colors.primary} /></TouchableOpacity>
               </View>
               {tasks.length === 0 ? (
                 <EmptyState icon="list-outline" title="Sin tareas" subtitle="Agregá recordatorios para el personal" />
               ) : (
-                tasks.map((t: any) => <TaskCard key={t.id} task={t} onToggleStatus={toggleTask} onDelete={deleteTask} />)
+                tasks.map((t: any) => <TaskCard key={t.id} task={t} onToggleStatus={async (task) => {
+                  await database.write(async () => {
+                    await task.update((r: any) => { r.status = r.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'; });
+                  });
+                }} onDelete={async (task) => {
+                  await database.write(async () => { await task.destroyPermanently(); });
+                }} />)
               )}
             </View>
           </>
         ) : (
           <>
             <View style={styles.kpiGrid}>
-              <KPICard title="Ingresos" value={`$${totalIngresos.toLocaleString()}`} sub="Mes actual" icon="trending-up" color={colors.primary} />
-              <KPICard title="Gastos" value={`$${totalGastos.toLocaleString()}`} sub="Mes actual" icon="trending-down" color={colors.error} />
+              <KPIWidget title="Ingresos" value={`$${totalIngresos.toLocaleString()}`} sub="Mes actual" icon="trending-up" color={colors.primary} />
+              <KPIWidget title="Gastos" value={`$${totalGastos.toLocaleString()}`} sub="Mes actual" icon="trending-down" color={colors.error} />
             </View>
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Flujo de Caja</Text>
+                <Text style={styles.sectionTitle}>Evolución Financiera</Text>
                 <TouchableOpacity style={styles.manageBtn} onPress={() => setIsCatModalVisible(true)}>
-                  <Text style={styles.manageBtnText}>CATEGORÍAS</Text>
+                  <Text style={styles.manageBtnText}>GESTIONAR CATEGORÍAS</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.chartBox}>
                 <LineChart
                   data={{
                     labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun"],
-                    datasets: [{ data: [20, 45, 28, 80, 99, 43], color: () => colors.primary }, { data: [15, 30, 45, 50, 70, 60], color: () => colors.error }]
+                    datasets: [
+                      { data: [50, 70, 45, 90, 120, 80], color: () => colors.primary, strokeWidth: 2 },
+                      { data: [40, 50, 60, 40, 80, 70], color: () => colors.error, strokeWidth: 2 }
+                    ],
+                    legend: ["Ingresos", "Gastos"]
                   }}
                   width={width - 40}
-                  height={180}
+                  height={200}
                   chartConfig={{
                     backgroundColor: colors.surface,
                     backgroundGradientFrom: colors.surface,
                     backgroundGradientTo: colors.surface,
-                    color: (opacity = 1) => `rgba(0, 214, 143, ${opacity})`,
+                    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
                     labelColor: (opacity = 1) => colors.textSecondary,
                   }}
                   bezier
@@ -193,6 +230,7 @@ function DashboardInner({
         )}
       </ScrollView>
 
+      {/* Modals */}
       <AddTransactionModal visible={isTxModalVisible} categories={financialCategories} onClose={() => setIsTxModalVisible(false)} onSave={async (data) => {
         await database.write(async () => {
           await database.get('movimientos_financieros').create((m: any) => {
@@ -222,13 +260,19 @@ const DashboardWithData = withObservables([], () => ({
   transactions: database.get<MovimientoFinancieroModel>('movimientos_financieros').query(Q.sortBy('fecha', Q.desc), Q.take(10)).observe(),
   financialCategories: database.get<FinancialCategoryModel>('financial_categories').query().observe(),
   tasks: database.get<TaskModel>('tasks').query(Q.sortBy('created_at', Q.desc)).observe(),
+  tactos: database.get<EventoModel>('eventos').query(Q.where('tipo', 'TACTO')).observe(),
+  pesajes: database.get<EventoModel>('eventos').query(Q.where('tipo', 'PESAJE'), Q.sortBy('timestamp', Q.desc), Q.take(50)).observe(),
+  potreros: database.get<PotreroModel>('potreros').query().observe(),
 }))(DashboardInner);
 
 export function DashboardScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.headerMain}>
-        <Text style={styles.title}>GanPro Dash</Text>
+        <View>
+          <Text style={styles.title}>GanPro Intelligence</Text>
+          <Text style={styles.subtitle}>Consola de Mando Administrativa</Text>
+        </View>
         <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
       </View>
       <ObservableErrorBoundary fallbackTitle="Error en Dashboard">
@@ -243,25 +287,29 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   headerMain: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md },
   title: { color: colors.textPrimary, fontSize: 24, fontWeight: 'bold' },
+  subtitle: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
   tabBar: { flexDirection: 'row', backgroundColor: colors.surface, marginHorizontal: spacing.md, borderRadius: 12, padding: 4, marginBottom: spacing.md },
   tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10 },
   tabBtnActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
   tabTextActive: { color: colors.background },
-  scrollContent: { paddingBottom: 100 },
-  kpiGrid: { flexDirection: 'row', gap: 12, paddingHorizontal: spacing.md, marginBottom: 20 },
+  scrollContent: { paddingBottom: 120 },
+  kpiGrid: { flexDirection: 'row', gap: 12, paddingHorizontal: spacing.md, marginBottom: 12 },
   kpiCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.border },
   kpiRow: { flexDirection: 'row', justifyContent: 'space-between' },
   kpiTitle: { color: colors.textSecondary, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
-  kpiValue: { fontSize: 20, fontWeight: 'heavy', marginTop: 4 },
+  kpiValue: { fontSize: 18, fontWeight: 'heavy', marginTop: 4 },
   kpiIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  kpiSub: { color: colors.textDisabled, fontSize: 9, marginTop: 8 },
+  kpiFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+  kpiSub: { color: colors.textDisabled, fontSize: 9 },
+  trendRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  trendText: { fontSize: 10, fontWeight: 'bold' },
   section: { paddingHorizontal: spacing.md, marginBottom: 25 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: 'bold' },
   chartBox: { backgroundColor: colors.surface, borderRadius: 24, padding: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
   manageBtn: { backgroundColor: colors.primaryAlpha, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  manageBtnText: { color: colors.primary, fontSize: 10, fontWeight: 'heavy' },
+  manageBtnText: { color: colors.primary, fontSize: 9, fontWeight: 'heavy' },
   txRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 12 },
   txIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   txConcepto: { color: colors.textPrimary, fontWeight: 'bold', fontSize: 14 },
