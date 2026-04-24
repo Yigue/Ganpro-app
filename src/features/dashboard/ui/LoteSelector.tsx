@@ -17,6 +17,7 @@ export function LoteSelector({ lotes, selectedLoteId, onSelect }: LoteSelectorPr
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.scrollContainer}
       contentContainerStyle={styles.row}
     >
       <TouchableOpacity
@@ -45,8 +46,11 @@ export function LoteSelector({ lotes, selectedLoteId, onSelect }: LoteSelectorPr
 const styles = StyleSheet.create({
   row: {
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingVertical: spacing.sm,
     gap: spacing.xs,
+  },
+  scrollContainer: {
+    flexGrow: 0,
   },
   chip: {
     paddingHorizontal: spacing.md,
