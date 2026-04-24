@@ -435,9 +435,20 @@ function CCFormModal({ visible, onClose, potreros }: any) {
   );
 }
 
+import { LineChart } from 'react-native-chart-kit';
+
 // ── Componentes de Lista ─────────────────────────────────────────────────────
 
+const PotreroMapPlaceholder = () => (
+  <View style={styles.mapPlaceholder}>
+    <Ionicons name="map-outline" size={48} color={colors.primary} style={{ opacity: 0.5 }} />
+    <Text style={styles.mapPlaceholderTitle}>Vista Satelital (GIS)</Text>
+    <Text style={styles.mapPlaceholderSub}>El módulo de mapas interactivos estará disponible en la próxima actualización.</Text>
+  </View>
+);
+
 const PotreroCardInner = ({ potrero, animalsCount, onPress }: any) => (
+
   <TouchableOpacity style={styles.card} onPress={() => onPress(potrero, animalsCount)}>
     <View style={styles.cardIcon}><Ionicons name="map" size={24} color={colors.primary} /></View>
     <View style={styles.cardMain}>
@@ -518,6 +529,7 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
 
       {activeTab === 'potreros' && (
         <View style={styles.flex}>
+          <PotreroMapPlaceholder />
           <FlatList
             data={potreros}
             keyExtractor={p => p.id}
@@ -563,6 +575,33 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
               <Text style={styles.dashLabel}>CC Promedio</Text>
             </View>
           </View>
+          
+          <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.md }}>
+            <Text style={styles.sectionTitle}>Evolución CC</Text>
+            <View style={{ backgroundColor: colors.surface, borderRadius: 16, marginTop: 10, padding: 10, borderWidth: 1, borderColor: colors.border }}>
+              <LineChart
+                data={{
+                  labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun"],
+                  datasets: [{ data: [2.5, 2.8, 3.0, 3.2, 3.1, 3.2] }]
+                }}
+                width={width - spacing.md * 2 - 20}
+                height={180}
+                chartConfig={{
+                  backgroundColor: colors.surface,
+                  backgroundGradientFrom: colors.surface,
+                  backgroundGradientTo: colors.surface,
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => `rgba(0, 214, 143, ${opacity})`,
+                  labelColor: (opacity = 1) => colors.textSecondary,
+                  style: { borderRadius: 16 },
+                  propsForDots: { r: "4", strokeWidth: "2", stroke: colors.primary }
+                }}
+                bezier
+                style={{ marginVertical: 8, borderRadius: 16 }}
+              />
+            </View>
+          </View>
+
           <FlatList
             data={ccs}
             keyExtractor={c => c.id}
@@ -704,4 +743,28 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 25 },
   actionBtn: { height: 56, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   fab: { position: 'absolute', bottom: 120, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8 },
+
+  mapPlaceholder: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  mapPlaceholderTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: spacing.sm,
+  },
+  mapPlaceholderSub: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
 });
