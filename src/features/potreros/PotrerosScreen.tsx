@@ -358,7 +358,7 @@ const PotrerosWithData = withObservables([], () => ({
   raciones: database.get<RacionModel>('raciones').query(Q.where('activa', true)).observe(),
   ccs: database.get<CondicionCorporalModel>('condicion_corporal').query(Q.sortBy('fecha', Q.desc)).observe(),
   suplementos: database.get<SuplementoModel>('suplementos').query().observe(),
-}))(SanidadInner);
+}))(PotrerosInner);
 
 export function PotrerosScreen() {
   return (
