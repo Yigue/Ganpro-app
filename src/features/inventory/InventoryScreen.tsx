@@ -59,46 +59,88 @@ const DetailRow = ({ label, value, icon, color }: { label: string; value: string
   </View>
 );
 
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+
 /**
- * AnimalListItem con observación de Lote para mostrar el NOMBRE real
+ * AnimalListItem con observación de Lote para mostrar el NOMBRE real y Gestos
  */
 const AnimalListItemInner = ({ 
   animal, 
   lote,
-  onPress 
+  onPress,
+  isBulkSelect,
+  isSelected,
+  onToggleSelect,
+  onSwipeAction
 }: { 
   animal: AnimalModel; 
   lote: LoteModel | null;
   onPress: (a: AnimalModel) => void;
+  isBulkSelect: boolean;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
+  onSwipeAction: (action: 'BAJA' | 'MOVER', animal: AnimalModel) => void;
 }) => {
   const peso = useMemo(() => getStableWeight(animal.id), [animal.id]);
   const hasAlert = animal.idCaravana.endsWith('2');
 
+  const renderRightActions = () => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', height: '100%', paddingLeft: 10 }}>
+      <TouchableOpacity 
+        style={{ width: 64, height: '90%', backgroundColor: colors.info, justifyContent: 'center', alignItems: 'center', borderRadius: 16, marginRight: 8 }}
+        onPress={() => onSwipeAction('MOVER', animal)}
+      >
+        <Ionicons name="swap-horizontal" size={24} color="white" />
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={{ width: 64, height: '90%', backgroundColor: colors.error, justifyContent: 'center', alignItems: 'center', borderRadius: 16 }}
+        onPress={() => onSwipeAction('BAJA', animal)}
+      >
+        <Ionicons name="trash" size={24} color="white" />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
-    <TouchableOpacity
-      style={styles.animalCard}
-      activeOpacity={0.7}
-      onPress={() => onPress(animal)}
-    >
-      <View style={styles.cardMain}>
-        <View style={styles.cardLeft}>
-          <View style={styles.rfidContainer}>
-            <Text style={styles.animalRfid}>{animal.idCaravana}</Text>
-            {hasAlert && <View style={styles.carenciaDot} />}
+    <Swipeable renderRightActions={!isBulkSelect ? renderRightActions : undefined}>
+      <TouchableOpacity
+        style={[styles.animalCard, isSelected && { borderColor: colors.primary, backgroundColor: 'rgba(0,214,143,0.05)' }]}
+        activeOpacity={0.7}
+        onPress={() => isBulkSelect ? onToggleSelect(animal.id) : onPress(animal)}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {isBulkSelect && (
+            <View style={{ marginRight: spacing.md }}>
+              <Ionicons 
+                name={isSelected ? "checkbox" : "square-outline"} 
+                size={24} 
+                color={isSelected ? colors.primary : colors.textSecondary} 
+              />
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <View style={styles.cardMain}>
+              <View style={styles.cardLeft}>
+                <View style={styles.rfidContainer}>
+                  <Text style={styles.animalRfid}>{animal.idCaravana}</Text>
+                  {hasAlert && <View style={styles.carenciaDot} />}
+                </View>
+                <Text style={styles.animalMeta}>
+                  {animal.raza || 'Sin Raza'} · {animal.sexo === 'M' ? 'Macho' : 'Hembra'} · {peso}kg
+                </Text>
+              </View>
+              <StatusBadge label={animal.categoria} categoria={animal.categoria as CategoriaType} />
+            </View>
+            <View style={styles.cardFooter}>
+              <View style={styles.locationTag}>
+                <Ionicons name="location-sharp" size={14} color={colors.textSecondary} />
+                <Text style={styles.locationText}>Lote: {lote?.nombre || 'General'}</Text>
+              </View>
+            </View>
           </View>
-          <Text style={styles.animalMeta}>
-            {animal.raza || 'Sin Raza'} · {animal.sexo === 'M' ? 'Macho' : 'Hembra'} · {peso}kg
-          </Text>
         </View>
-        <StatusBadge label={animal.categoria} categoria={animal.categoria as CategoriaType} />
-      </View>
-      <View style={styles.cardFooter}>
-        <View style={styles.locationTag}>
-          <Ionicons name="location-sharp" size={14} color={colors.textSecondary} />
-          <Text style={styles.locationText}>Lote: {lote?.nombre || 'General'}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Swipeable>
   );
 };
 
@@ -114,12 +156,20 @@ function CategorySection({
   title, 
   count, 
   animals, 
-  onAnimalPress 
+  onAnimalPress,
+  isBulkSelect,
+  selectedIds,
+  onToggleSelect,
+  onSwipeAction
 }: { 
   title: string; 
   count: number; 
   animals: AnimalModel[]; 
-  onAnimalPress: (a: AnimalModel) => void; 
+  onAnimalPress: (a: AnimalModel) => void;
+  isBulkSelect: boolean;
+  selectedIds: string[];
+  onToggleSelect: (id: string) => void;
+  onSwipeAction: (action: 'BAJA' | 'MOVER', animal: AnimalModel) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -157,6 +207,10 @@ function CategorySection({
               key={animal.id} 
               animal={animal} 
               onPress={onAnimalPress} 
+              isBulkSelect={isBulkSelect}
+              isSelected={selectedIds.includes(animal.id)}
+              onToggleSelect={onToggleSelect}
+              onSwipeAction={onSwipeAction}
             />
           ))}
         </View>
@@ -185,7 +239,10 @@ function InventoryListInner({
 }) {
   const [selectedAnimal, setSelectedAnimal] = useState<AnimalModel | null>(null);
   const [selectedAnimalLote, setSelectedAnimalLote] = useState<string>('Cargando...');
+  
+  // Bulk Selection State
   const [isBulkSelect, setIsBulkSelect] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Efecto para cargar el nombre del lote cuando se selecciona un animal
   useEffect(() => {
@@ -216,46 +273,25 @@ function InventoryListInner({
     return groups;
   }, [animals, allAnimals, filterCategory, searchQuery]);
 
-  const handleAction = async (type: 'PESAR' | 'BAJA' | 'MOVER' | 'EDITAR') => {
-    if (!selectedAnimal) return;
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
-    try {
-      switch (type) {
-        case 'PESAR':
-          const peso = getStableWeight(selectedAnimal.id);
-          await eventoRepo.create({
-            animalId: selectedAnimal.id,
-            tipo: 'PESAJE',
-            valor: peso,
-            notas: 'Registro rápido desde Inventario'
-          });
-          Alert.alert('Éxito', `Pesaje de ${peso}kg registrado para ${selectedAnimal.idCaravana}`);
-          break;
-        case 'BAJA':
-          Alert.alert(
-            'Confirmar Baja',
-            `¿Está seguro de dar de baja al animal ${selectedAnimal.idCaravana}?`,
-            [
-              { text: 'Cancelar', style: 'cancel' },
-              { 
-                text: 'Confirmar', 
-                style: 'destructive',
-                onPress: async () => {
-                  await animalRepo.updateEstado(selectedAnimal, 'MUERTO', 'Baja desde Inventario');
-                  setSelectedAnimal(null);
-                }
-              }
-            ]
-          );
-          return;
-        default:
-          Alert.alert('Próximamente', `La acción ${type} estará disponible pronto.`);
-          break;
-      }
-      setSelectedAnimal(null);
-    } catch (error) {
-      console.error(`Error en acción ${type}:`, error);
-      Alert.alert('Error', 'No se pudo completar la operación.');
+  const toggleBulkMode = () => {
+    setIsBulkSelect(!isBulkSelect);
+    setSelectedIds([]);
+  };
+
+  const handleSwipeAction = async (action: 'BAJA' | 'MOVER', animal: AnimalModel) => {
+    if (action === 'BAJA') {
+      Alert.alert('Baja Rápida', `¿Dar de baja a ${animal.idCaravana}?`, [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', style: 'destructive', onPress: async () => {
+          await animalRepo.updateEstado(animal, 'MUERTO', 'Baja rápida por Swipe');
+        }}
+      ]);
+    } else {
+      Alert.alert('Mover Rápido', `Próximamente: Mover a ${animal.idCaravana}`);
     }
   };
 
@@ -296,7 +332,7 @@ function InventoryListInner({
           </View>
           <TouchableOpacity 
             style={[styles.toolButton, isBulkSelect && styles.toolButtonActive]}
-            onPress={() => setIsBulkSelect(!isBulkSelect)}
+            onPress={toggleBulkMode}
           >
             <Ionicons name="list-outline" size={24} color={isBulkSelect ? 'white' : colors.primary} />
           </TouchableOpacity>
@@ -314,10 +350,31 @@ function InventoryListInner({
               count={list.length} 
               animals={list} 
               onAnimalPress={setSelectedAnimal}
+              isBulkSelect={isBulkSelect}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onSwipeAction={handleSwipeAction}
             />
           ))
         )}
       </ScrollView>
+
+      {/* Bulk Action Bottom Bar */}
+      {isBulkSelect && (
+        <View style={styles.bulkActionBar}>
+          <Text style={styles.bulkCount}>{selectedIds.length} seleccionados</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity style={[styles.bulkBtn, { backgroundColor: colors.info }]} onPress={() => Alert.alert('Mover Lote', `Moveriendo ${selectedIds.length} animales`)}>
+              <Ionicons name="swap-horizontal" size={20} color="white" />
+              <Text style={styles.bulkBtnText}>Mover</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.bulkBtn, { backgroundColor: colors.warning }]} onPress={() => Alert.alert('Sanidad', `Registrando evento a ${selectedIds.length} animales`)}>
+              <Ionicons name="medkit" size={20} color="white" />
+              <Text style={styles.bulkBtnText}>Sanidad</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Modal de Acciones (Bottom Sheet) */}
       <Modal
@@ -541,4 +598,42 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   actionLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: 'bold' },
+
+  bulkActionBar: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 20,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  bulkCount: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  bulkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  bulkBtnText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 });
