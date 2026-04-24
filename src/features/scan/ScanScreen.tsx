@@ -258,7 +258,7 @@ export function ScanScreen() {
       )}
 
       {/* Center content — delegated to mode sub-components */}
-      <View style={styles.centerContent}>
+      <View style={[styles.centerContent, { paddingBottom: 100 }]}>
         {batchMode && sessionActive ? (
           <SessionQueueView
             queue={queue}
@@ -283,7 +283,7 @@ export function ScanScreen() {
       {/* Bottom refocus button — individual mode only */}
       {!batchMode && (
         <TouchableOpacity
-          style={styles.refocusButton}
+          style={[styles.refocusButton, { marginBottom: 120 }]}
           onPress={handleManualRefocus}
           activeOpacity={0.8}
           accessibilityLabel="Activar escáner"
@@ -294,6 +294,7 @@ export function ScanScreen() {
           </Text>
         </TouchableOpacity>
       )}
+
 
       {/* Modals */}
       <AnimalRegistrationModal
