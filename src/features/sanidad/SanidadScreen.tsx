@@ -401,9 +401,11 @@ function SanidadInner({ schedules, operations, logs, lotes }: any) {
   const [isProgModalVisible, setIsProgModalVisible] = useState(false);
   const [isVadeFormVisible, setIsVadeFormVisible] = useState(false);
   const [isCatModalVisible, setIsCatModalVisible] = useState(false);
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
+  const [selectedLoteFilter, setSelectedLoteFilter] = useState<string | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('@sanidad_categories').then(data => {
@@ -416,6 +418,11 @@ function SanidadInner({ schedules, operations, logs, lotes }: any) {
     await AsyncStorage.setItem('@sanidad_categories', JSON.stringify(newCats));
   };
 
+  const filteredSchedules = useMemo(() => {
+    if (!selectedLoteFilter) return schedules;
+    return schedules.filter((e: any) => e.loteId === selectedLoteFilter);
+  }, [schedules, selectedLoteFilter]);
+
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
     const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
@@ -423,8 +430,8 @@ function SanidadInner({ schedules, operations, logs, lotes }: any) {
   }, [currentMonth]);
 
   const dayEvents = useMemo(() => {
-    return schedules.filter((e: any) => isSameDay(new Date(e.fechaProgramada), selectedDate));
-  }, [schedules, selectedDate]);
+    return filteredSchedules.filter((e: any) => isSameDay(new Date(e.fechaProgramada), selectedDate));
+  }, [filteredSchedules, selectedDate]);
 
   const filteredOperations = useMemo(() => {
     if (!activeCategoryFilter) return operations;
@@ -438,12 +445,20 @@ function SanidadInner({ schedules, operations, logs, lotes }: any) {
           <Text style={styles.title}>Sanidad</Text>
           <Text style={styles.subtitle}>{calendarMode === 'MONTH' ? 'Vista Mensual' : 'Vista Anual'}</Text>
         </View>
-        {activeTab === 'calendario' && (
-          <TouchableOpacity style={styles.viewToggleBtn} onPress={() => setCalendarView(calendarMode === 'MONTH' ? 'YEAR' : 'MONTH')}>
-            <Ionicons name={calendarMode === 'MONTH' ? "grid" : "calendar"} size={20} color={colors.primary} />
-            <Text style={styles.viewToggleText}>{calendarMode === 'MONTH' ? 'AÑO' : 'MES'}</Text>
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {activeTab === 'calendario' && (
+            <TouchableOpacity style={styles.viewToggleBtn} onPress={() => setIsFilterModalVisible(true)}>
+              <Ionicons name="filter" size={20} color={selectedLoteFilter ? colors.background : colors.primary} />
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: selectedLoteFilter ? colors.primary : 'transparent', borderRadius: 10, zIndex: -1 }]} />
+            </TouchableOpacity>
+          )}
+          {activeTab === 'calendario' && (
+            <TouchableOpacity style={styles.viewToggleBtn} onPress={() => setCalendarView(calendarMode === 'MONTH' ? 'YEAR' : 'MONTH')}>
+              <Ionicons name={calendarMode === 'MONTH' ? "grid" : "calendar"} size={20} color={colors.primary} />
+              <Text style={styles.viewToggleText}>{calendarMode === 'MONTH' ? 'AÑO' : 'MES'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <SegmentedControl active={activeTab} onChange={setActiveTab} />
@@ -598,6 +613,36 @@ function SanidadInner({ schedules, operations, logs, lotes }: any) {
         categories={categories}
         onSave={saveCategories}
       />
+
+      <Modal visible={isFilterModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlayCenter}>
+          <View style={styles.modalContentCenter}>
+            <Text style={styles.modalTitle}>Filtrar por Lote</Text>
+            <ScrollView style={{ maxHeight: 300, marginTop: 10 }}>
+              <TouchableOpacity 
+                style={[styles.catListItem, !selectedLoteFilter && { borderColor: colors.primary }]}
+                onPress={() => { setSelectedLoteFilter(null); setIsFilterModalVisible(false); }}
+              >
+                <Text style={styles.catListText}>Ver Todos</Text>
+                {!selectedLoteFilter && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+              </TouchableOpacity>
+              {lotes.map((l: any) => (
+                <TouchableOpacity 
+                  key={l.id} 
+                  style={[styles.catListItem, selectedLoteFilter === l.id && { borderColor: colors.primary }]}
+                  onPress={() => { setSelectedLoteFilter(l.id); setIsFilterModalVisible(false); }}
+                >
+                  <Text style={styles.catListText}>{l.nombre}</Text>
+                  {selectedLoteFilter === l.id && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={[styles.actionBtn, { marginTop: 15 }]} onPress={() => setIsFilterModalVisible(false)}>
+              <Text style={{ color: colors.background, fontWeight: 'bold' }}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
