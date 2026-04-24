@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -8,187 +8,61 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '@theme/index';
-import type { TaskModel, TaskPriority, TaskStatus } from '@data/models/TaskModel';
 
 interface AddTaskModalProps {
   visible: boolean;
-  editTask?: TaskModel | null;
   onClose: () => void;
-  onSave: (data: {
-    title: string;
-    description: string;
-    priority: TaskPriority;
-    dueDateText: string;
-    status: TaskStatus;
-  }) => void;
+  onSave: (data: { title: string; priority: string; dueDate?: number }) => void;
 }
 
-const PRIORITIES: { key: TaskPriority; label: string; color: string }[] = [
-  { key: 'HIGH', label: 'Alta', color: colors.error },
-  { key: 'MEDIUM', label: 'Media', color: colors.warning },
-  { key: 'LOW', label: 'Baja', color: colors.info },
-];
-
-const STATUSES: { key: TaskStatus; label: string }[] = [
-  { key: 'PENDING', label: 'Pendiente' },
-  { key: 'IN_PROGRESS', label: 'En progreso' },
-  { key: 'COMPLETED', label: 'Completada' },
-];
-
-/**
- * AddTaskModal — modal para crear o editar una tarea operativa.
- * Fecha como TextInput libre (DD/MM/AAAA) — ver TECHNICAL_DEBT.md para picker nativo.
- */
-export function AddTaskModal({ visible, editTask, onClose, onSave }: AddTaskModalProps) {
+export function AddTaskModal({ visible, onClose, onSave }: AddTaskModalProps) {
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<TaskPriority>('MEDIUM');
-  const [status, setStatus] = useState<TaskStatus>('PENDING');
-  const [dueDateText, setDueDateText] = useState('');
-
-  useEffect(() => {
-    if (editTask) {
-      setTitle(editTask.title);
-      setDescription(editTask.description ?? '');
-      setPriority(editTask.priority);
-      setStatus(editTask.status);
-      if (editTask.dueDate) {
-        const d = new Date(editTask.dueDate);
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        setDueDateText(`${dd}/${mm}/${yyyy}`);
-      } else {
-        setDueDateText('');
-      }
-    } else {
-      setTitle('');
-      setDescription('');
-      setPriority('MEDIUM');
-      setStatus('PENDING');
-      setDueDateText('');
-    }
-  }, [editTask, visible]);
+  const [priority, setPriority] = useState('MEDIUM');
 
   const handleSave = () => {
-    if (title.trim().length === 0) {
-      Alert.alert('Error', 'El título es obligatorio');
-      return;
-    }
-    onSave({ title: title.trim(), description: description.trim(), priority, dueDateText, status });
+    if (!title.trim()) return Alert.alert('Error', 'El título es obligatorio');
+    onSave({ title: title.trim(), priority, dueDate: Date.now() });
+    setTitle('');
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
         <View style={styles.sheet}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>
-              {editTask ? 'Editar tarea' : 'Nueva tarea'}
-            </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={22} color={colors.textSecondary} />
-            </TouchableOpacity>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Nueva Tarea</Text>
+          
+          <Text style={styles.label}>TÍTULO DE LA TAREA</Text>
+          <TextInput 
+            style={styles.input} 
+            placeholder="Ej: Arreglar alambrado potrero 4" 
+            placeholderTextColor={colors.textDisabled}
+            value={title}
+            onChangeText={setTitle}
+          />
+
+          <Text style={styles.label}>PRIORIDAD</Text>
+          <View style={styles.priorityRow}>
+            {['LOW', 'MEDIUM', 'HIGH'].map(p => (
+              <TouchableOpacity 
+                key={p} 
+                style={[styles.priorityBtn, priority === p && styles.priorityBtnActive]} 
+                onPress={() => setPriority(p)}
+              >
+                <Text style={[styles.priorityText, priority === p && styles.priorityTextActive]}>{p}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Título */}
-            <Text style={styles.fieldLabel}>Título *</Text>
-            <TextInput
-              style={styles.input}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Ej: Vacunación lote 3"
-              placeholderTextColor={colors.textDisabled}
-              maxLength={120}
-            />
-
-            {/* Descripción */}
-            <Text style={styles.fieldLabel}>Descripción</Text>
-            <TextInput
-              style={[styles.input, styles.inputMultiline]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Detalles opcionales..."
-              placeholderTextColor={colors.textDisabled}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-
-            {/* Prioridad */}
-            <Text style={styles.fieldLabel}>Prioridad</Text>
-            <View style={styles.chipRow}>
-              {PRIORITIES.map((p) => (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[
-                    styles.chip,
-                    { borderColor: p.color },
-                    priority === p.key && { backgroundColor: `${p.color}20` },
-                  ]}
-                  onPress={() => setPriority(p.key)}
-                >
-                  <Text style={[styles.chipText, { color: priority === p.key ? p.color : colors.textSecondary }]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Estado */}
-            {editTask != null && (
-              <>
-                <Text style={styles.fieldLabel}>Estado</Text>
-                <View style={styles.chipRow}>
-                  {STATUSES.map((s) => (
-                    <TouchableOpacity
-                      key={s.key}
-                      style={[
-                        styles.chip,
-                        status === s.key && styles.chipActive,
-                      ]}
-                      onPress={() => setStatus(s.key)}
-                    >
-                      <Text style={[styles.chipText, status === s.key && styles.chipTextActive]}>
-                        {s.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-
-            {/* Fecha límite */}
-            <Text style={styles.fieldLabel}>Fecha límite (DD/MM/AAAA)</Text>
-            <TextInput
-              style={styles.input}
-              value={dueDateText}
-              onChangeText={setDueDateText}
-              placeholder="ej: 30/04/2026"
-              placeholderTextColor={colors.textDisabled}
-              keyboardType="numeric"
-              maxLength={10}
-            />
-          </ScrollView>
-
-          {/* Acciones */}
-          <View style={styles.footer}>
+          <View style={styles.modalActions}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>Cancelar</Text>
+              <Text style={{ color: colors.textPrimary }}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveText}>{editTask ? 'Guardar' : 'Crear'}</Text>
+              <Text style={{ color: colors.background, fontWeight: 'bold' }}>Crear Tarea</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -198,113 +72,18 @@ export function AddTaskModal({ visible, editTask, onClose, onSave }: AddTaskModa
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.surfaceElevated,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '85%',
-    paddingBottom: Platform.OS === 'ios' ? 34 : spacing.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-  },
-  body: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  fieldLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    color: colors.textPrimary,
-    fontSize: typography.sizes.md,
-  },
-  inputMultiline: {
-    height: 80,
-    paddingTop: spacing.sm,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    flexWrap: 'wrap',
-  },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  chipActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryAlpha,
-  },
-  chipText: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.sm,
-  },
-  chipTextActive: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  cancelText: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semibold,
-  },
-  saveBtn: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-  },
-  saveText: {
-    color: colors.textOnPrimary,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-  },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colors.surfaceElevated, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: spacing.xl, paddingBottom: 40 },
+  modalHandle: { width: 40, height: 5, backgroundColor: colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
+  modalTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  label: { color: colors.textSecondary, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10, marginTop: 10 },
+  input: { backgroundColor: colors.surface, borderRadius: 12, padding: 15, color: colors.textPrimary, borderWidth: 1, borderColor: colors.border },
+  priorityRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  priorityBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: colors.border },
+  priorityBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  priorityText: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
+  priorityTextActive: { color: colors.background },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  cancelBtn: { flex: 0.5, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  saveBtn: { flex: 1, height: 56, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
 });
