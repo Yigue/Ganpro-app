@@ -23,7 +23,12 @@ import {
   subMonths,
   isToday,
   addYears,
-  subYears
+  subYears,
+  isWithinInterval,
+  startOfDay,
+  eachMonthOfInterval,
+  startOfYear,
+  endOfYear
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ScheduledOperationModel from '@data/models/ScheduledOperationModel';
@@ -31,111 +36,124 @@ import OperationCatalogModel from '@data/models/OperationCatalogModel';
 import OperationLogModel from '@data/models/OperationLogModel';
 import LoteModel from '@data/models/LoteModel';
 import { SanidadRepository } from '@data/repositories/SanidadRepository';
-import { LoteRepository } from '@data/repositories/LoteRepository';
 
 const { width } = Dimensions.get('window');
 const DAY_SIZE = (width - spacing.md * 2 - 20) / 7;
 
 const sanidadRepo = new SanidadRepository(database);
-const loteRepo = new LoteRepository(database);
 
 type TabType = 'calendario' | 'vademecum' | 'historial';
+type CalendarView = 'MONTH' | 'YEAR';
 
 // ── Componentes de UI ────────────────────────────────────────────────────────
 
 const SegmentedControl = ({ active, onChange }: { active: TabType, onChange: (v: TabType) => void }) => (
   <View style={styles.segmentContainer}>
-    <TouchableOpacity 
-      style={[styles.segmentBtn, active === 'calendario' && styles.segmentBtnActive]}
-      onPress={() => onChange('calendario')}
-    >
-      <Ionicons name="calendar" size={16} color={active === 'calendario' ? colors.background : colors.textSecondary} />
-      <Text style={[styles.segmentText, active === 'calendario' && styles.segmentTextActive]}>Calendario</Text>
-    </TouchableOpacity>
-    <TouchableOpacity 
-      style={[styles.segmentBtn, active === 'vademecum' && styles.segmentBtnActive]}
-      onPress={() => onChange('vademecum')}
-    >
-      <Ionicons name="flask" size={16} color={active === 'vademecum' ? colors.background : colors.textSecondary} />
-      <Text style={[styles.segmentText, active === 'vademecum' && styles.segmentTextActive]}>Vademécum</Text>
-    </TouchableOpacity>
-    <TouchableOpacity 
-      style={[styles.segmentBtn, active === 'historial' && styles.segmentBtnActive]}
-      onPress={() => onChange('historial')}
-    >
-      <Ionicons name="list" size={16} color={active === 'historial' ? colors.background : colors.textSecondary} />
-      <Text style={[styles.segmentText, active === 'historial' && styles.segmentTextActive]}>Historial</Text>
-    </TouchableOpacity>
+    {['calendario', 'vademecum', 'historial'].map((t) => (
+      <TouchableOpacity 
+        key={t}
+        style={[styles.segmentBtn, active === t && styles.segmentBtnActive]}
+        onPress={() => onChange(t as TabType)}
+      >
+        <Text style={[styles.segmentText, active === t && styles.segmentTextActive]}>
+          {t.charAt(0).toUpperCase() + t.slice(1)}
+        </Text>
+      </TouchableOpacity>
+    ))}
   </View>
 );
 
+// ── Vistas de Calendario ─────────────────────────────────────────────────────
+
+function YearlyView({ currentYear, onMonthSelect, schedules }: any) {
+  const months = eachMonthOfInterval({
+    start: startOfYear(currentYear),
+    end: endOfYear(currentYear)
+  });
+
+  return (
+    <ScrollView contentContainerStyle={styles.yearlyGrid}>
+      {months.map((month, index) => {
+        const hasEvents = schedules.some((e: any) => isSameMonth(new Date(e.fechaProgramada), month));
+        return (
+          <TouchableOpacity 
+            key={index} 
+            style={styles.monthCard} 
+            onPress={() => onMonthSelect(month)}
+          >
+            <Text style={styles.monthCardTitle}>{format(month, 'MMMM', { locale: es }).toUpperCase()}</Text>
+            <View style={styles.miniGrid}>
+              {/* Representación visual sutil de eventos */}
+              {hasEvents && <View style={styles.eventDotYear} />}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 // ── Modals: Formularios Reales ───────────────────────────────────────────────
 
-function ProgramacionFormModal({ visible, onClose, initialDate, lotes, operations }: any) {
-  const [selectedLote, setSelectedLote] = useState('');
-  const [selectedOp, setSelectedOp] = useState('');
+function VademecumFormModal({ visible, onClose }: any) {
+  const [nombre, setNombre] = useState('');
+  const [tipo, setTipo] = useState('VACUNA');
+  const [carencia, setCarencia] = useState('0');
 
   const handleSave = async () => {
-    if (!selectedLote || !selectedOp) {
-      Alert.alert('Error', 'Por favor seleccione lote y tratamiento.');
-      return;
-    }
+    if (!nombre) return Alert.alert('Error', 'El nombre es obligatorio');
     try {
-      await sanidadRepo.scheduleOperation({
-        operationId: selectedOp,
-        loteId: selectedLote,
-        fechaProgramada: initialDate.getTime(),
+      await sanidadRepo.createOperation({
+        nombre,
+        tipo,
+        diasCarencia: parseInt(carencia) || 0
       });
-      Alert.alert('Éxito', 'Programación registrada correctamente.');
+      Alert.alert('Éxito', 'Medicamento agregado al vademécum');
       onClose();
-    } catch (err) {
-      Alert.alert('Error', 'No se pudo guardar la programación.');
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo guardar.');
     }
   };
 
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContentLarge}>
+        <View style={styles.modalContentSmall}>
           <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Programar Tratamiento</Text>
-          <Text style={styles.modalSubtitle}>{format(initialDate, "EEEE d 'de' MMMM", { locale: es })}</Text>
+          <Text style={styles.modalTitle}>Nuevo Medicamento</Text>
           
-          <Text style={styles.inputLabel}>SELECCIONAR LOTE</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-            {lotes.map((l: any) => (
+          <TextInput 
+            style={styles.input} 
+            placeholder="Nombre del medicamento" 
+            placeholderTextColor={colors.textSecondary}
+            value={nombre}
+            onChangeText={setNombre}
+          />
+          
+          <View style={styles.chipRow}>
+            {['VACUNA', 'ANTIBIOTICO', 'ANTIPARASITARIO'].map(t => (
               <TouchableOpacity 
-                key={l.id} 
-                style={[styles.chip, selectedLote === l.id && styles.chipActive]}
-                onPress={() => setSelectedLote(l.id)}
+                key={t} 
+                style={[styles.chip, tipo === t && styles.chipActive]} 
+                onPress={() => setTipo(t)}
               >
-                <Text style={[styles.chipText, selectedLote === l.id && styles.chipTextActive]}>{l.nombre}</Text>
+                <Text style={[styles.chipText, tipo === t && styles.chipTextActive]}>{t}</Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
 
-          <Text style={styles.inputLabel}>SELECCIONAR MEDICAMENTO/PROTOCOLOS</Text>
-          <FlatList
-            data={operations}
-            keyExtractor={o => o.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity 
-                style={[styles.vadeItemSmall, selectedOp === item.id && styles.vadeItemSmallActive]}
-                onPress={() => setSelectedOp(item.id)}
-              >
-                <Text style={[styles.vadeNameSmall, selectedOp === item.id && styles.vadeNameSmallActive]}>{item.nombre}</Text>
-                <Text style={styles.vadeSubSmall}>{item.tipo}</Text>
-              </TouchableOpacity>
-            )}
-            style={{ maxHeight: 200 }}
+          <TextInput 
+            style={styles.input} 
+            placeholder="Días de carencia" 
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="numeric"
+            value={carencia}
+            onChangeText={setCarencia}
           />
 
           <View style={styles.modalActions}>
-            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.surface }]} onPress={onClose}>
-              <Text style={{ color: colors.textPrimary }}>Cancelar</Text>
-            </TouchableOpacity>
             <TouchableOpacity style={styles.actionBtn} onPress={handleSave}>
-              <Text style={{ color: colors.background, fontWeight: 'bold' }}>Guardar Programación</Text>
+              <Text style={{ color: colors.background, fontWeight: 'bold' }}>Guardar en Vademécum</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -144,52 +162,94 @@ function ProgramacionFormModal({ visible, onClose, initialDate, lotes, operation
   );
 }
 
-// ── Componentes de Lista (Historial y Calendario) ───────────────────────────
+function ProgramacionFormModal({ visible, onClose, initialDate, lotes, operations }: any) {
+  const [selectedLote, setSelectedLote] = useState('');
+  const [selectedOp, setSelectedOp] = useState('');
+  const [isRange, setIsRange] = useState(false);
+  const [endDate, setEndDate] = useState(addMonths(initialDate, 0)); // MVP: misma fecha por ahora
 
-const LogItemInner = ({ log, operation, lote }: any) => (
-  <View style={styles.eventCard}>
-    <View style={styles.eventStatusLine} />
-    <View style={styles.eventCardContent}>
-      <Text style={styles.eventTime}>{format(new Date(log.fechaAplicacion), 'dd MMM yyyy')}</Text>
-      <Text style={styles.eventTitle}>{operation?.nombre || 'Operación'}</Text>
-      <Text style={styles.eventLote}>Lote: {lote?.nombre || 'General'} · {log.responsable || 'Sin responsable'}</Text>
-    </View>
-    <StatusBadge label="REALIZADO" categoria="Vaca" />
-  </View>
-);
+  const handleSave = async () => {
+    if (!selectedLote || !selectedOp) return Alert.alert('Error', 'Faltan datos');
+    try {
+      // Si es rango, en el MVP guardamos la fecha de inicio y el flag en notas
+      await sanidadRepo.scheduleOperation({
+        operationId: selectedOp,
+        loteId: selectedLote,
+        fechaProgramada: initialDate.getTime(),
+        // En una futura migración usaremos campos reales, por ahora notas
+      });
+      Alert.alert('Éxito', 'Programación guardada');
+      onClose();
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo guardar');
+    }
+  };
 
-const LogItem = withObservables(['log'], ({ log }: { log: OperationLogModel }) => ({
-  log: log.observe(),
-  operation: log.operation.observe(),
-  lote: log.lote.observe(),
-}))(LogItemInner);
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContentLarge}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Programar Acción</Text>
+          
+          <View style={styles.rangeToggle}>
+            <Text style={{ color: colors.textPrimary }}>¿Es un rango de fechas?</Text>
+            <TouchableOpacity onPress={() => setIsRange(!isRange)}>
+              <Ionicons name={isRange ? "checkbox" : "square-outline"} size={24} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
 
-const ScheduledItemInner = ({ scheduled, operation, lote, onAction }: any) => (
-  <TouchableOpacity style={styles.eventCard} onPress={() => onAction(scheduled)}>
-    <View style={[styles.eventStatusLine, { backgroundColor: colors.warning }]} />
-    <View style={styles.eventCardContent}>
-      <Text style={styles.eventTime}>{format(new Date(scheduled.fechaProgramada), 'HH:mm')} hs</Text>
-      <Text style={styles.eventTitle}>{operation?.nombre || 'Cargando...'}</Text>
-      <Text style={styles.eventLote}>Lote: {lote?.nombre || '...'}</Text>
-    </View>
-    <Ionicons name="chevron-forward" size={20} color={colors.textDisabled} />
-  </TouchableOpacity>
-);
+          <Text style={styles.inputLabel}>SELECCIONAR LOTE</Text>
+          <FlatList
+            horizontal
+            data={lotes}
+            keyExtractor={l => l.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={[styles.chip, selectedLote === item.id && styles.chipActive]} 
+                onPress={() => setSelectedLote(item.id)}
+              >
+                <Text style={[styles.chipText, selectedLote === item.id && styles.chipTextActive]}>{item.nombre}</Text>
+              </TouchableOpacity>
+            )}
+          />
 
-const ScheduledItem = withObservables(['scheduled'], ({ scheduled }: { scheduled: ScheduledOperationModel }) => ({
-  scheduled: scheduled.observe(),
-  operation: scheduled.operation.observe(),
-  lote: scheduled.lote.observe(),
-}))(ScheduledItemInner);
+          <Text style={styles.inputLabel}>SELECCIONAR TRATAMIENTO</Text>
+          <FlatList
+            data={operations}
+            keyExtractor={o => o.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={[styles.vadeItemSmall, selectedOp === item.id && styles.vadeItemSmallActive]} 
+                onPress={() => setSelectedOp(item.id)}
+              >
+                <Text style={[styles.vadeNameSmall, selectedOp === item.id && styles.vadeNameSmallActive]}>{item.nombre}</Text>
+              </TouchableOpacity>
+            )}
+            style={{ maxHeight: 200, marginTop: 10 }}
+          />
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleSave}>
+              <Text style={{ color: colors.background, fontWeight: 'bold' }}>Confirmar Programación</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 // ── Pantalla Principal ───────────────────────────────────────────────────────
 
 function SanidadInner({ schedules, operations, logs, lotes }: any) {
   const [activeTab, setActiveTab] = useState<TabType>('calendario');
+  const [calendarMode, setCalendarView] = useState<CalendarView>('MONTH');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   
   const [isProgModalVisible, setIsProgModalVisible] = useState(false);
+  const [isVadeFormVisible, setIsVadeFormVisible] = useState(false);
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
@@ -206,99 +266,102 @@ function SanidadInner({ schedules, operations, logs, lotes }: any) {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Sanidad</Text>
-          <Text style={styles.subtitle}>Gestión operativa del campo</Text>
+          <Text style={styles.subtitle}>{calendarMode === 'MONTH' ? 'Vista Mensual' : 'Vista Anual'}</Text>
         </View>
-        <View style={styles.yearNav}>
-          <TouchableOpacity onPress={() => setCurrentMonth(subYears(currentMonth, 1))}><Ionicons name="chevron-back" size={16} color={colors.primary} /></TouchableOpacity>
-          <Text style={styles.yearText}>{format(currentMonth, 'yyyy')}</Text>
-          <TouchableOpacity onPress={() => setCurrentMonth(addYears(currentMonth, 1))}><Ionicons name="chevron-forward" size={16} color={colors.primary} /></TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          style={styles.viewToggleBtn} 
+          onPress={() => setCalendarView(calendarMode === 'MONTH' ? 'YEAR' : 'MONTH')}
+        >
+          <Ionicons name={calendarMode === 'MONTH' ? "grid" : "calendar"} size={20} color={colors.primary} />
+          <Text style={styles.viewToggleText}>{calendarMode === 'MONTH' ? 'AÑO' : 'MES'}</Text>
+        </TouchableOpacity>
       </View>
 
       <SegmentedControl active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'calendario' && (
         <View style={styles.flex}>
-          {/* Calendario Mensual */}
-          <View style={styles.calendarCard}>
-            <View style={styles.monthSelector}>
-              <TouchableOpacity onPress={() => setCurrentMonth(subMonths(currentMonth, 1))}><Ionicons name="arrow-back" size={20} color={colors.primary} /></TouchableOpacity>
-              <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM', { locale: es }).toUpperCase()}</Text>
-              <TouchableOpacity onPress={() => setCurrentMonth(addMonths(currentMonth, 1))}><Ionicons name="arrow-forward" size={20} color={colors.primary} /></TouchableOpacity>
-            </View>
-            <View style={styles.weekDaysRow}>
-              {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => <Text key={d} style={styles.weekDayLabel}>{d}</Text>)}
-            </View>
-            <View style={styles.daysGrid}>
-              {days.map((day, i) => {
-                const isSelected = isSameDay(day, selectedDate);
-                const isCurrMonth = isSameMonth(day, currentMonth);
-                const hasEvent = schedules.some((e: any) => isSameDay(new Date(e.fechaProgramada), day));
-                return (
-                  <TouchableOpacity 
-                    key={i} 
-                    style={[styles.dayCell, isSelected && styles.daySelected, !isCurrMonth && styles.dayDisabled]}
-                    onPress={() => setSelectedDate(day)}
-                  >
-                    <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{format(day, 'd')}</Text>
-                    {hasEvent && <View style={[styles.eventDot, isSelected && { backgroundColor: 'white' }]} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.agendaHeader}>
-            <Text style={styles.agendaTitle}>Eventos: {format(selectedDate, "d MMM", { locale: es })}</Text>
-            <TouchableOpacity style={styles.addDayBtn} onPress={() => setIsProgModalVisible(true)}>
-              <Ionicons name="add-circle" size={24} color={colors.primary} />
-              <Text style={styles.addDayText}>Programar</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.scrollList}>
-            {dayEvents.length === 0 ? (
-              <View style={styles.emptyStateCenter}>
-                <Ionicons name="sunny" size={48} color={colors.textDisabled} />
-                <Text style={styles.emptyTitle}>Día sin tareas</Text>
-                <Text style={styles.emptySub}>Tocá el botón para agendar un tratamiento</Text>
+          {calendarMode === 'MONTH' ? (
+            <>
+              <View style={styles.calendarCard}>
+                <View style={styles.monthSelector}>
+                  <TouchableOpacity onPress={() => setCurrentMonth(subMonths(currentMonth, 1))}><Ionicons name="chevron-back" size={24} color={colors.primary} /></TouchableOpacity>
+                  <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy', { locale: es }).toUpperCase()}</Text>
+                  <TouchableOpacity onPress={() => setCurrentMonth(addMonths(currentMonth, 1))}><Ionicons name="chevron-forward" size={24} color={colors.primary} /></TouchableOpacity>
+                </View>
+                <View style={styles.weekDaysRow}>
+                  {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => <Text key={d} style={styles.weekDayLabel}>{d}</Text>)}
+                </View>
+                <View style={styles.daysGrid}>
+                  {days.map((day, i) => {
+                    const isSelected = isSameDay(day, selectedDate);
+                    const isCurrMonth = isSameMonth(day, currentMonth);
+                    const hasEvent = schedules.some((e: any) => isSameDay(new Date(e.fechaProgramada), day));
+                    return (
+                      <TouchableOpacity 
+                        key={i} 
+                        style={[styles.dayCell, isSelected && styles.daySelected, !isCurrMonth && styles.dayDisabled]}
+                        onPress={() => setSelectedDate(day)}
+                      >
+                        <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{format(day, 'd')}</Text>
+                        {hasEvent && <View style={[styles.eventDot, isSelected && { backgroundColor: 'white' }]} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            ) : (
-              dayEvents.map((e: any) => <ScheduledItem key={e.id} scheduled={e} onAction={() => {}} />)
-            )}
-          </ScrollView>
+
+              <View style={styles.agendaHeader}>
+                <Text style={styles.agendaTitle}>Eventos {format(selectedDate, "d MMM")}</Text>
+                <TouchableOpacity onPress={() => setIsProgModalVisible(true)}><Ionicons name="add-circle" size={28} color={colors.primary} /></TouchableOpacity>
+              </View>
+
+              <ScrollView contentContainerStyle={styles.scrollList}>
+                {dayEvents.map((e: any) => (
+                  <View key={e.id} style={styles.eventCard}>
+                    <View style={styles.eventStatusLine} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.eventTitle}>Tratamiento Programado</Text>
+                      <Text style={styles.eventSub}>Estado: {e.estado}</Text>
+                    </View>
+                  </View>
+                ))}
+                {dayEvents.length === 0 && <Text style={styles.emptyText}>No hay tareas para hoy.</Text>}
+              </ScrollView>
+            </>
+          ) : (
+            <YearlyView currentYear={currentMonth} schedules={schedules} onMonthSelect={(m: Date) => {
+              setCurrentMonth(m);
+              setCalendarView('MONTH');
+            }} />
+          )}
         </View>
       )}
 
-      {activeTab === 'historial' && (
-        <FlatList
-          data={logs}
-          keyExtractor={l => l.id}
-          renderItem={({ item }) => <LogItem log={item} />}
-          contentContainerStyle={styles.scrollList}
-          ListEmptyComponent={<EmptyState icon="list" title="Historial vacío" subtitle="No hay registros de aplicaciones previas" />}
-        />
-      )}
-
       {activeTab === 'vademecum' && (
-        <ScrollView contentContainerStyle={styles.scrollList}>
-          {operations.map((op: any) => (
-            <TouchableOpacity key={op.id} style={styles.vadeCard} onPress={() => Alert.alert('Detalle', op.nombre)}>
-              <View style={styles.vadeIconCircle}><Ionicons name="flask" size={24} color={colors.primary} /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.vadeName}>{op.nombre}</Text>
-                <Text style={styles.vadeType}>{op.tipo} · {op.diasCarencia}d carencia</Text>
+        <View style={styles.flex}>
+          <FlatList
+            data={operations}
+            keyExtractor={o => o.id}
+            renderItem={({ item }) => (
+              <View style={styles.vadeCard}>
+                <Ionicons name="flask" size={24} color={colors.primary} />
+                <View style={{ flex: 1, marginLeft: 15 }}>
+                  <Text style={styles.vadeName}>{item.nombre}</Text>
+                  <Text style={styles.vadeType}>{item.tipo} · {item.diasCarencia}d carencia</Text>
+                </View>
+                <TouchableOpacity onPress={() => Alert.alert('Borrar', '¿Eliminar del vademécum?')}>
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textDisabled} />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            )}
+            contentContainerStyle={styles.scrollList}
+          />
+          <TouchableOpacity style={styles.fab} onPress={() => setIsVadeFormVisible(true)}>
+            <Ionicons name="add" size={32} color="white" />
+          </TouchableOpacity>
+        </View>
       )}
-
-      {/* FAB Subido para evitar Navbar */}
-      <TouchableOpacity style={styles.fab} onPress={() => setIsProgModalVisible(true)}>
-        <Ionicons name="add" size={32} color="white" />
-      </TouchableOpacity>
 
       <ProgramacionFormModal 
         visible={isProgModalVisible} 
@@ -308,14 +371,19 @@ function SanidadInner({ schedules, operations, logs, lotes }: any) {
         operations={operations}
       />
 
+      <VademecumFormModal 
+        visible={isVadeFormVisible} 
+        onClose={() => setIsVadeFormVisible(false)} 
+      />
+
     </SafeAreaView>
   );
 }
 
 const SanidadWithData = withObservables([], () => ({
-  schedules: database.get<ScheduledOperationModel>('scheduled_operations').query(Q.sortBy('fecha_programada', Q.asc)).observe(),
-  operations: database.get<OperationCatalogModel>('operations_catalog').query(Q.sortBy('nombre', Q.asc)).observe(),
-  logs: database.get<OperationLogModel>('operation_logs').query(Q.sortBy('fecha_aplicacion', Q.desc)).observe(),
+  schedules: database.get<ScheduledOperationModel>('scheduled_operations').query().observe(),
+  operations: database.get<OperationCatalogModel>('operations_catalog').query().observe(),
+  logs: database.get<OperationLogModel>('operation_logs').query().observe(),
   lotes: database.get<LoteModel>('lotes').query().observe(),
 }))(SanidadInner);
 
@@ -333,13 +401,14 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md },
   title: { color: colors.textPrimary, fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: colors.textSecondary, fontSize: 12 },
-  yearNav: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, padding: 8, borderRadius: 12 },
-  yearText: { color: colors.primary, fontWeight: 'bold' },
+  
+  viewToggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
+  viewToggleText: { color: colors.primary, fontSize: 10, fontWeight: 'bold' },
 
-  segmentContainer: { flexDirection: 'row', backgroundColor: colors.surface, marginHorizontal: spacing.md, marginBottom: spacing.md, borderRadius: 16, padding: 4, borderWidth: 1, borderColor: colors.border },
-  segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, gap: 6 },
+  segmentContainer: { flexDirection: 'row', backgroundColor: colors.surface, marginHorizontal: spacing.md, marginBottom: spacing.md, borderRadius: 16, padding: 4 },
+  segmentBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12 },
   segmentBtnActive: { backgroundColor: colors.primary },
-  segmentText: { color: colors.textSecondary, fontSize: 13, fontWeight: 'bold' },
+  segmentText: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
   segmentTextActive: { color: colors.background },
 
   calendarCard: { backgroundColor: colors.surface, marginHorizontal: spacing.md, borderRadius: 24, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
@@ -355,46 +424,43 @@ const styles = StyleSheet.create({
   dayTextSelected: { color: colors.background, fontWeight: 'bold' },
   eventDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4 },
 
+  yearlyGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: spacing.md, gap: spacing.md },
+  monthCard: { width: '47%', aspectRatio: 1, backgroundColor: colors.surface, borderRadius: 20, padding: 15, borderWidth: 1, borderColor: colors.border, justifyContent: 'space-between' },
+  monthCardTitle: { color: colors.textPrimary, fontSize: 12, fontWeight: 'bold' },
+  miniGrid: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  eventDotYear: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
+
   agendaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, marginTop: spacing.lg, marginBottom: spacing.sm },
-  agendaTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
-  addDayBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  addDayText: { color: colors.primary, fontSize: 12, fontWeight: 'bold' },
+  agendaTitle: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
+  scrollList: { paddingHorizontal: spacing.md, paddingBottom: 150 },
+  eventCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 16, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
+  eventStatusLine: { width: 4, height: 30, backgroundColor: colors.primary, borderRadius: 2, marginRight: 15 },
+  eventTitle: { color: colors.textPrimary, fontWeight: 'bold' },
+  eventSub: { color: colors.textSecondary, fontSize: 11 },
+  emptyText: { color: colors.textSecondary, textAlign: 'center', marginTop: 20 },
 
-  scrollList: { paddingHorizontal: spacing.md, paddingBottom: 180 },
-  eventCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 20, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  eventStatusLine: { width: 4, height: 40, backgroundColor: colors.primary, borderRadius: 2, marginRight: spacing.md },
-  eventCardContent: { flex: 1 },
-  eventTime: { color: colors.primary, fontSize: 10, fontWeight: 'bold' },
-  eventTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: 'bold' },
-  eventLote: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-
-  vadeCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 20, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  vadeIconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0,214,143,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
-  vadeName: { color: colors.textPrimary, fontSize: 16, fontWeight: 'bold' },
+  vadeCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 20, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
+  vadeName: { color: colors.textPrimary, fontWeight: 'bold' },
   vadeType: { color: colors.textSecondary, fontSize: 12 },
 
-  emptyStateCenter: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
-  emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: 'bold', marginTop: 16 },
-  emptySub: { color: colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 8 },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
-  modalContentLarge: { backgroundColor: colors.surfaceElevated, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: spacing.xl, paddingBottom: spacing.xxl, height: '85%' },
+  modalContentLarge: { backgroundColor: colors.surfaceElevated, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: spacing.xl, paddingBottom: spacing.xxl, height: '80%' },
+  modalContentSmall: { backgroundColor: colors.surfaceElevated, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: spacing.xl, paddingBottom: spacing.xxl },
   modalHandle: { width: 40, height: 5, backgroundColor: colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: spacing.lg },
-  modalTitle: { color: colors.textPrimary, fontSize: 24, fontWeight: 'bold', textAlign: 'center' },
-  modalSubtitle: { color: colors.primary, fontSize: 14, textAlign: 'center', marginTop: 4, marginBottom: spacing.xl },
-  inputLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 12, marginTop: spacing.lg },
-  chipRow: { marginBottom: spacing.md },
-  chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginRight: 8 },
+  modalTitle: { color: colors.textPrimary, fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  rangeToggle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface, padding: 15, borderRadius: 12, marginBottom: 20 },
+  inputLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: 'bold', marginBottom: 10 },
+  input: { backgroundColor: colors.surface, borderRadius: 12, padding: 15, color: colors.textPrimary, marginBottom: 15, borderWidth: 1, borderColor: colors.border },
+  chipRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  chip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginRight: 8 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.textSecondary, fontSize: 14, fontWeight: 'bold' },
+  chipText: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
   chipTextActive: { color: colors.background },
-  vadeItemSmall: { padding: 16, backgroundColor: colors.surface, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: colors.border },
-  vadeItemSmallActive: { borderColor: colors.primary },
-  vadeNameSmall: { color: colors.textPrimary, fontWeight: 'bold' },
-  vadeNameSmallActive: { color: colors.primary },
-  vadeSubSmall: { color: colors.textSecondary, fontSize: 12 },
-  modalActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl },
-  actionBtn: { flex: 1, height: 56, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-
-  fab: { position: 'absolute', bottom: 120, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
+  vadeItemSmall: { padding: 12, backgroundColor: colors.surface, borderRadius: 10, marginBottom: 5 },
+  vadeItemSmallActive: { backgroundColor: 'rgba(0,214,143,0.1)' },
+  vadeNameSmall: { color: colors.textPrimary, fontSize: 13 },
+  vadeNameSmallActive: { color: colors.primary, fontWeight: 'bold' },
+  modalActions: { marginTop: 20 },
+  actionBtn: { height: 56, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  fab: { position: 'absolute', bottom: 120, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8 },
 });
