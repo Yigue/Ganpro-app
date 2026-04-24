@@ -39,49 +39,44 @@ export class NutricionRepository {
 
   // ── Raciones ────────────────────────────────────────────────────────────────
 
-  /**
-   * Deactivates any currently active racion for the same lote, then creates
-   * a new active racion. Both operations run inside a single write transaction.
-   */
   async createRacion(params: {
-    loteId: string;
-    suplementoId: string;
-    kgDiaAnimal: number;
-    fechaInicio: number;
-    fechaFin?: number;
-    notas?: string;
+    nombre: string;
+    descripcion?: string; // Usaremos esto para JSON de ingredientes
   }): Promise<RacionModel> {
     return this.database.write(async () => {
-      // Deactivate previous active raciones for this lote
-      const activeRaciones = await this.database
-        .get<RacionModel>('raciones')
-        .query(Q.where('lote_id', params.loteId), Q.where('activa', true))
-        .fetch();
-
-      await Promise.all(
-        activeRaciones.map((r) =>
-          r.update((rec) => {
-            rec.activa = false;
-          })
-        )
-      );
-
       return this.database.get<RacionModel>('raciones').create((r) => {
-        r.loteId = params.loteId;
-        r.suplementoId = params.suplementoId;
-        r.kgDiaAnimal = params.kgDiaAnimal;
-        r.fechaInicio = params.fechaInicio;
-        r.fechaFin = params.fechaFin ?? null;
-        r.notas = params.notas ?? '';
+        r.nombre = params.nombre;
+        r.descripcion = params.descripcion ?? '';
         r.activa = true;
       });
     });
   }
 
-  queryRacionesActivasByLote(loteId: string): Query<RacionModel> {
+  queryRacionesActivas(): Query<RacionModel> {
     return this.database
       .get<RacionModel>('raciones')
-      .query(Q.where('lote_id', loteId), Q.where('activa', true));
+      .query(Q.where('activa', true));
+  }
+
+  // ── Feeding Logs ────────────────────────────────────────────────────────────
+  // Como aún no tenemos el Model definido explícitamente en el repo importado,
+  // podemos interactuar directamente con la tabla para registrar entregas.
+  async logFeeding(params: {
+    potreroId: string;
+    racionId: string;
+    cantidadKg: number;
+    fecha: number;
+    notas?: string;
+  }): Promise<any> {
+    return this.database.write(async () => {
+      return this.database.get('potrero_feeding_logs').create((log: any) => {
+        log.potreroId = params.potreroId;
+        log.racionId = params.racionId;
+        log.cantidadKg = params.cantidadKg;
+        log.fecha = params.fecha;
+        log.notas = params.notas ?? '';
+      });
+    });
   }
 
   // ── Condición Corporal ──────────────────────────────────────────────────────

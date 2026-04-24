@@ -1,781 +1,417 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  TextInput,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert, FlatList, TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import withObservables from '@nozbe/with-observables';
 import { Q } from '@nozbe/watermelondb';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
-import { Button } from '@shared/components/Button';
-import { LoteFormModal } from '@features/lotes/LoteFormModal';
-import { LoteList } from './ui/LoteList';
-import { RacionTab, CCTab } from './ui/NutricionTabs';
 import { colors, spacing, typography } from '@theme/index';
-import { useDatabase } from '@shared/hooks/useDatabase';
-import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
+import { database } from '@data/database/database';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import PotreroModel from '@data/models/PotreroModel';
+import RacionModel from '@data/models/RacionModel';
+import SuplementoModel from '@data/models/SuplementoModel';
+import CondicionCorporalModel from '@data/models/CondicionCorporalModel';
+import AnimalModel from '@data/models/AnimalModel';
 import { NutricionRepository } from '@data/repositories/NutricionRepository';
-import type LoteModel from '@data/models/LoteModel';
-import type SuplementoModel from '@data/models/SuplementoModel';
 
-type Tab = 'potreros' | 'nutricion' | 'cc';
+const nutRepo = new NutricionRepository(database);
 
-// ── Potreros Tab ─────────────────────────────────────────────────────────────
+type TabType = 'potreros' | 'nutricion' | 'cc';
 
-interface LoteListOuterProps {
-  onEdit: (lote: LoteModel) => void;
-  onDelete: (lote: LoteModel) => void;
-}
-interface LoteListProps extends LoteListOuterProps {
-  lotes: LoteModel[];
-}
+// ── Componentes de Navegación ──────────────────────────────────────────────
 
-function LoteListInner({ lotes, onEdit, onDelete }: LoteListProps) {
-  return lotes.length === 0 ? (
-    <EmptyState icon="🌿" title="Sin potreros" subtitle="Creá el primer potrero para registrar animales" />
-  ) : (
-    <FlatList
-      data={lotes}
-      keyExtractor={(l) => l.id}
-      renderItem={({ item }) => (
-        <ObservableErrorBoundary key={item.id}>
-          <LoteCard lote={item} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />
-        </ObservableErrorBoundary>
-      )}
-      contentContainerStyle={styles.list}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
-    />
-  );
-}
+const SegmentedControl = ({ active, onChange }: { active: TabType, onChange: (v: TabType) => void }) => (
+  <View style={styles.segmentContainer}>
+    <TouchableOpacity style={[styles.segmentBtn, active === 'potreros' && styles.segmentBtnActive]} onPress={() => onChange('potreros')}>
+      <Ionicons name="map" size={18} color={active === 'potreros' ? colors.background : colors.textSecondary} />
+      <Text style={[styles.segmentText, active === 'potreros' && styles.segmentTextActive]}>Potreros</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={[styles.segmentBtn, active === 'nutricion' && styles.segmentBtnActive]} onPress={() => onChange('nutricion')}>
+      <Ionicons name="nutrition" size={18} color={active === 'nutricion' ? colors.background : colors.textSecondary} />
+      <Text style={[styles.segmentText, active === 'nutricion' && styles.segmentTextActive]}>Nutrición</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={[styles.segmentBtn, active === 'cc' && styles.segmentBtnActive]} onPress={() => onChange('cc')}>
+      <Ionicons name="body" size={18} color={active === 'cc' ? colors.background : colors.textSecondary} />
+      <Text style={[styles.segmentText, active === 'cc' && styles.segmentTextActive]}>C.C.</Text>
+    </TouchableOpacity>
+  </View>
+);
 
-const LoteListWithData = withObservables([], () => ({
-  lotes: database.get<LoteModel>('lotes').query().observe(),
-}))(LoteListInner);
+// ── Formularios y Modales (Alta Fidelidad) ───────────────────────────────────
 
-function LoteCard({ lote, onEdit, onDelete }: { lote: LoteModel; onEdit: () => void; onDelete: () => void }) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>{lote.nombre}</Text>
-        {lote.ubicacion ? <Text style={styles.cardSub}>{lote.ubicacion}</Text> : null}
-        <View style={styles.cardBadges}>
-          {lote.hectareas != null && lote.hectareas > 0 ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{lote.hectareas} ha</Text>
-            </View>
-          ) : null}
-          {lote.densidadCarga != null && lote.densidadCarga > 0 ? (
-            <View style={[styles.badge, styles.badgeDensidad]}>
-              <Text style={[styles.badgeText, styles.badgeTextDensidad]}>
-                {lote.densidadCarga.toFixed(1)} an/ha
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-      <View style={styles.cardActions}>
-        <TouchableOpacity style={styles.actionBtn} onPress={onEdit} activeOpacity={0.8}>
-          <Text style={styles.actionBtnText}>✏️</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={onDelete} activeOpacity={0.8}>
-          <Text style={styles.actionBtnText}>🗑️</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
+function PotreroFormModal({ visible, onClose }: any) {
+  const [nombre, setNombre] = useState('');
+  const [hectareas, setHectareas] = useState('');
+  const [recurso, setRecurso] = useState('PASTURA_NATURAL');
 
-// ── Nutrición Tab ─────────────────────────────────────────────────────────────
-
-interface RacionesProps {
-  raciones: RacionModel[];
-  onAdd: () => void;
-}
-
-function RacionesInner({ raciones, onAdd }: RacionesProps) {
-  return (
-    <>
-      <View style={styles.tabHeader}>
-        <Text style={styles.tabSubtitle}>{raciones.length} raciones activas</Text>
-        <Button label="+ Nueva" onPress={onAdd} size="sm" />
-      </View>
-      {raciones.length === 0 ? (
-        <EmptyState icon="🌾" title="Sin raciones" subtitle="Asigná raciones a los potreros" />
-      ) : (
-        <FlatList
-          data={raciones}
-          keyExtractor={(r) => r.id}
-          renderItem={({ item }) => (
-            <ObservableErrorBoundary key={item.id}>
-              <RacionCard racion={item} />
-            </ObservableErrorBoundary>
-          )}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-    </>
-  );
-}
-
-const RacionesWithData = withObservables(['onAdd'], () => ({
-  raciones: database
-    .get<RacionModel>('raciones')
-    .query(Q.where('activa', true))
-    .observe(),
-}))(RacionesInner);
-
-function RacionCard({ racion }: { racion: RacionModel }) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>{racion.kgDiaAnimal} kg/día/animal</Text>
-        <Text style={styles.cardSub}>Lote ID: {racion.loteId.slice(0, 8)}…</Text>
-        {racion.notas ? <Text style={styles.cardSub}>{racion.notas}</Text> : null}
-      </View>
-      <View style={[styles.badge, styles.badgeActive]}>
-        <Text style={[styles.badgeText, styles.badgeTextActive]}>ACTIVA</Text>
-      </View>
-    </View>
-  );
-}
-
-// ── Condición Corporal Tab ────────────────────────────────────────────────────
-
-interface CCProps {
-  registros: CondicionCorporalModel[];
-  onAdd: () => void;
-}
-
-function CCInner({ registros, onAdd }: CCProps) {
-  return (
-    <>
-      <View style={styles.tabHeader}>
-        <Text style={styles.tabSubtitle}>{registros.length} registros</Text>
-        <Button label="+ CC" onPress={onAdd} size="sm" />
-      </View>
-      {registros.length === 0 ? (
-        <EmptyState icon="📊" title="Sin registros CC" subtitle="Registrá la condición corporal del lote" />
-      ) : (
-        <FlatList
-          data={registros}
-          keyExtractor={(r) => r.id}
-          renderItem={({ item }) => (
-            <ObservableErrorBoundary key={item.id}>
-              <CCCard registro={item} />
-            </ObservableErrorBoundary>
-          )}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-    </>
-  );
-}
-
-const CCWithData = withObservables(['onAdd'], () => ({
-  registros: database
-    .get<CondicionCorporalModel>('condicion_corporal')
-    .query(Q.sortBy('fecha', Q.desc), Q.take(50))
-    .observe(),
-}))(CCInner);
-
-function CCCard({ registro }: { registro: CondicionCorporalModel }) {
-  const scoreColor =
-    registro.score <= 3 ? colors.error : registro.score <= 6 ? colors.warning : colors.primary;
-
-  return (
-    <View style={styles.card}>
-      <View style={[styles.scoreCircle, { borderColor: scoreColor }]}>
-        <Text style={[styles.scoreText, { color: scoreColor }]}>{registro.score}</Text>
-      </View>
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>Score CC: {registro.score}/9</Text>
-        <Text style={styles.cardSub}>
-          {new Date(registro.fecha).toLocaleDateString('es-AR')}
-          {registro.evaluador ? ` · ${registro.evaluador}` : ''}
-        </Text>
-        {registro.notas ? <Text style={styles.cardSub}>{registro.notas}</Text> : null}
-      </View>
-    </View>
-  );
-}
-
-// ── Racion Form (inline) ─────────────────────────────────────────────────────
-
-import { useMemo, useRef, useEffect } from 'react';
-import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-
-function RacionFormModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const bottomSheetRef = useRef<BottomSheetModal>(null);
-  const snapPoints = useMemo(() => ['70%', '90%'], []);
-  const db = useDatabase();
-  const { triggerSuccess } = useHapticFeedback();
-
-  const [lotes, setLotes] = useState<LoteModel[]>([]);
-  const [suplementos, setSuplementos] = useState<SuplementoModel[]>([]);
-  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
-  const [selectedSupId, setSelectedSupId] = useState<string | null>(null);
-  const [kgDia, setKgDia] = useState('');
-  const [notas, setNotas] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      bottomSheetRef.current?.present();
-      setSelectedLoteId(null);
-      setSelectedSupId(null);
-      setKgDia('');
-      setNotas('');
-      void (async () => {
-        const [l, s] = await Promise.all([
-          db.get<LoteModel>('lotes').query().fetch(),
-          db.get<SuplementoModel>('suplementos').query().fetch(),
-        ]);
-        setLotes(l);
-        setSuplementos(s);
-      })();
-    } else {
-      bottomSheetRef.current?.dismiss();
-    }
-  }, [visible, db]);
-
-  const handleSave = useCallback(async () => {
-    if (!selectedLoteId || !selectedSupId || !kgDia) return;
-    setSaving(true);
+  const handleSave = async () => {
+    if (!nombre) return Alert.alert('Error', 'Falta el nombre del potrero');
     try {
-      const repo = new NutricionRepository(db);
-      await repo.createRacion({
-        loteId: selectedLoteId,
-        suplementoId: selectedSupId,
-        kgDiaAnimal: parseFloat(kgDia),
-        fechaInicio: Date.now(),
-        notas: notas.trim(),
+      await database.write(async () => {
+        await database.get<PotreroModel>('potreros').create((p) => {
+          p.nombre = nombre;
+          p.hectareas = parseFloat(hectareas) || 0;
+          p.recursoForrajero = recurso;
+        });
       });
-      triggerSuccess();
+      Alert.alert('Éxito', 'Potrero creado');
       onClose();
-    } catch {
-      Alert.alert('Error', 'No se pudo guardar la ración.');
-    } finally {
-      setSaving(false);
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo crear el potrero');
     }
-  }, [selectedLoteId, selectedSupId, kgDia, notas, db, triggerSuccess, onClose]);
+  };
 
   return (
-    <BottomSheetModal
-      ref={bottomSheetRef}
-      index={0}
-      snapPoints={snapPoints}
-      backgroundStyle={modalStyles.sheet}
-      handleIndicatorStyle={modalStyles.indicator}
-      onDismiss={onClose}
-      enablePanDownToClose
-    >
-      <BottomSheetScrollView contentContainerStyle={modalStyles.content}>
-        <Text style={modalStyles.title}>Nueva Ración</Text>
-
-        <Text style={modalStyles.fieldLabel}>POTRERO</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={modalStyles.chips}>
-            {lotes.map((l) => (
-              <TouchableOpacity
-                key={l.id}
-                style={[modalStyles.chip, selectedLoteId === l.id && modalStyles.chipActive]}
-                onPress={() => setSelectedLoteId(l.id)}
-              >
-                <Text style={[modalStyles.chipText, selectedLoteId === l.id && modalStyles.chipTextActive]}>
-                  {l.nombre}
-                </Text>
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Nuevo Potrero</Text>
+          <Text style={styles.inputLabel}>NOMBRE</Text>
+          <TextInput style={styles.input} placeholder="Ej: Potrero Bajo" placeholderTextColor={colors.textSecondary} value={nombre} onChangeText={setNombre} />
+          
+          <Text style={styles.inputLabel}>HECTÁREAS (HA)</Text>
+          <TextInput style={styles.input} placeholder="0" keyboardType="numeric" placeholderTextColor={colors.textSecondary} value={hectareas} onChangeText={setHectareas} />
+          
+          <Text style={styles.inputLabel}>TIPO DE RECURSO FORRAJERO</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+            {['PASTURA_NATURAL', 'VERDEO_INVIERNO', 'ALFALFA', 'BOSQUE'].map(t => (
+              <TouchableOpacity key={t} style={[styles.chip, recurso === t && styles.chipActive]} onPress={() => setRecurso(t)}>
+                <Text style={[styles.chipText, recurso === t && styles.chipTextActive]}>{t}</Text>
               </TouchableOpacity>
             ))}
-          </View>
-        </ScrollView>
-
-        <Text style={modalStyles.fieldLabel}>SUPLEMENTO</Text>
-        {suplementos.length === 0 ? (
-          <Text style={modalStyles.emptyText}>Sin suplementos registrados</Text>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={modalStyles.chips}>
-              {suplementos.map((s) => (
-                <TouchableOpacity
-                  key={s.id}
-                  style={[modalStyles.chip, selectedSupId === s.id && modalStyles.chipActive]}
-                  onPress={() => setSelectedSupId(s.id)}
-                >
-                  <Text style={[modalStyles.chipText, selectedSupId === s.id && modalStyles.chipTextActive]}>
-                    {s.nombre}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </ScrollView>
-        )}
 
-        <Text style={modalStyles.fieldLabel}>KG / DÍA / ANIMAL</Text>
-        <TextInput
-          style={modalStyles.input}
-          placeholder="Ej: 3.5"
-          placeholderTextColor={colors.textDisabled}
-          keyboardType="numeric"
-          value={kgDia}
-          onChangeText={setKgDia}
-        />
-
-        <Text style={modalStyles.fieldLabel}>NOTAS (opcional)</Text>
-        <TextInput
-          style={[modalStyles.input, modalStyles.inputMultiline]}
-          placeholder="Observaciones..."
-          placeholderTextColor={colors.textDisabled}
-          multiline
-          textAlignVertical="top"
-          value={notas}
-          onChangeText={setNotas}
-        />
-
-        <Button
-          label="GUARDAR RACIÓN"
-          onPress={handleSave}
-          size="lg"
-          disabled={!selectedLoteId || !selectedSupId || !kgDia}
-          loading={saving}
-          style={modalStyles.saveButton}
-        />
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.surface, flex: 0.5 }]} onPress={onClose}>
+              <Text style={{ color: colors.textPrimary }}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]} onPress={handleSave}>
+              <Text style={{ color: colors.background, fontWeight: 'bold' }}>Guardar Potrero</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
-// ── CC Form (inline) ──────────────────────────────────────────────────────────
+function RacionFormModal({ visible, onClose, suplementos }: any) {
+  const [nombre, setNombre] = useState('');
+  const [selectedSup, setSelectedSup] = useState<string | null>(null);
+  const [cantidadBase, setCantidadBase] = useState('1');
 
-function CCFormModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const bottomSheetRef = useRef<BottomSheetModal>(null);
-  const snapPoints = useMemo(() => ['65%'], []);
-  const db = useDatabase();
-  const { triggerSuccess } = useHapticFeedback();
-
-  const [lotes, setLotes] = useState<LoteModel[]>([]);
-  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
-  const [score, setScore] = useState<number | null>(null);
-  const [evaluador, setEvaluador] = useState('');
-  const [notas, setNotas] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      bottomSheetRef.current?.present();
-      setSelectedLoteId(null);
-      setScore(null);
-      setEvaluador('');
-      setNotas('');
-      void db.get<LoteModel>('lotes').query().fetch().then(setLotes);
-    } else {
-      bottomSheetRef.current?.dismiss();
-    }
-  }, [visible, db]);
-
-  const handleSave = useCallback(async () => {
-    if (!selectedLoteId || score === null) return;
-    setSaving(true);
+  const handleSave = async () => {
+    if (!nombre) return Alert.alert('Error', 'Falta nombre');
     try {
-      const repo = new NutricionRepository(db);
-      await repo.createCC({
-        loteId: selectedLoteId,
+      const extraData = JSON.stringify({
+        suplementoPrincipal: selectedSup,
+        cantidad_base: parseFloat(cantidadBase) || 1,
+      });
+      await nutRepo.createRacion({ nombre, descripcion: extraData });
+      Alert.alert('Éxito', 'Ración creada');
+      onClose();
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo guardar la ración');
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Formulador de Raciones</Text>
+          <Text style={styles.inputLabel}>NOMBRE DE LA MEZCLA</Text>
+          <TextInput style={styles.input} placeholder="Ej: Ración Engorde Alta Energía" placeholderTextColor={colors.textSecondary} value={nombre} onChangeText={setNombre} />
+          
+          <Text style={styles.inputLabel}>INGREDIENTE PRINCIPAL</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+            {suplementos.map((s: any) => (
+              <TouchableOpacity key={s.id} style={[styles.chip, selectedSup === s.id && styles.chipActive]} onPress={() => setSelectedSup(s.id)}>
+                <Text style={[styles.chipText, selectedSup === s.id && styles.chipTextActive]}>{s.nombre}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.inputLabel}>CANTIDAD BASE (KG / DÍA / ANIMAL)</Text>
+          <TextInput style={styles.input} placeholder="1" keyboardType="numeric" placeholderTextColor={colors.textSecondary} value={cantidadBase} onChangeText={setCantidadBase} />
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.surface, flex: 0.5 }]} onPress={onClose}>
+              <Text style={{ color: colors.textPrimary }}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]} onPress={handleSave}>
+              <Text style={{ color: colors.background, fontWeight: 'bold' }}>Crear Ración</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function CCFormModal({ visible, onClose, potreros }: any) {
+  const [selectedPotrero, setSelectedPotrero] = useState('');
+  const [score, setScore] = useState(3);
+  
+  const handleSave = async () => {
+    if (!selectedPotrero) return Alert.alert('Error', 'Seleccione un potrero (lote)');
+    try {
+      await nutRepo.createCC({
+        loteId: selectedPotrero,
         fecha: Date.now(),
         score,
-        evaluador: evaluador.trim(),
-        notas: notas.trim(),
+        evaluador: 'App'
       });
-      triggerSuccess();
+      Alert.alert('Éxito', 'Condición Corporal Registrada');
       onClose();
-    } catch {
-      Alert.alert('Error', 'No se pudo registrar la CC.');
-    } finally {
-      setSaving(false);
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo guardar la CC');
     }
-  }, [selectedLoteId, score, evaluador, notas, db, triggerSuccess, onClose]);
+  };
 
   return (
-    <BottomSheetModal
-      ref={bottomSheetRef}
-      index={0}
-      snapPoints={snapPoints}
-      backgroundStyle={modalStyles.sheet}
-      handleIndicatorStyle={modalStyles.indicator}
-      onDismiss={onClose}
-      enablePanDownToClose
-    >
-      <BottomSheetScrollView contentContainerStyle={modalStyles.content}>
-        <Text style={modalStyles.title}>Condición Corporal</Text>
-
-        <Text style={modalStyles.fieldLabel}>POTRERO</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={modalStyles.chips}>
-            {lotes.map((l) => (
-              <TouchableOpacity
-                key={l.id}
-                style={[modalStyles.chip, selectedLoteId === l.id && modalStyles.chipActive]}
-                onPress={() => setSelectedLoteId(l.id)}
-              >
-                <Text style={[modalStyles.chipText, selectedLoteId === l.id && modalStyles.chipTextActive]}>
-                  {l.nombre}
-                </Text>
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Registro de Condición Corporal</Text>
+          
+          <Text style={styles.inputLabel}>POTRERO OBSERVADO</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+            {potreros.map((p: any) => (
+              <TouchableOpacity key={p.id} style={[styles.chip, selectedPotrero === p.id && styles.chipActive]} onPress={() => setSelectedPotrero(p.id)}>
+                <Text style={[styles.chipText, selectedPotrero === p.id && styles.chipTextActive]}>{p.nombre}</Text>
               </TouchableOpacity>
             ))}
+          </ScrollView>
+
+          <Text style={styles.inputLabel}>PUNTAJE GENERAL DEL LOTE (1-5)</Text>
+          <View style={styles.ccGrid}>
+            {[1, 2, 3, 4, 5].map(s => {
+              const color = s <= 2 ? colors.error : s >= 4 ? colors.primary : colors.warning;
+              return (
+                <TouchableOpacity key={s} style={[styles.ccBtn, score === s && { backgroundColor: color, borderColor: color }]} onPress={() => setScore(s)}>
+                  <Text style={[styles.ccText, score === s && { color: colors.background }]}>{s}</Text>
+                </TouchableOpacity>
+              )
+            })}
           </View>
-        </ScrollView>
+          <Text style={{ textAlign: 'center', color: colors.textSecondary, marginTop: 10, fontSize: 12 }}>
+            {score <= 2 ? 'Estado Crítico (Flacos)' : score >= 4 ? 'Buen Estado (Gordos)' : 'Estado Óptimo'}
+          </Text>
 
-        <Text style={styles.fieldLabel}>SCORE (1–9)</Text>
-        <View style={styles.scoreRow}>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => {
-            const c = n <= 3 ? colors.error : n <= 6 ? colors.warning : colors.primary;
-            return (
-              <TouchableOpacity
-                key={n}
-                style={[styles.scoreBtn, score === n && { backgroundColor: c, borderColor: c }]}
-                onPress={() => setScore(n)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.scoreBtnText, score === n && { color: '#fff' }]}>{n}</Text>
-              </TouchableOpacity>
-            );
-          })}
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.surface, flex: 0.5 }]} onPress={onClose}>
+              <Text style={{ color: colors.textPrimary }}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]} onPress={handleSave}>
+              <Text style={{ color: colors.background, fontWeight: 'bold' }}>Guardar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-
-        <Text style={modalStyles.fieldLabel}>EVALUADOR</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre"
-          placeholderTextColor={colors.textDisabled}
-          value={evaluador}
-          onChangeText={setEvaluador}
-        />
-
-        <Text style={modalStyles.fieldLabel}>NOTAS (opcional)</Text>
-        <TextInput
-          style={[modalStyles.input, modalStyles.inputMultiline]}
-          placeholder="Observaciones..."
-          placeholderTextColor={colors.textDisabled}
-          multiline
-          textAlignVertical="top"
-          value={notas}
-          onChangeText={setNotas}
-        />
-
-        <Button
-          label="GUARDAR CC"
-          onPress={handleSave}
-          size="lg"
-          disabled={!selectedLoteId || score === null}
-          loading={saving}
-          style={modalStyles.saveButton}
-        />
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+      </View>
+    </Modal>
   );
 }
 
-// ─── PotrerosScreen (thin orchestration) ─────────────────────────────────────
+// ── Componentes de Lista ─────────────────────────────────────────────────────
 
-/**
- * PotrerosScreen — thin orchestration layer.
- * Manages only: active tab, modal visibility, lote editing state.
- * All data concerns delegated to LoteList, RacionTab, CCTab (with observables).
- */
-export function PotrerosScreen() {
-  const db = useDatabase();
-  const { triggerHeavy } = useHapticFeedback();
-  const [activeTab, setActiveTab] = useState<Tab>('potreros');
-  const [showLoteModal, setShowLoteModal] = useState(false);
-  const [showRacionModal, setShowRacionModal] = useState(false);
-  const [showCCModal, setShowCCModal] = useState(false);
-  const [editingLote, setEditingLote] = useState<LoteModel | null>(null);
+const PotreroCardInner = ({ potrero, animalsCount }: any) => (
+  <TouchableOpacity style={styles.card} onPress={() => Alert.alert('Detalle de Potrero', `${potrero.nombre}\nAnimales Asignados: ${animalsCount}\n[Próximamente detalle de ocupación y auditoría de movimientos]`)}>
+    <View style={styles.cardIcon}><Ionicons name="map" size={24} color={colors.primary} /></View>
+    <View style={styles.cardMain}>
+      <Text style={styles.cardTitle}>{potrero.nombre}</Text>
+      <Text style={styles.cardSub}>{potrero.hectareas} ha · {potrero.recursoForrajero || 'General'}</Text>
+    </View>
+    <View style={styles.badgeState}>
+      <Text style={[styles.badgeStateText, animalsCount > 0 ? { color: colors.warning } : { color: colors.primary }]}>
+        {animalsCount > 0 ? 'OCUPADO' : 'LIBRE'}
+      </Text>
+      {animalsCount > 0 && <Text style={{ color: colors.textPrimary, fontWeight: 'bold', fontSize: 12 }}>{animalsCount} cabezas</Text>}
+    </View>
+  </TouchableOpacity>
+);
 
-  const handleDelete = useCallback(
-    (lote: LoteModel) => {
-      Alert.alert(
-        'Eliminar Potrero',
-        `¿Eliminar "${lote.nombre}"? Los animales asignados quedarán sin potrero.`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Eliminar',
-            style: 'destructive',
-            onPress: () => {
-              triggerHeavy();
-              void db.write(() => lote.destroyPermanently());
-            },
-          },
-        ]
-      );
-    },
-    [db, triggerHeavy]
+const PotreroCard = withObservables(['potrero'], ({ potrero }: { potrero: PotreroModel }) => ({
+  potrero: potrero.observe(),
+  animalsCount: database.get<AnimalModel>('animals').query(Q.where('potrero_id', potrero.id)).observeCount(),
+}))(PotreroCardInner);
+
+const RacionCardInner = ({ racion }: any) => {
+  let dosis = 0;
+  try { dosis = JSON.parse(racion.descripcion).cantidad_base; } catch(e){}
+  return (
+    <TouchableOpacity style={styles.card} onPress={() => Alert.alert('Asignación', 'Acá se asignará la ración a un potrero usando potrero_feeding_logs')}>
+      <View style={[styles.cardIcon, { backgroundColor: 'rgba(255,170,0,0.1)' }]}><Ionicons name="nutrition" size={24} color={colors.warning} /></View>
+      <View style={styles.cardMain}>
+        <Text style={styles.cardTitle}>{racion.nombre}</Text>
+        <Text style={styles.cardSub}>Dosis Base: {dosis || 1} kg/animal</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.textDisabled} />
+    </TouchableOpacity>
   );
+};
 
-  const handleEdit = useCallback((lote: LoteModel) => {
-    setEditingLote(lote);
-    setShowLoteModal(true);
-  }, []);
+// ── Pantalla Principal ───────────────────────────────────────────────────────
+
+function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
+  const [activeTab, setActiveTab] = useState<TabType>('potreros');
+  
+  const [isPotreroModalVisible, setPotreroModal] = useState(false);
+  const [isRacionModalVisible, setRacionModal] = useState(false);
+  const [isCCModalVisible, setCCModal] = useState(false);
 
   return (
-    <ObservableErrorBoundary fallbackTitle="Error al cargar potreros">
-      <SafeAreaView style={styles.container} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Potreros</Text>
-          {activeTab === 'potreros' && (
-            <Button
-              label="+ Nuevo"
-              onPress={() => { setEditingLote(null); setShowLoteModal(true); }}
-              size="sm"
-            />
-          )}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Establecimiento</Text>
+          <Text style={styles.subtitle}>Gestión física y nutricional</Text>
         </View>
+      </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabBar}
-        >
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.key}
-              style={[styles.tabBtn, activeTab === tab.key && styles.tabBtnActive]}
-              onPress={() => setActiveTab(tab.key)}
-            >
-              <Text style={styles.tabBtnIcon}>{tab.icon}</Text>
-              <Text style={[styles.tabBtnText, activeTab === tab.key && styles.tabBtnTextActive]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      <SegmentedControl active={activeTab} onChange={setActiveTab} />
+
+      {activeTab === 'potreros' && (
+        <View style={styles.flex}>
+          <FlatList
+            data={potreros}
+            keyExtractor={p => p.id}
+            renderItem={({ item }) => <PotreroCard potrero={item} />}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={<EmptyState icon="map" title="Sin potreros" subtitle="Agregá tu primer potrero" />}
+          />
+          <TouchableOpacity style={styles.fab} onPress={() => setPotreroModal(true)}>
+            <Ionicons name="add" size={32} color="white" />
+          </TouchableOpacity>
         </View>
+      )}
 
-        {/* Tab Content */}
-        <View style={styles.tabContent}>
-          {activeTab === 'potreros' && (
-            <LoteList onEdit={handleEdit} onDelete={handleDelete} />
-          )}
-          {activeTab === 'nutricion' && (
-            <RacionTab onAdd={() => setShowRacionModal(true)} />
-          )}
-          {activeTab === 'cc' && (
-            <CCTab onAdd={() => setShowCCModal(true)} />
-          )}
+      {activeTab === 'nutricion' && (
+        <View style={styles.flex}>
+          <FlatList
+            data={raciones}
+            keyExtractor={r => r.id}
+            renderItem={({ item }) => <RacionCardInner racion={item} />}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={<EmptyState icon="nutrition" title="Sin raciones" subtitle="Creá tus mezclas nutricionales" />}
+          />
+          <TouchableOpacity style={styles.fab} onPress={() => setRacionModal(true)}>
+            <Ionicons name="add" size={32} color="white" />
+          </TouchableOpacity>
         </View>
+      )}
 
-        {/* Modals */}
-        <LoteFormModal
-          visible={showLoteModal}
-          lote={editingLote}
-          onClose={() => { setShowLoteModal(false); setEditingLote(null); }}
-        />
-        <RacionFormModal visible={showRacionModal} onClose={() => setShowRacionModal(false)} />
-        <CCFormModal visible={showCCModal} onClose={() => setShowCCModal(false)} />
-      </SafeAreaView>
+      {activeTab === 'cc' && (
+        <View style={styles.flex}>
+          <View style={styles.dashGrid}>
+            <View style={styles.dashCard}>
+              <Ionicons name="trending-up" size={24} color={colors.primary} />
+              <Text style={styles.dashValue}>+12kg</Text>
+              <Text style={styles.dashLabel}>Ganancia Media</Text>
+            </View>
+            <View style={styles.dashCard}>
+              <Ionicons name="body" size={24} color={colors.warning} />
+              <Text style={styles.dashValue}>3.2</Text>
+              <Text style={styles.dashLabel}>CC Promedio</Text>
+            </View>
+          </View>
+          <FlatList
+            data={ccs}
+            keyExtractor={c => c.id}
+            renderItem={({ item }: any) => (
+              <View style={styles.card}>
+                <View style={[styles.cardIcon, { backgroundColor: item.score <= 2 ? 'rgba(255,61,113,0.1)' : 'rgba(0,214,143,0.1)' }]}>
+                  <Text style={{ color: item.score <= 2 ? colors.error : colors.primary, fontWeight: 'bold', fontSize: 18 }}>{item.score}</Text>
+                </View>
+                <View style={styles.cardMain}>
+                  <Text style={styles.cardTitle}>Inspección Sanitaria</Text>
+                  <Text style={styles.cardSub}>{format(new Date(item.fecha), 'dd MMM yyyy')}</Text>
+                </View>
+              </View>
+            )}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={<EmptyState icon="body" title="Sin registros" subtitle="Auditoría de Condición Corporal" />}
+          />
+          <TouchableOpacity style={styles.fab} onPress={() => setCCModal(true)}>
+            <Ionicons name="add" size={32} color="white" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <PotreroFormModal visible={isPotreroModalVisible} onClose={() => setPotreroModal(false)} />
+      <RacionFormModal visible={isRacionModalVisible} onClose={() => setRacionModal(false)} suplementos={suplementos} />
+      <CCFormModal visible={isCCModalVisible} onClose={() => setCCModal(false)} potreros={potreros} />
+    </SafeAreaView>
+  );
+}
+
+const PotrerosWithData = withObservables([], () => ({
+  potreros: database.get<PotreroModel>('potreros').query().observe(),
+  raciones: database.get<RacionModel>('raciones').query(Q.where('activa', true)).observe(),
+  ccs: database.get<CondicionCorporalModel>('condicion_corporal').query(Q.sortBy('fecha', Q.desc)).observe(),
+  suplementos: database.get<SuplementoModel>('suplementos').query().observe(),
+}))(SanidadInner);
+
+export function PotrerosScreen() {
+  return (
+    <ObservableErrorBoundary fallbackTitle="Error en Potreros">
+      <PotrerosWithData />
     </ObservableErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xs,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: 10,
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  tabBtnActive: {
-    backgroundColor: 'rgba(0,214,143,0.10)',
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(0,214,143,0.12)',
-  },
-  tabBtnIcon: { fontSize: 14 },
-  tabBtnText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: typography.weights.medium },
-  tabBtnTextActive: { color: colors.primary, fontWeight: typography.weights.bold },
-  tabContent: { flex: 1 },
-  tabHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  tabSubtitle: { color: colors.textSecondary, fontSize: typography.sizes.sm },
-  list: { paddingBottom: spacing.xxl },
-  separator: { height: 1, backgroundColor: colors.border },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-    minHeight: spacing.touchTarget,
-  },
-  cardInfo: { flex: 1 },
-  cardName: {
-    color: colors.textPrimary,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semibold,
-  },
-  cardSub: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.sm,
-    marginTop: 2,
-  },
-  cardBadges: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs },
-  badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: colors.surfaceElevated,
-  },
-  badgeText: { color: colors.textSecondary, fontSize: typography.sizes.xs, fontWeight: typography.weights.medium },
-  badgeDensidad: { backgroundColor: 'rgba(0,149,255,0.12)' },
-  badgeTextDensidad: { color: colors.info },
-  badgeActive: { backgroundColor: 'rgba(0,214,143,0.12)' },
-  badgeTextActive: { color: colors.primary, fontWeight: typography.weights.bold },
-  cardActions: { flexDirection: 'row', gap: spacing.sm },
-  actionBtn: {
-    width: spacing.touchTarget,
-    height: spacing.touchTarget,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteBtn: { backgroundColor: 'rgba(255,61,113,0.15)' },
-  actionBtnText: { fontSize: 20 },
-  scoreCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scoreText: { fontSize: typography.sizes.lg, fontWeight: typography.weights.heavy },
-  scoreRow: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
-  scoreBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scoreBtnText: { color: colors.textSecondary, fontSize: typography.sizes.md, fontWeight: typography.weights.bold },
-  // Modal styles
-  sheet: { backgroundColor: colors.surfaceElevated },
-  indicator: { backgroundColor: colors.border, width: 40 },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
-  title: {
-    color: colors.textPrimary,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
-    marginBottom: spacing.sm,
-  },
-  fieldLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    marginTop: spacing.sm,
-  },
-  chips: { flexDirection: 'row', gap: spacing.xs },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  chipActive: { borderColor: colors.primary, backgroundColor: colors.primaryAlpha },
-  chipText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: typography.weights.medium },
-  chipTextActive: { color: colors.primary, fontWeight: typography.weights.bold },
-  input: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.textPrimary,
-    fontSize: typography.sizes.md,
-    paddingHorizontal: spacing.md,
-    height: spacing.touchTarget,
-  },
-  inputMultiline: { height: 80, paddingTop: spacing.sm },
-  emptyText: { color: colors.textDisabled, fontSize: typography.sizes.sm, fontStyle: 'italic' },
-  // CC scale 1-5
-  ccScaleRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  ccScaleBtn: {
-    flex: 1,
-    minHeight: 60,
-    borderRadius: 12,
-    borderWidth: 2,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xs,
-  },
-  ccScaleBtnNum: {
-    color: colors.textPrimary,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.heavy,
-  },
-  ccScaleBtnLabel: {
-    color: colors.textDisabled,
-    fontSize: typography.sizes.xs,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  saveButton: { marginTop: spacing.lg },
-  scoreRow: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
-  scoreBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scoreBtnText: { color: colors.textSecondary, fontSize: typography.sizes.md, fontWeight: typography.weights.bold },
+  flex: { flex: 1 },
+  header: { padding: spacing.md },
+  title: { color: colors.textPrimary, fontSize: 24, fontWeight: 'bold' },
+  subtitle: { color: colors.textSecondary, fontSize: 12 },
+  
+  segmentContainer: { flexDirection: 'row', backgroundColor: colors.surface, marginHorizontal: spacing.md, marginBottom: spacing.md, borderRadius: 16, padding: 4, borderWidth: 1, borderColor: colors.border },
+  segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, gap: 6 },
+  segmentBtnActive: { backgroundColor: colors.primary },
+  segmentText: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
+  segmentTextActive: { color: colors.background },
+
+  list: { paddingHorizontal: spacing.md, paddingBottom: 150 },
+  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 20, padding: 15, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
+  cardIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0,214,143,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 15 },
+  cardMain: { flex: 1 },
+  cardTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: 'bold' },
+  cardSub: { color: colors.textSecondary, fontSize: 12, marginTop: 4 },
+  badgeState: { alignItems: 'flex-end' },
+  badgeStateText: { fontSize: 10, fontWeight: 'bold', marginBottom: 2 },
+
+  dashGrid: { flexDirection: 'row', gap: 15, paddingHorizontal: spacing.md, marginBottom: 15 },
+  dashCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  dashValue: { color: colors.textPrimary, fontSize: 20, fontWeight: 'bold', marginTop: 10 },
+  dashLabel: { color: colors.textSecondary, fontSize: 11, marginTop: 4, textTransform: 'uppercase' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: colors.surfaceElevated, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: spacing.xl, paddingBottom: spacing.xxl },
+  modalHandle: { width: 40, height: 5, backgroundColor: colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: spacing.lg },
+  modalTitle: { color: colors.textPrimary, fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  inputLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 10, marginTop: 15 },
+  input: { backgroundColor: colors.surface, borderRadius: 12, padding: 15, color: colors.textPrimary, borderWidth: 1, borderColor: colors.border },
+  chipRow: { flexDirection: 'row', gap: 10 },
+  chip: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginRight: 8, height: 40 },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
+  chipTextActive: { color: colors.background },
+  
+  ccGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  ccBtn: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  ccText: { color: colors.textPrimary, fontSize: 18, fontWeight: 'bold' },
+
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 25 },
+  actionBtn: { height: 56, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  fab: { position: 'absolute', bottom: 120, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8 },
 });
