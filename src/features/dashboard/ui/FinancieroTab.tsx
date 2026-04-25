@@ -184,11 +184,13 @@ function FinancieroTabView({ transactions, financialCategories, loteId }: Financ
     categoria: string;
     fechaText: string;
   }) => {
-    const fecha = parseFechaText(data.fechaText);
+    const fechaNum = parseFechaText(data.fechaText);
+    const fecha = fechaNum ? new Date(fechaNum) : new Date();
     await database.write(async () => {
       await database.get<MovimientoFinancieroModel>('movimientos_financieros').create((m) => {
         m.tipo = data.tipo;
         m.categoria = data.categoria;
+        m.categoryId = data.categoria;
         m.monto = parseFloat(data.monto);
         m.fecha = fecha;
         m.descripcion = data.concepto;

@@ -15,7 +15,12 @@ export default class LoteModel extends Model {
   @text('nombre') nombre!: string;
   @text('descripcion') descripcion!: string;
   @text('objetivo') objetivo!: string | null; // CRÍA, RECRÍA, ENGORDE
+  @text('ubicacion') ubicacion!: string;
+  @field('hectareas') hectareas!: number | null;
+  @field('densidad_carga') densidadCarga!: number | null;
   @field('densidad_carga_objetivo') densidadCargaObjetivo!: number | null;
+  @field('costo_alquiler_ha') costoAlquilerHa!: number | null;
+  @text('geo_json') geoJson!: string | null;
   @field('establecimiento_id') establecimientoId!: string;
 
   @readonly @date('created_at') createdAt!: Date;

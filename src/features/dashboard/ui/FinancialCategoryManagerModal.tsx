@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '@theme/index';
 import { database } from '@data/database/database';
-import type { FinancialCategoryModel } from '@data/models/FinancialCategoryModel';
+import FinancialCategoryModel from '@data/models/FinancialCategoryModel';
 
 interface FinancialCategoryManagerModalProps {
   visible: boolean;

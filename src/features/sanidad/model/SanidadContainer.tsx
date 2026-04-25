@@ -12,7 +12,7 @@ import { database } from '@data/database/database';
 import { colors, spacing, typography } from '@theme/index';
 import { OperationCatalogModel } from '@data/models/OperationCatalogModel';
 import { OperationLogModel } from '@data/models/OperationLogModel';
-import { ScheduledOperationModel } from '@data/models/ScheduledOperationModel';
+import ScheduledOperationModel from '@data/models/ScheduledOperationModel';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

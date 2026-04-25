@@ -21,7 +21,7 @@ import type EventoModel from '@data/models/EventoModel';
 import type LoteModel from '@data/models/LoteModel';
 import type PrecioMercadoModel from '@data/models/PrecioMercadoModel';
 import type MovimientoFinancieroModel from '@data/models/MovimientoFinancieroModel';
-import { TaskModel } from '@data/models/TaskModel';
+import TaskModel from '@data/models/TaskModel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

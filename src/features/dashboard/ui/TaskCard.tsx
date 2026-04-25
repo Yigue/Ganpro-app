@@ -8,11 +8,12 @@ import { es } from 'date-fns/locale';
 
 interface TaskCardProps {
   task: TaskModel;
-  onToggleStatus: (task: TaskModel) => void;
+  onComplete: (task: TaskModel) => void;
+  onEdit: (task: TaskModel) => void;
   onDelete: (task: TaskModel) => void;
 }
 
-export function TaskCard({ task, onToggleStatus, onDelete }: TaskCardProps) {
+export function TaskCard({ task, onComplete, onEdit, onDelete }: TaskCardProps) {
   const isCompleted = task.status === 'COMPLETED';
   const priorityColor = 
     task.priority === 'HIGH' ? colors.error : 
@@ -23,7 +24,7 @@ export function TaskCard({ task, onToggleStatus, onDelete }: TaskCardProps) {
     <View style={styles.card}>
       <TouchableOpacity 
         style={styles.checkBtn} 
-        onPress={() => onToggleStatus(task)}
+        onPress={() => onComplete(task)}
       >
         <Ionicons 
           name={isCompleted ? "checkbox" : "square-outline"} 
@@ -32,7 +33,10 @@ export function TaskCard({ task, onToggleStatus, onDelete }: TaskCardProps) {
         />
       </TouchableOpacity>
 
-      <View style={{ flex: 1 }}>
+      <TouchableOpacity 
+        style={{ flex: 1 }}
+        onPress={() => onEdit(task)}
+      >
         <Text style={[styles.title, isCompleted && styles.textStrikethrough]}>
           {task.title}
         </Text>
@@ -46,7 +50,7 @@ export function TaskCard({ task, onToggleStatus, onDelete }: TaskCardProps) {
             </Text>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={() => onDelete(task)}>
         <Ionicons name="trash-outline" size={20} color={colors.textDisabled} />

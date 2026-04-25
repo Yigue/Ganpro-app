@@ -30,10 +30,6 @@ import { database } from '@data/database/database';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
 import { EventoRepository } from '@data/repositories/EventoRepository';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
 const animalRepo = new AnimalRepository(database);
 const eventoRepo = new EventoRepository(database);
 
@@ -281,6 +277,26 @@ function InventoryListInner({
     setIsBulkSelect(!isBulkSelect);
     setSelectedIds([]);
   };
+
+  const handleAction = useCallback((action: string) => {
+    if (!selectedAnimal) return;
+    
+    switch(action) {
+      case 'EDITAR':
+        Alert.alert('Editar', `Editar animal ${selectedAnimal.idCaravana}`);
+        break;
+      case 'MOVER':
+        Alert.alert('Mover', `Mover animal ${selectedAnimal.idCaravana}`);
+        break;
+      case 'PESAR':
+        Alert.alert('Pesar', `Registrar peso para ${selectedAnimal.idCaravana}`);
+        break;
+      case 'BAJA':
+        handleSwipeAction('BAJA', selectedAnimal);
+        break;
+    }
+    setSelectedAnimal(null);
+  }, [selectedAnimal]);
 
   const handleSwipeAction = async (action: 'BAJA' | 'MOVER', animal: AnimalModel) => {
     if (action === 'BAJA') {
@@ -647,72 +663,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-});
-ing.xl },
-  modalRfid: { color: colors.textPrimary, fontSize: 24, fontWeight: 'bold' },
-  modalSubHeader: { color: colors.textSecondary, fontSize: 16, marginTop: 2 },
-  animalSheetInfo: {
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: spacing.md,
-    marginBottom: spacing.xl,
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  detailLabelContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  detailLabel: { color: colors.textSecondary, fontSize: 13 },
-  detailValue: { color: colors.textPrimary, fontSize: 14, fontWeight: 'bold' },
-  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, justifyContent: 'space-between' },
-  actionButton: {
-    width: '47%',
-    height: 100,
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  actionLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: 'bold' },
-
-  bulkActionBar: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 20,
-    padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  bulkCount: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  bulkBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  bulkBtnText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+  carenciaDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.error,
+    marginLeft: 4,
   },
 });

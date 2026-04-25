@@ -66,9 +66,10 @@ export function AnimalCard({ rfid }: Props) {
 
   if (!animal) return null;
 
-  const edad = animal.fechaNacimiento
-    ? `${Math.floor((Date.now() - animal.fechaNacimiento) / (1000 * 60 * 60 * 24 * 365))} años`
-    : 'Edad desconocida';
+  const ageStr = animal.fechaNacimiento
+      ? `${Math.floor((Date.now() - animal.fechaNacimiento.getTime()) / (1000 * 60 * 60 * 24 * 365))} años`
+      : 'Edad desconocida';
+
 
   return (
     <View style={styles.card}>
@@ -88,7 +89,7 @@ export function AnimalCard({ rfid }: Props) {
 
       <View style={styles.row}>
         <InfoItem label="Sexo" value={animal.sexo === 'M' ? 'Macho' : 'Hembra'} />
-        <InfoItem label="Edad" value={edad} />
+        <InfoItem label="Edad" value={ageStr} />
         <InfoItem label="Estado" value={animal.estado} />
       </View>
 

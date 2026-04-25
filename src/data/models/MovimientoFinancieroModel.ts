@@ -9,6 +9,7 @@ export default class MovimientoFinancieroModel extends Model {
   @field('tipo_cambio') tipoCambio!: number;
   @text('tipo') tipo!: string; // GASTO | INGRESO
   @date('fecha') fecha!: Date;
+  @text('categoria') categoria!: string;
   @field('category_id') categoryId!: string;
   @field('animal_id') animalId!: string | null;
   @field('lote_id') loteId!: string | null;

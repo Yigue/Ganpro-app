@@ -84,7 +84,7 @@ export const SessionQueueView = ({ queue, onClear, onProcess, onBulkRegister, on
       <ScrollView style={styles.queueScroll} contentContainerStyle={{ paddingBottom: 20 }}>
         {queue.length === 0 ? (
           <View style={styles.emptyQueue}>
-            <Ionicons name=" people-outline" size={40} color={colors.textDisabled} />
+            <Ionicons name="people-outline" size={40} color={colors.textDisabled} />
             <Text style={styles.emptyQueueText}>La manga está vacía. Escanee para empezar.</Text>
           </View>
         ) : (

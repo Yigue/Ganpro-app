@@ -19,8 +19,10 @@ export class OperationLogModel extends Model {
   @text('tipo_operacion') tipoOperacion!: string;
   @date('fecha_aplicacion') fechaAplicacion!: Date;
   @date('fecha_fin_carencia') fechaFinCarencia!: Date | null;
+  @text('dosis') dosis!: string;
   @field('dosis_aplicada') dosisAplicada!: number | null;
   @field('costo_aplicado') costoAplicado!: number | null;
+  @text('responsable') responsable!: string;
 
   @readonly @date('created_at') createdAt!: Date;
   @date('updated_at') updatedAt!: Date;

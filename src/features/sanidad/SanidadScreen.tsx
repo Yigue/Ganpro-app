@@ -591,7 +591,8 @@ function SanidadInner({ schedules, operations, logs, lotes, categorias }: {
 
     return logs.filter((log) => {
       const fecha = log.fechaAplicacion;
-      const dentroDelMes = fecha >= mesStart && fecha <= mesEnd;
+      const fechaTime = fecha.getTime();
+      const dentroDelMes = fechaTime >= mesStart && fechaTime <= mesEnd;
       if (!dentroDelMes) return false;
 
       if (historialTipoFilter === null) return true;

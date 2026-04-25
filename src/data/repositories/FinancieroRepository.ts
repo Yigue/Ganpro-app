@@ -26,10 +26,11 @@ export class FinancieroRepository {
         .create((m) => {
           m.tipo = params.tipo;
           m.categoria = params.categoria;
+          m.categoryId = params.categoria; // Sync both for now
           m.loteId = params.loteId ?? null;
           m.animalId = params.animalId ?? null;
           m.monto = params.monto;
-          m.fecha = params.fecha;
+          m.fecha = new Date(params.fecha);
           m.descripcion = params.descripcion ?? '';
           m.comprobante = params.comprobante ?? '';
           m.dteNumero = params.dteNumero ?? '';

@@ -20,6 +20,7 @@ import type TaskModel from '@data/models/TaskModel';
 import type PotreroModel from '@data/models/PotreroModel';
 import type MovimientoFinancieroModel from '@data/models/MovimientoFinancieroModel';
 import type AgregadoFinancieroModel from '@data/models/AgregadoFinancieroModel';
+import FinancialCategoryModel from '@data/models/FinancialCategoryModel';
 
 import { AddTransactionModal } from './ui/AddTransactionModal';
 import { FinancialCategoryManagerModal } from './ui/FinancialCategoryManagerModal';
@@ -65,6 +66,7 @@ interface DashboardProps {
   tasks: TaskModel[];
   agregados: AgregadoFinancieroModel[];
   lotes: LoteModel[];
+  categories: FinancialCategoryModel[];
   selectedLoteId: string | null;
   setSelectedLoteId: (id: string | null) => void;
   selectedMoneda: 'ARS' | 'USD';
@@ -78,6 +80,7 @@ function DashboardInner({
   tasks,
   agregados,
   lotes,
+  categories,
   selectedLoteId,
   setSelectedLoteId,
   selectedMoneda,
@@ -167,11 +170,11 @@ function DashboardInner({
               {tasks.length === 0 ? (
                 <EmptyState icon="list-outline" title="Sin tareas" subtitle="Agregá recordatorios" />
               ) : (
-                tasks.map((t: any) => <TaskCard key={t.id} task={t} onToggleStatus={async (task: any) => {
+                tasks.map((t: any) => <TaskCard key={t.id} task={t} onComplete={async (task: any) => {
                   await database.write(async () => {
                     await task.update((r: any) => { r.status = r.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'; });
                   });
-                }} onDelete={async (task: any) => {
+                }} onEdit={() => {}} onDelete={async (task: any) => {
                   await database.write(async () => { await task.destroyPermanently(); });
                 }} />)
               )}
@@ -250,24 +253,30 @@ function DashboardInner({
       <AddTransactionModal
         visible={isTxModalVisible}
         onClose={() => setIsTxModalVisible(false)}
+        categories={categories}
         onSave={async (data: any) => {
           await database.write(async () => {
-            await database.get('movimientos_financieros').create((m: any) => {
+            await database.get<MovimientoFinancieroModel>('movimientos_financieros').create((m) => {
               m.tipo = data.tipo;
               m.categoryId = data.categoria;
+              m.categoria = data.categoria;
               m.monto = parseFloat(data.monto);
               m.moneda = selectedMoneda;
-              m.fecha = Date.now();
+              m.fecha = new Date();
               m.descripcion = data.concepto;
             });
           });
           setIsTxModalVisible(false);
         }}
       />
-      <FinancialCategoryManagerModal visible={isCatModalVisible} onClose={() => setIsCatModalVisible(false)} />
+      <FinancialCategoryManagerModal 
+        visible={isCatModalVisible} 
+        onClose={() => setIsCatModalVisible(false)} 
+        categories={categories}
+      />
       <AddTaskModal visible={isTaskModalVisible} onClose={() => setIsTaskModalVisible(false)} onSave={async (data: any) => {
         await database.write(async () => {
-          await database.get('tasks').create((t: any) => {
+          await database.get<TaskModel>('tasks').create((t) => {
             t.title = data.title; t.priority = data.priority; t.dueDate = data.dueDate; t.status = 'PENDING';
           });
         });
@@ -295,6 +304,7 @@ const DashboardWithData = withObservables(['selectedLoteId', 'selectedMoneda'], 
       Q.sortBy('periodo_mes', Q.asc)
     ).observe(),
     lotes: database.get<LoteModel>('lotes').query().observe(),
+    categories: database.get<FinancialCategoryModel>('financial_categories').query().observe(),
   };
 })(DashboardInner);
 

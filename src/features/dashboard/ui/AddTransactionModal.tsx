@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '@theme/index';
-import type { FinancialCategoryModel } from '@data/models/FinancialCategoryModel';
+import FinancialCategoryModel from '@data/models/FinancialCategoryModel';
 
 export type TransactionTipo = 'INGRESO' | 'GASTO';
 

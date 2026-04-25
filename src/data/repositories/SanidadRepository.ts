@@ -1,8 +1,8 @@
 import { Database, Q } from '@nozbe/watermelondb';
 import type { Query } from '@nozbe/watermelondb';
-import { OperationCatalogModel } from '../models/OperationCatalogModel';
-import { OperationLogModel } from '../models/OperationLogModel';
-import { ScheduledOperationModel } from '../models/ScheduledOperationModel';
+import OperationCatalogModel from '../models/OperationCatalogModel';
+import OperationLogModel from '../models/OperationLogModel';
+import ScheduledOperationModel from '../models/ScheduledOperationModel';
 import ProtocoloIATFModel from '../models/ProtocoloIATFModel';
 import EtapaProtocoloModel from '../models/EtapaProtocoloModel';
 
@@ -64,8 +64,8 @@ export class SanidadRepository {
         log.animalId = params.animalId ?? '';
         log.loteId = params.loteId ?? '';
         log.operationId = params.operationId;
-        log.fechaAplicacion = params.fechaAplicacion;
-        log.fechaFinCarencia = fechaFinCarencia;
+        log.fechaAplicacion = new Date(params.fechaAplicacion);
+        log.fechaFinCarencia = new Date(fechaFinCarencia);
         log.dosis = params.dosis ?? '';
         log.responsable = params.responsable ?? '';
       });
@@ -124,7 +124,7 @@ export class SanidadRepository {
       return this.database.get<ScheduledOperationModel>('scheduled_operations').create((op) => {
         op.operationId = params.operationId;
         op.loteId = params.loteId ?? '';
-        op.fechaProgramada = params.fechaProgramada;
+        op.fechaProgramada = new Date(params.fechaProgramada);
         op.estado = 'PENDING';
       });
     });

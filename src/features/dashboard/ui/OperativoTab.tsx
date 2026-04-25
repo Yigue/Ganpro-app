@@ -26,7 +26,7 @@ import { TaskCard } from './TaskCard';
 import { AddTaskModal } from './AddTaskModal';
 import type AnimalModel from '@data/models/AnimalModel';
 import type EventoModel from '@data/models/EventoModel';
-import { TaskModel, type TaskPriority, type TaskStatus } from '@data/models/TaskModel';
+import TaskModel, { type TaskPriority, type TaskStatus } from '@data/models/TaskModel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -264,31 +264,24 @@ function OperativoTabView({
 
   const handleSaveTask = async (data: {
     title: string;
-    description: string;
-    priority: TaskPriority;
-    dueDateText: string;
-    status: TaskStatus;
+    priority: string;
+    dueDate?: number;
   }) => {
-    const dueDate = parseDueDateText(data.dueDateText);
-
     if (editingTask) {
       await database.write(async () => {
         await editingTask.update((t) => {
           t.title = data.title;
-          t.description = data.description;
-          t.priority = data.priority;
-          t.status = data.status;
-          (t as TaskModel & { dueDate: number | null }).dueDate = dueDate;
+          t.priority = data.priority as any;
+          (t as any).dueDate = data.dueDate ?? null;
         });
       });
     } else {
       await database.write(async () => {
         await database.get<TaskModel>('tasks').create((t) => {
           t.title = data.title;
-          t.description = data.description;
-          t.priority = data.priority;
+          t.priority = data.priority as any;
           t.status = 'PENDING';
-          (t as TaskModel & { dueDate: number | null }).dueDate = dueDate;
+          (t as any).dueDate = data.dueDate ?? null;
         });
       });
     }

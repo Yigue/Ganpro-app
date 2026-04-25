@@ -97,6 +97,31 @@ export class NutricionRepository {
 
   // ── Feeding Logs (Entregas de Ración) ───────────────────────────────────────
 
+  async applyRacionToPotrero(racionId: string, potreroId: string, kilos: number): Promise<void> {
+    const racion = await this.database.get<RacionModel>('raciones').find(racionId);
+    const costoTotal = (racion.costoEstimadoKg || 0) * kilos;
+    
+    await this.logFeeding({
+      potreroId,
+      racionId,
+      cantidadKg: kilos,
+      fecha: Date.now(),
+      notas: `Costo total estimado: $${costoTotal.toFixed(2)}`
+    });
+  }
+
+  async calculateGDPEstimado(racionId: string, pesoPromedio: number): Promise<{ gdp: number, costoKgProducido: number }> {
+    const racion = await this.database.get<RacionModel>('raciones').find(racionId);
+    const costoPorKg = racion.costoEstimadoKg || 0;
+    
+    // Estimación agronómica simplificada MVP
+    const consumoDiarioEstimado = pesoPromedio * 0.03; // 3% del peso vivo
+    const gdp = 0.75 + (costoPorKg > 0 ? 0.25 : 0); // Asumiendo base de 0.75kg, sube si la ración tiene costo
+    const costoKgProducido = gdp > 0 ? (costoPorKg * consumoDiarioEstimado) / gdp : 0;
+    
+    return { gdp, costoKgProducido };
+  }
+
   async logFeeding(params: {
     potreroId: string;
     racionId: string;

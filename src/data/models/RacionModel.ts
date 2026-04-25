@@ -9,6 +9,9 @@ export default class RacionModel extends Model {
   @field('activa') activa!: boolean;
   @field('costo_estimado_kg') costoEstimadoKg!: number;
   @text('moneda') moneda!: string; // USD | ARS
+  @field('kg_dia_animal') kgDiaAnimal!: number;
+  @field('lote_id') loteId!: string;
+  @text('notas') notas!: string;
 
   @readonly @date('created_at') createdAt!: Date;
   @date('updated_at') updatedAt!: Date;

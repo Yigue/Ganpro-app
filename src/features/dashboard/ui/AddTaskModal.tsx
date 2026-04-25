@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -12,15 +12,28 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '@theme/index';
 
+import type TaskModel from '@data/models/TaskModel';
+
 interface AddTaskModalProps {
   visible: boolean;
+  editTask?: TaskModel | null;
   onClose: () => void;
   onSave: (data: { title: string; priority: string; dueDate?: number }) => void;
 }
 
-export function AddTaskModal({ visible, onClose, onSave }: AddTaskModalProps) {
+export function AddTaskModal({ visible, editTask, onClose, onSave }: AddTaskModalProps) {
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState('MEDIUM');
+
+  useEffect(() => {
+    if (editTask) {
+      setTitle(editTask.title);
+      setPriority(editTask.priority);
+    } else {
+      setTitle('');
+      setPriority('MEDIUM');
+    }
+  }, [editTask, visible]);
 
   const handleSave = () => {
     if (!title.trim()) return Alert.alert('Error', 'El título es obligatorio');
