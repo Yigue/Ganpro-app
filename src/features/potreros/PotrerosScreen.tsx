@@ -110,11 +110,21 @@ const PotreroDetailsInner = ({ visible, onClose, potrero, animalsCount, movement
             </View>
           </View>
 
-          {/* ACCIÓN RÁPIDA DE INGENIERO EXPERTO */}
-          <TouchableOpacity style={styles.quickFeedingBtn} onPress={() => { onClose(); onFeeding(potrero); }}>
-            <Ionicons name="cart" size={24} color="white" />
-            <Text style={styles.quickFeedingText}>SUPLEMENTAR ESTE POTRERO</Text>
-          </TouchableOpacity>
+          {/* ACCIONES RÁPIDAS DE POTRERO */}
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+            <TouchableOpacity style={[styles.quickFeedingBtn, { flex: 1, backgroundColor: colors.info }]} onPress={() => { onClose(); Alert.alert('Movimiento Masivo', 'Próximamente: Mover la hacienda de este potrero.'); }}>
+              <Ionicons name="swap-horizontal" size={20} color="white" />
+              <Text style={styles.quickFeedingText}>MOVER</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.quickFeedingBtn, { flex: 1, backgroundColor: colors.warning }]} onPress={() => { onClose(); Alert.alert('Sanidad', 'Próximamente: Aplicar tratamiento al potrero.'); }}>
+              <Ionicons name="medkit" size={20} color="white" />
+              <Text style={styles.quickFeedingText}>SANIDAD</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.quickFeedingBtn, { flex: 1, backgroundColor: colors.primary }]} onPress={() => { onClose(); onFeeding(potrero); }}>
+              <Ionicons name="cart" size={20} color="white" />
+              <Text style={styles.quickFeedingText}>NUTRIR</Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.sectionTitleSmall}>ÚLTIMOS MOVIMIENTOS</Text>
           <View style={{ flex: 1, marginTop: 10 }}>

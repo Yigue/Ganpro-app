@@ -19,13 +19,15 @@ import { Q } from '@nozbe/watermelondb';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ObservableErrorBoundary } from '@shared/components/ObservableErrorBoundary';
+import { BulkCreateModal } from './ui/BulkCreateModal';
+import { GenericGroupCard } from './ui/GenericGroupCard';
 import { colors, spacing, typography } from '@theme/index';
 import {
   CATEGORIA,
   type CategoriaType,
 } from '@core/constants/categories';
 import type AnimalModel from '@data/models/AnimalModel';
-import type LoteModel from '@data/models/LoteModel';
+import type PotreroModel from '@data/models/PotreroModel';
 import { database } from '@data/database/database';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
 import { EventoRepository } from '@data/repositories/EventoRepository';
@@ -62,7 +64,7 @@ import Swipeable from 'react-native-gesture-handler/Swipeable';
  */
 const AnimalListItemInner = ({ 
   animal, 
-  lote,
+  potrero,
   onPress,
   isBulkSelect,
   isSelected,
@@ -70,7 +72,7 @@ const AnimalListItemInner = ({
   onSwipeAction
 }: { 
   animal: AnimalModel; 
-  lote: LoteModel | null;
+  potrero: PotreroModel | null;
   onPress: (a: AnimalModel) => void;
   isBulkSelect: boolean;
   isSelected: boolean;
@@ -118,7 +120,9 @@ const AnimalListItemInner = ({
             <View style={styles.cardMain}>
               <View style={styles.cardLeft}>
                 <View style={styles.rfidContainer}>
-                  <Text style={styles.animalRfid}>{animal.idCaravana}</Text>
+                  <Text style={[styles.animalRfid, animal.isGeneric && { color: colors.textSecondary }]}>
+                    {animal.isGeneric ? 'GENÉRICO' : animal.idCaravana}
+                  </Text>
                   {hasAlert && <View style={styles.carenciaDot} />}
                 </View>
                 <Text style={styles.animalMeta}>
@@ -130,7 +134,7 @@ const AnimalListItemInner = ({
             <View style={styles.cardFooter}>
               <View style={styles.locationTag}>
                 <Ionicons name="location-sharp" size={14} color={colors.textSecondary} />
-                <Text style={styles.locationText}>Lote: {lote?.nombre || 'General'}</Text>
+                <Text style={styles.locationText}>Potrero: {potrero?.nombre || 'General'}</Text>
               </View>
             </View>
           </View>
@@ -142,7 +146,7 @@ const AnimalListItemInner = ({
 
 const AnimalListItem = withObservables(['animal'], ({ animal }: { animal: AnimalModel }) => ({
   animal: animal.observe(),
-  lote: animal.lote.observe(),
+  potrero: animal.potrero.observe(),
 }))(AnimalListItemInner);
 
 /**
@@ -174,6 +178,34 @@ function CategorySection({
     setExpanded(!expanded);
   };
 
+  const groupedItems = useMemo(() => {
+    const genericsByPotrero: Record<string, AnimalModel[]> = {};
+    const individuals: AnimalModel[] = [];
+
+    animals.forEach(a => {
+      if (a.isGeneric) {
+        const key = a.potreroId || 'NO_POTRERO';
+        if (!genericsByPotrero[key]) genericsByPotrero[key] = [];
+        genericsByPotrero[key].push(a);
+      } else {
+        individuals.push(a);
+      }
+    });
+
+    const groups = Object.entries(genericsByPotrero)
+      .filter(([_, list]) => list.length >= 2) // Group if 2 or more
+      .map(([potreroId, list]) => ({ isGroup: true, potreroId, count: list.length, sample: list[0] }));
+
+    // Unpack the ones that were fewer than 2 back to individuals
+    Object.entries(genericsByPotrero).forEach(([_, list]) => {
+      if (list.length < 2) {
+        individuals.push(...list);
+      }
+    });
+
+    return { groups, individuals };
+  }, [animals]);
+
   if (animals.length === 0) return null;
 
   return (
@@ -198,7 +230,19 @@ function CategorySection({
       
       {expanded && (
         <View style={styles.categoryList}>
-          {animals.map(animal => (
+          {groupedItems.groups.map(g => (
+            <GenericGroupCard
+              key={`group-${g.sample.categoria}-${g.potreroId}`}
+              count={g.count}
+              categoria={g.sample.categoria}
+              loteNombre="Varios/Potrero"
+              onPress={() => Alert.alert('Tropa Genérica', `Hay ${g.count} animales aquí. Acciones masivas pronto.`)}
+              isBulkSelect={isBulkSelect}
+              isSelected={false} // Would need logic for bulk selecting groups
+              onToggleSelect={() => {}}
+            />
+          ))}
+          {groupedItems.individuals.map(animal => (
             <AnimalListItem 
               key={animal.id} 
               animal={animal} 
@@ -234,19 +278,23 @@ function InventoryListInner({
   onSearchChange: (text: string) => void;
 }) {
   const [selectedAnimal, setSelectedAnimal] = useState<AnimalModel | null>(null);
-  const [selectedAnimalLote, setSelectedAnimalLote] = useState<string>('Cargando...');
+  const [selectedAnimalPotrero, setSelectedAnimalPotrero] = useState<string>('Cargando...');
   
+  // Generic Action Modal State
+  const [selectedGenericGroup, setSelectedGenericGroup] = useState<any | null>(null);
+
   // Bulk Selection State
   const [isBulkSelect, setIsBulkSelect] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showBulkCreate, setShowBulkCreate] = useState(false);
 
-  // Efecto para cargar el nombre del lote cuando se selecciona un animal
+  // Efecto para cargar el nombre del potrero cuando se selecciona un animal
   useEffect(() => {
     if (selectedAnimal) {
-      selectedAnimal.lote.fetch().then(l => {
-        setSelectedAnimalLote(l?.nombre || 'General');
+      selectedAnimal.potrero.fetch().then(p => {
+        setSelectedAnimalPotrero(p?.nombre || 'General');
       }).catch(() => {
-        setSelectedAnimalLote('General');
+        setSelectedAnimalPotrero('General');
       });
     }
   }, [selectedAnimal]);
@@ -347,6 +395,12 @@ function InventoryListInner({
             />
           </View>
           <TouchableOpacity 
+            style={[styles.toolButton]}
+            onPress={() => setShowBulkCreate(true)}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity 
             style={[styles.toolButton, isBulkSelect && styles.toolButtonActive]}
             onPress={toggleBulkMode}
           >
@@ -380,7 +434,7 @@ function InventoryListInner({
         <View style={styles.bulkActionBar}>
           <Text style={styles.bulkCount}>{selectedIds.length} seleccionados</Text>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity style={[styles.bulkBtn, { backgroundColor: colors.info }]} onPress={() => Alert.alert('Mover Lote', `Moveriendo ${selectedIds.length} animales`)}>
+            <TouchableOpacity style={[styles.bulkBtn, { backgroundColor: colors.info }]} onPress={() => Alert.alert('Mover Potrero', `Moviendo ${selectedIds.length} animales`)}>
               <Ionicons name="swap-horizontal" size={20} color="white" />
               <Text style={styles.bulkBtnText}>Mover</Text>
             </TouchableOpacity>
@@ -418,7 +472,7 @@ function InventoryListInner({
             <View style={styles.animalSheetInfo}>
               <DetailRow label="Sexo" value={selectedAnimal?.sexo === 'M' ? 'Macho' : 'Hembra'} icon="male-female-outline" />
               <DetailRow label="Peso Est." value={`${selectedAnimal ? getStableWeight(selectedAnimal.id) : '-'} kg`} icon="speedometer-outline" />
-              <DetailRow label="Lote Actual" value={selectedAnimalLote} icon="layers-outline" />
+              <DetailRow label="Potrero Actual" value={selectedAnimalPotrero} icon="map-outline" />
               <DetailRow label="Estado" value={selectedAnimal?.estado || '-'} icon="pulse-outline" color={colors.primary} />
             </View>
             
@@ -443,6 +497,27 @@ function InventoryListInner({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Modal de Ingreso Masivo */}
+      <BulkCreateModal 
+        visible={showBulkCreate} 
+        onClose={() => setShowBulkCreate(false)} 
+        onSuccess={() => {
+          Alert.alert("Éxito", "Tropa ingresada correctamente.");
+          setShowBulkCreate(false);
+        }} 
+      />
+
+      {/* Modal de Acción Genérica */}
+      {selectedGenericGroup && (
+        <GenericActionModal
+          visible={!!selectedGenericGroup}
+          onClose={() => setSelectedGenericGroup(null)}
+          count={selectedGenericGroup.count}
+          categoria={selectedGenericGroup.sample.categoria}
+          potreroNombre={selectedGenericGroup.potreroId === 'NO_POTRERO' ? 'Sin Potrero' : 'Potrero Asignado'}
+        />
+      )}
     </View>
   );
 }
@@ -628,7 +703,7 @@ const styles = StyleSheet.create({
 
   bulkActionBar: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 100,
     left: 20,
     right: 20,
     backgroundColor: colors.surfaceElevated,

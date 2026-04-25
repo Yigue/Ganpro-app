@@ -20,6 +20,10 @@ import type LoteModel from '@data/models/LoteModel';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
 import { useScanStore, type QueueItem } from '@store/scanStore';
 
+import withObservables from '@nozbe/with-observables';
+import { Q } from '@nozbe/watermelondb';
+
+// ... (resto de los imports ya existentes)
 type BatchAction = 'VACUNACION' | 'PESAJE' | 'CAMBIO_LOTE' | 'CAMBIO_CATEGORIA';
 
 const BATCH_ACTIONS: { tipo: BatchAction; label: string; icon: string; color: string }[] =
@@ -33,9 +37,10 @@ const BATCH_ACTIONS: { tipo: BatchAction; label: string; icon: string; color: st
 interface Props {
   visible: boolean;
   onClose: () => void;
+  lotes: LoteModel[];
 }
 
-export function BatchActionSheet({ visible, onClose }: Props) {
+function BatchActionSheetInner({ visible, onClose, lotes }: Props) {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
   const snapPoints = useMemo(() => ['60%', '95%'], []);
 
@@ -47,7 +52,6 @@ export function BatchActionSheet({ visible, onClose }: Props) {
   const [selectedAction, setSelectedAction] = useState<BatchAction | null>(null);
   const [vacuna, setVacuna] = useState('');
   const [notas, setNotas] = useState('');
-  const [lotes, setLotes] = useState<LoteModel[]>([]);
   const [loteDestinoId, setLoteDestinoId] = useState<string | null>(null);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<CategoriaType | null>(null);
   const [applying, setApplying] = useState(false);
@@ -60,15 +64,10 @@ export function BatchActionSheet({ visible, onClose }: Props) {
       setNotas('');
       setLoteDestinoId(null);
       setCategoriaSeleccionada(null);
-      void (async () => {
-        try {
-          setLotes(await database.get<LoteModel>('lotes').query().fetch());
-        } catch (e) { console.error('[BatchActionSheet] load lotes error:', e); }
-      })();
     } else {
       bottomSheetRef.current?.dismiss();
     }
-  }, [visible, database]);
+  }, [visible]);
 
   const handleApply = useCallback(async () => {
     if (!selectedAction || queue.length === 0) return;
@@ -508,3 +507,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
 });
+
+export const BatchActionSheet = withObservables([], () => ({
+  lotes: database.get<LoteModel>('lotes').query().observe(),
+}))(BatchActionSheetInner);
