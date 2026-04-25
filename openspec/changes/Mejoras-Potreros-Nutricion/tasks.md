@@ -22,6 +22,6 @@
 
 ## Phase 4: Testing & Verification
 
-- [ ] 4.1 In `src/data/repositories/__tests__/NutricionRepository.test.ts`, write unit tests for `calculateGDPEstimado` and `applyRacionToPotrero`.
-- [ ] 4.2 In `src/features/potreros/ui/__tests__/RacionMixerModal.test.tsx`, verify percentage validation (must equal 100%) and close button functionality.
-- [ ] 4.3 Verify end-to-end that inserting a new CC score via `CCAuditModal` updates the CC LineChart dynamically.
+- [x] 4.1 In `src/data/repositories/__tests__/NutricionRepository.test.ts`, write unit tests for `calculateGDPEstimado` and `applyRacionToPotrero`.
+- [x] 4.2 In `src/features/potreros/ui/__tests__/RacionMixerModal.test.tsx`, verify percentage validation (must equal 100%) and close button functionality.
+- [x] 4.3 Verify end-to-end that inserting a new CC score via `CCAuditModal` updates the CC LineChart dynamically.
