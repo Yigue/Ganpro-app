@@ -22,7 +22,7 @@ import {
   type SexoType,
   type CategoriaType,
 } from '@core/constants/categories';
-import type LoteModel from '@data/models/LoteModel';
+import type PotreroModel from '@data/models/PotreroModel';
 import { AnimalRepository } from '@data/repositories/AnimalRepository';
 
 interface Props {
@@ -42,9 +42,9 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
   const [sexo, setSexo] = useState<SexoType | null>(null);
   const [categoria, setCategoria] = useState<CategoriaType | null>(null);
   const [raza, setRaza] = useState('');
-  const [loteId, setLoteId] = useState<string | null>(null);
+  const [potreroId, setPotreroId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [lotes, setLotes] = useState<LoteModel[]>([]);
+  const [potreros, setPotreros] = useState<PotreroModel[]>([]);
 
   useEffect(() => {
     if (visible) {
@@ -52,12 +52,12 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
       setSexo(null);
       setCategoria(null);
       setRaza('');
-      setLoteId(null);
+      setPotreroId(null);
       void (async () => {
         try {
-          setLotes(await database.get<LoteModel>('lotes').query().fetch());
+          setPotreros(await database.get<PotreroModel>('potreros').query().fetch());
         } catch (e) {
-          console.error('[Registration] load lotes error:', e);
+          console.error('[Registration] load potreros error:', e);
         }
       })();
     } else {
@@ -82,18 +82,18 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
     [triggerSelection]
   );
 
-  const handleLoteSelect = useCallback(
+  const handlePotreroSelect = useCallback(
     (id: string) => {
       triggerSelection();
-      setLoteId(id);
+      setPotreroId(id);
     },
     [triggerSelection]
   );
 
-  const isFormValid = sexo !== null && categoria !== null && loteId !== null;
+  const isFormValid = sexo !== null && categoria !== null && potreroId !== null;
 
   const handleSave = useCallback(async () => {
-    if (!isFormValid || !sexo || !categoria || !loteId) return;
+    if (!isFormValid || !sexo || !categoria || !potreroId) return;
     setSaving(true);
     try {
       const repo = new AnimalRepository(database);
@@ -103,7 +103,7 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
         categoria,
         raza: raza.trim(),
         estado: ESTADO.ACTIVO,
-        loteId,
+        potreroId,
       });
       triggerSuccess();
       onSaved(newAnimal);
@@ -113,7 +113,7 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
     } finally {
       setSaving(false);
     }
-  }, [isFormValid, database, rfid, sexo, categoria, raza, loteId, triggerSuccess, onSaved]);
+  }, [isFormValid, database, rfid, sexo, categoria, raza, potreroId, triggerSuccess, onSaved]);
 
   const categoriasDisponibles =
     sexo === SEXO.MACHO ? CATEGORIAS_MACHO : CATEGORIAS_HEMBRA;
@@ -204,11 +204,11 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
           returnKeyType="done"
         />
 
-        {/* LOTE */}
-        <Text style={styles.sectionLabel}>LOTE / POTRERO</Text>
-        {lotes.length === 0 ? (
+        {/* POTRERO */}
+        <Text style={styles.sectionLabel}>POTRERO</Text>
+        {potreros.length === 0 ? (
           <Text style={styles.noLotesText}>
-            No hay lotes configurados. Creá uno en la pestaña Lotes.
+            No hay potreros configurados. Creá uno en la pestaña Potreros.
           </Text>
         ) : (
           <ScrollView
@@ -216,26 +216,27 @@ export function AnimalRegistrationModal({ visible, rfid, onClose, onSaved }: Pro
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.loteList}
           >
-            {lotes.map((lote) => (
+            {potreros.map((potrero) => (
               <TouchableOpacity
-                key={lote.id}
+                key={potrero.id}
                 style={[
                   styles.loteChip,
-                  loteId === lote.id && styles.loteChipSelected,
+                  potreroId === potrero.id && styles.loteChipSelected,
                 ]}
-                onPress={() => handleLoteSelect(lote.id)}
+                onPress={() => handlePotreroSelect(potrero.id)}
                 activeOpacity={0.8}
               >
                 <Text
                   style={[
                     styles.loteChipText,
-                    loteId === lote.id && styles.loteChipTextSelected,
+                    potreroId === potrero.id && styles.loteChipTextSelected,
                   ]}
                 >
-                  {lote.nombre}
+                  {potrero.nombre}
                 </Text>
-                {lote.ubicacion ? (
-                  <Text style={styles.loteChipUbicacion}>{lote.ubicacion}</Text>
+                {/* Potrero might not have 'ubicacion', but has 'recurso_forrajero' */}
+                {potrero.recursoForrajero ? (
+                  <Text style={styles.loteChipUbicacion}>{potrero.recursoForrajero}</Text>
                 ) : null}
               </TouchableOpacity>
             ))}

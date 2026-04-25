@@ -161,8 +161,8 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
             setPhase('not_found');
             triggerError();
             playError();
-            if (registrationTimeoutRef.current) clearTimeout(registrationTimeoutRef.current);
-            registrationTimeoutRef.current = setTimeout(() => openRegistrationModal(), 50);
+            // Eliminado: no abrimos RegistrationModal automáticamente.
+            // Dejamos que el usuario elija en IndividualModeView.
           }
         } catch (error) {
           console.error('[RFID] DB query error:', error);

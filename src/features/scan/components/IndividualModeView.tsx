@@ -3,9 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
 import { colors, spacing, typography } from '@theme/index';
-import type { ScanPhase } from '@store/scanStore';
+import { useScanStore, type ScanPhase } from '@store/scanStore';
 import { AnimalCard } from '../AnimalCard';
 import { RadarAnimation } from './RadarAnimation';
 
@@ -66,6 +67,22 @@ export function IndividualModeView({ phase, currentRfid }: IndividualModeViewPro
           <Text style={styles.notFoundSubtext}>
             El arete escaneado no corresponde a ningún animal en el sistema
           </Text>
+          
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              onPress={() => useScanStore.getState().openRegistrationModal()}
+            >
+              <Text style={styles.actionButtonText}>Nuevo Animal</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: colors.warning }]}
+              onPress={() => useScanStore.getState().openLinkGenericModal()}
+            >
+              <Text style={styles.actionButtonText}>Vincular Tropa</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -134,5 +151,20 @@ const styles = StyleSheet.create({
   scanningContainer: {
     alignItems: 'center',
     marginTop: spacing.lg,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  actionButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: typography.sizes.sm,
   },
 });

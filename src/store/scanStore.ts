@@ -32,6 +32,7 @@ interface ScanState {
   lastScanTime: number | null;
   isRegistrationModalOpen: boolean;
   isEventSheetOpen: boolean;
+  isLinkGenericModalOpen: boolean;
 
   // Batch mode
   batchMode: boolean;
@@ -49,6 +50,8 @@ interface ScanState {
   closeRegistrationModal: () => void;
   openEventSheet: () => void;
   closeEventSheet: () => void;
+  openLinkGenericModal: () => void;
+  closeLinkGenericModal: () => void;
   reset: () => void;
 
   toggleBatchMode: () => void;
@@ -77,6 +80,7 @@ export const useScanStore = create<ScanState>()((set, get) => ({
   lastScanTime: null,
   isRegistrationModalOpen: false,
   isEventSheetOpen: false,
+  isLinkGenericModalOpen: false,
 
   batchMode: false,
   queue: [],
@@ -93,12 +97,15 @@ export const useScanStore = create<ScanState>()((set, get) => ({
   closeRegistrationModal: () => set({ isRegistrationModalOpen: false, phase: 'idle' }),
   openEventSheet: () => set({ isEventSheetOpen: true }),
   closeEventSheet: () => set({ isEventSheetOpen: false }),
+  openLinkGenericModal: () => set({ isLinkGenericModalOpen: true }),
+  closeLinkGenericModal: () => set({ isLinkGenericModalOpen: false, phase: 'idle' }),
   reset: () =>
     set({
       currentRfid: null,
       phase: 'idle',
       isRegistrationModalOpen: false,
       isEventSheetOpen: false,
+      isLinkGenericModalOpen: false,
     }),
 
   toggleBatchMode: () =>

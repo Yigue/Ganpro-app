@@ -2,7 +2,7 @@ import { Model } from '@nozbe/watermelondb';
 import { field, date, readonly, relation } from '@nozbe/watermelondb/decorators';
 import type { Relation } from '@nozbe/watermelondb';
 import type AnimalModel from './AnimalModel';
-import type LoteModel from './LoteModel';
+import type PotreroModel from './PotreroModel';
 import type OperationCatalogModel from './OperationCatalogModel';
 
 export default class ScheduledOperationModel extends Model {
@@ -25,6 +25,6 @@ export default class ScheduledOperationModel extends Model {
   @date('updated_at') updatedAt!: Date;
 
   @relation('operations_catalog', 'operation_id') operation!: Relation<OperationCatalogModel>;
-  @relation('lotes', 'lote_id') lote!: Relation<LoteModel>;
+  @relation('potreros', 'lote_id') lote!: Relation<PotreroModel>;
   @relation('animals', 'animal_id') animal!: Relation<AnimalModel>;
 }

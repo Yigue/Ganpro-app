@@ -14,13 +14,14 @@ import { database } from '@data/database/database';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
   isSameMonth, isSameDay, addMonths, subMonths, isToday, addYears, subYears,
-  eachMonthOfInterval, startOfYear, endOfYear, addDays
+  eachMonthOfInterval, startOfYear, endOfYear, addDays, differenceInCalendarDays,
+  isAfter, isBefore
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ScheduledOperationModel from '@data/models/ScheduledOperationModel';
 import OperationCatalogModel from '@data/models/OperationCatalogModel';
 import OperationLogModel from '@data/models/OperationLogModel';
-import LoteModel from '@data/models/LoteModel';
+import PotreroModel from '@data/models/PotreroModel';
 import { CategoriaTratamientoModel } from '@data/models/CategoriaTratamientoModel';
 import { SanidadRepository } from '@data/repositories/SanidadRepository';
 
@@ -78,23 +79,99 @@ const SegmentedControl = ({ active, onChange }: { active: TabType, onChange: (v:
 
 // ── Vistas de Calendario ─────────────────────────────────────────────────────
 
-function YearlyView({ currentYear, onMonthSelect, schedules }: any) {
-  const months = eachMonthOfInterval({ start: startOfYear(currentYear), end: endOfYear(currentYear) });
+function YearlyView({ currentYear, currentMonth, onMonthSelect, onPrevYear, onNextYear, schedules }: {
+  currentYear: Date;
+  currentMonth: Date;
+  onMonthSelect: (m: Date) => void;
+  onPrevYear: () => void;
+  onNextYear: () => void;
+  schedules: ScheduledOperationModel[];
+}) {
+  const months = useMemo(
+    () => eachMonthOfInterval({ start: startOfYear(currentYear), end: endOfYear(currentYear) }),
+    [currentYear]
+  );
+
+  const monthsData = useMemo(() => {
+    const stats = months.map((month) => {
+      const eventCount = schedules.filter((e) => isSameMonth(new Date(e.fechaProgramada), month)).length;
+      return { month, eventCount };
+    });
+    const maxEvents = Math.max(1, ...stats.map((s) => s.eventCount));
+    const today = new Date();
+    return stats.map(({ month, eventCount }) => ({
+      month,
+      eventCount,
+      intensity: eventCount / maxEvents,
+      isCurrent: isSameMonth(month, today),
+      isSelected: isSameMonth(month, currentMonth),
+    }));
+  }, [months, schedules, currentMonth]);
+
+  const totalYearEvents = useMemo(
+    () => monthsData.reduce((sum, m) => sum + m.eventCount, 0),
+    [monthsData]
+  );
 
   return (
-    <ScrollView contentContainerStyle={styles.yearlyGrid}>
-      {months.map((month, index) => {
-        const hasEvents = schedules.some((e: any) => isSameMonth(new Date(e.fechaProgramada), month));
-        return (
-          <TouchableOpacity key={`month-${index}`} style={styles.monthCard} onPress={() => onMonthSelect(month)}>
-            <Text style={styles.monthCardTitle}>{format(month, 'MMMM', { locale: es }).toUpperCase()}</Text>
-            <View style={styles.miniGrid}>
-              {hasEvents && <View style={styles.eventDotYear} />}
+    <View style={styles.flex}>
+      <View style={styles.yearNavRow}>
+        <TouchableOpacity onPress={onPrevYear} style={styles.yearNavBtn} hitSlop={8}>
+          <Ionicons name="chevron-back" size={22} color={colors.primary} />
+        </TouchableOpacity>
+        <View style={styles.yearTitleBlock}>
+          <Text style={styles.yearTitle}>{format(currentYear, 'yyyy')}</Text>
+          <Text style={styles.yearSubtitle}>{totalYearEvents} evento{totalYearEvents !== 1 ? 's' : ''}</Text>
+        </View>
+        <TouchableOpacity onPress={onNextYear} style={styles.yearNavBtn} hitSlop={8}>
+          <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
+      <ScrollView contentContainerStyle={styles.yearlyGrid} showsVerticalScrollIndicator={false}>
+        {monthsData.map(({ month, eventCount, intensity, isCurrent, isSelected }, index) => (
+          <TouchableOpacity
+            key={`month-${index}`}
+            style={[
+              styles.monthCard,
+              isSelected && styles.monthCardSelected,
+              isCurrent && styles.monthCardCurrent,
+            ]}
+            onPress={() => onMonthSelect(month)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.monthCardHeader}>
+              <Text style={styles.monthCardTitle}>
+                {format(month, 'MMM', { locale: es }).toUpperCase()}
+              </Text>
+              {isCurrent && (
+                <View style={styles.todayBadge}>
+                  <Text style={styles.todayBadgeText}>HOY</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.monthCardBody}>
+              {eventCount > 0 ? (
+                <>
+                  <View
+                    style={[
+                      styles.eventCountCircle,
+                      { backgroundColor: `rgba(0, 214, 143, ${0.25 + intensity * 0.55})` },
+                    ]}
+                  >
+                    <Text style={styles.eventCountText}>{eventCount}</Text>
+                  </View>
+                  <Text style={styles.eventCountLabel}>
+                    {eventCount === 1 ? 'evento' : 'eventos'}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.emptyMonthText}>·</Text>
+              )}
             </View>
           </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -333,91 +410,261 @@ function VademecumFormModal({ visible, onClose, categories, operationToEdit = nu
   );
 }
 
-function ProgramacionFormModal({ visible, onClose, initialDate, lotes, operations }: any) {
+interface ProgramacionFormModalProps {
+  visible: boolean;
+  onClose: () => void;
+  initialDate: Date;
+  initialEndDate?: Date | null;
+  lotes: PotreroModel[];
+  operations: OperationCatalogModel[];
+}
+
+function ProgramacionFormModal({
+  visible,
+  onClose,
+  initialDate,
+  initialEndDate,
+  lotes,
+  operations,
+}: ProgramacionFormModalProps) {
   const [selectedLote, setSelectedLote] = useState('');
   const [selectedOp, setSelectedOp] = useState('');
   const [diasDuracion, setDiasDuracion] = useState('1');
+  const [useRange, setUseRange] = useState(false);
+  const [startDate, setStartDate] = useState<Date>(initialDate);
+  const [endDate, setEndDate] = useState<Date>(initialDate);
+  const [saving, setSaving] = useState(false);
 
+  // Reset al abrir el modal con la fecha inicial provista
   useEffect(() => {
+    if (!visible) return;
+    setSelectedLote('');
+    setSelectedOp('');
     setDiasDuracion('1');
-  }, [visible]);
+    setStartDate(initialDate);
+    if (initialEndDate && !isSameDay(initialDate, initialEndDate)) {
+      setEndDate(initialEndDate);
+      setUseRange(true);
+    } else {
+      setEndDate(initialDate);
+      setUseRange(false);
+    }
+  }, [visible, initialDate?.getTime(), initialEndDate?.getTime()]);
+
+  const computedEndDate = useMemo(() => {
+    if (useRange) return endDate;
+    const dias = Math.max(1, parseInt(diasDuracion) || 1);
+    return addDays(startDate, dias - 1);
+  }, [useRange, endDate, startDate, diasDuracion]);
+
+  const totalDias = useMemo(
+    () => Math.max(1, differenceInCalendarDays(computedEndDate, startDate) + 1),
+    [computedEndDate, startDate]
+  );
 
   const handleSave = async () => {
-    if (!selectedLote || !selectedOp) return Alert.alert('Error', 'Seleccione lote y tratamiento');
-    const duracion = parseInt(diasDuracion) || 1;
+    if (!selectedLote || !selectedOp) {
+      return Alert.alert('Error', 'Seleccione lote y tratamiento');
+    }
+    if (useRange && isBefore(endDate, startDate)) {
+      return Alert.alert('Error', 'La fecha de fin debe ser posterior al inicio');
+    }
+    if (totalDias > 60) {
+      return Alert.alert('Error', 'El rango no puede superar los 60 días');
+    }
 
+    setSaving(true);
     try {
-      for (let i = 0; i < duracion; i++) {
-        const targetDate = addDays(initialDate, i);
+      for (let i = 0; i < totalDias; i++) {
+        const targetDate = addDays(startDate, i);
         await sanidadRepo.scheduleOperation({
           operationId: selectedOp,
           loteId: selectedLote,
           fechaProgramada: targetDate.getTime(),
         });
       }
-      Alert.alert('Éxito', `Programación de ${duracion} día(s) guardada`);
+      Alert.alert('Éxito', `Programación de ${totalDias} día(s) guardada`);
       onClose();
     } catch (err) {
       Alert.alert('Error', 'No se pudo guardar la programación');
+    } finally {
+      setSaving(false);
     }
   };
 
+  const adjustEndDate = (deltaDays: number) => {
+    setEndDate((prev) => {
+      const next = addDays(prev, deltaDays);
+      // No permitir end < start
+      return isBefore(next, startDate) ? startDate : next;
+    });
+  };
+
+  const renderHeader = () => (
+    <View>
+      <Text style={styles.modalTitle}>Programar Acción</Text>
+      <Text style={styles.modalSubtitle}>
+        {useRange
+          ? `${format(startDate, 'dd MMM', { locale: es })} → ${format(computedEndDate, 'dd MMM yyyy', { locale: es })}`
+          : `Desde: ${format(startDate, "EEEE d 'de' MMMM", { locale: es })}`}
+      </Text>
+
+      <Text style={styles.inputLabel}>SELECCIONAR LOTE</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipRow}
+        keyboardShouldPersistTaps="handled"
+      >
+        {lotes.length === 0 ? (
+          <Text style={styles.subLabel}>No hay lotes disponibles</Text>
+        ) : (
+          lotes.map((l) => (
+            <TouchableOpacity
+              key={l.id}
+              style={[styles.chip, selectedLote === l.id && styles.chipActive]}
+              onPress={() => setSelectedLote(l.id)}
+            >
+              <Text style={[styles.chipText, selectedLote === l.id && styles.chipTextActive]}>
+                {l.nombre}
+              </Text>
+            </TouchableOpacity>
+          ))
+        )}
+      </ScrollView>
+
+      <Text style={styles.inputLabel}>SELECCIONAR TRATAMIENTO</Text>
+    </View>
+  );
+
+  const renderFooter = () => (
+    <View>
+      <View style={styles.switchRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.inputLabel, { marginTop: 0 }]}>RANGO DE FECHAS</Text>
+          <Text style={styles.subLabel}>
+            {useRange ? 'Elegí inicio y fin' : 'Ingresá días consecutivos'}
+          </Text>
+        </View>
+        <Switch
+          value={useRange}
+          onValueChange={setUseRange}
+          trackColor={{ true: colors.primary, false: colors.border }}
+        />
+      </View>
+
+      {!useRange ? (
+        <View style={{ marginTop: 15 }}>
+          <Text style={styles.inputLabel}>DURACIÓN (DÍAS CONSECUTIVOS)</Text>
+          <View style={styles.rowInputs}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="1"
+              keyboardType="numeric"
+              value={diasDuracion}
+              onChangeText={setDiasDuracion}
+              placeholderTextColor={colors.textSecondary}
+            />
+            <View style={{ flex: 1, justifyContent: 'center', paddingLeft: 10 }}>
+              <Text style={styles.subLabel}>Hasta:</Text>
+              <Text style={styles.endDatePreview}>
+                {format(computedEndDate, 'dd MMM yyyy')}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={{ marginTop: 15 }}>
+          <Text style={styles.inputLabel}>FECHAS DEL RANGO</Text>
+          <View style={styles.dateRangeBox}>
+            <View style={styles.dateRangeColumn}>
+              <Text style={styles.subLabel}>INICIO</Text>
+              <Text style={styles.dateRangeValue}>{format(startDate, 'dd MMM')}</Text>
+              <Text style={styles.dateRangeYear}>{format(startDate, 'yyyy')}</Text>
+            </View>
+            <Ionicons name="arrow-forward" size={18} color={colors.textSecondary} />
+            <View style={styles.dateRangeColumn}>
+              <Text style={styles.subLabel}>FIN</Text>
+              <Text style={styles.dateRangeValue}>{format(endDate, 'dd MMM')}</Text>
+              <Text style={styles.dateRangeYear}>{format(endDate, 'yyyy')}</Text>
+            </View>
+          </View>
+          <Text style={styles.totalDaysHint}>
+            {totalDias} día{totalDias > 1 ? 's' : ''} en total
+          </Text>
+          <View style={styles.rangeAdjustRow}>
+            <TouchableOpacity
+              style={[styles.rangeAdjustBtn, isSameDay(endDate, startDate) && { opacity: 0.4 }]}
+              onPress={() => adjustEndDate(-1)}
+              disabled={isSameDay(endDate, startDate)}
+            >
+              <Ionicons name="remove" size={18} color={colors.textPrimary} />
+              <Text style={styles.rangeAdjustText}>1 día</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.rangeAdjustBtn} onPress={() => adjustEndDate(1)}>
+              <Ionicons name="add" size={18} color={colors.textPrimary} />
+              <Text style={styles.rangeAdjustText}>1 día</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.rangeAdjustBtn} onPress={() => adjustEndDate(7)}>
+              <Ionicons name="add" size={18} color={colors.textPrimary} />
+              <Text style={styles.rangeAdjustText}>7 días</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.modalActions}>
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: colors.surface, flex: 0.5 }]}
+          onPress={onClose}
+          disabled={saving}
+        >
+          <Text style={{ color: colors.textPrimary }}>Cancelar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, { flex: 1 }, saving && { opacity: 0.6 }]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          <Text style={{ color: colors.background, fontWeight: 'bold' }}>
+            {saving ? 'Guardando...' : 'Confirmar'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContentLarge}>
           <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Programar Acción</Text>
-          <Text style={styles.modalSubtitle}>Desde: {format(initialDate, "EEEE d 'de' MMMM", { locale: es })}</Text>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.inputLabel}>SELECCIONAR LOTE</Text>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={lotes}
-              keyExtractor={(l: any) => l.id}
-              style={styles.chipRow}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={[styles.chip, selectedLote === item.id && styles.chipActive]} onPress={() => setSelectedLote(item.id)}>
-                  <Text style={[styles.chipText, selectedLote === item.id && styles.chipTextActive]}>{item.nombre}</Text>
-                </TouchableOpacity>
-              )}
-            />
-
-            <Text style={styles.inputLabel}>SELECCIONAR TRATAMIENTO</Text>
-            <FlatList
-              data={operations}
-              keyExtractor={(o: any) => o.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={[styles.vadeItemSmall, selectedOp === item.id && styles.vadeItemSmallActive]} onPress={() => setSelectedOp(item.id)}>
-                  <Text style={[styles.vadeNameSmall, selectedOp === item.id && styles.vadeNameSmallActive]}>{item.nombre}</Text>
-                  <Text style={styles.vadeSubSmall}>{item.tipo}</Text>
-                </TouchableOpacity>
-              )}
-              style={{ maxHeight: 180, marginBottom: 15 }}
-            />
-
-            <Text style={styles.inputLabel}>DURACIÓN DEL TRATAMIENTO (RANGO)</Text>
-            <View style={styles.rowInputs}>
-              <TextInput style={[styles.input, { flex: 1 }]} placeholder="1" keyboardType="numeric" value={diasDuracion} onChangeText={setDiasDuracion} placeholderTextColor={colors.textSecondary} />
-              <View style={{ flex: 1, justifyContent: 'center', paddingLeft: 10 }}>
-                <Text style={{ color: colors.textSecondary }}>Días consecutivos</Text>
-                <Text style={{ color: colors.primary, fontSize: 12 }}>
-                  Hasta: {format(addDays(initialDate, (parseInt(diasDuracion) || 1) - 1), 'dd MMM yyyy')}
-                </Text>
+          <FlatList
+            data={operations}
+            keyExtractor={(o) => o.id}
+            keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={renderHeader}
+            ListFooterComponent={renderFooter}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="flask-outline" size={32} color={colors.textSecondary} />
+                <Text style={styles.emptyText}>El vademécum está vacío. Agregá un tratamiento primero.</Text>
               </View>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.surface, flex: 0.5 }]} onPress={onClose}>
-                <Text style={{ color: colors.textPrimary }}>Cancelar</Text>
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.vadeItemSmall, selectedOp === item.id && styles.vadeItemSmallActive]}
+                onPress={() => setSelectedOp(item.id)}
+              >
+                <Text style={[styles.vadeNameSmall, selectedOp === item.id && styles.vadeNameSmallActive]}>
+                  {item.nombre}
+                </Text>
+                <Text style={styles.vadeSubSmall}>{item.tipo} · {item.diasCarencia}d carencia</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]} onPress={handleSave}>
-                <Text style={{ color: colors.background, fontWeight: 'bold' }}>Confirmar</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
+            )}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          />
         </View>
       </View>
     </Modal>
@@ -530,7 +777,7 @@ function SanidadInner({ schedules, operations, logs, lotes, categorias }: {
   schedules: ScheduledOperationModel[];
   operations: OperationCatalogModel[];
   logs: OperationLogModel[];
-  lotes: LoteModel[];
+  lotes: PotreroModel[];
   categorias: CategoriaTratamientoModel[];
 }) {
   const [activeTab, setActiveTab] = useState<TabType>('calendario');
@@ -542,6 +789,17 @@ function SanidadInner({ schedules, operations, logs, lotes, categorias }: {
   const [isVadeFormVisible, setIsVadeFormVisible] = useState(false);
   const [isCatModalVisible, setIsCatModalVisible] = useState(false);
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+
+  // Programación: fechas iniciales pasadas al modal (single tap o rango)
+  const [progModalInit, setProgModalInit] = useState<{ initialDate: Date; initialEndDate: Date | null }>({
+    initialDate: new Date(),
+    initialEndDate: null,
+  });
+
+  // Range mode en calendario
+  const [isRangeMode, setIsRangeMode] = useState(false);
+  const [rangeStart, setRangeStart] = useState<Date | null>(null);
+  const [rangeEnd, setRangeEnd] = useState<Date | null>(null);
 
   // Fix #2: estado para el item en edición
   const [selectedOperation, setSelectedOperation] = useState<OperationCatalogModel | null>(null);
@@ -564,6 +822,73 @@ function SanidadInner({ schedules, operations, logs, lotes, categorias }: {
     setSelectedOperation(null);
   }, []);
 
+  // Reset de rango cuando se cambia de mes / sale de range mode
+  useEffect(() => {
+    if (!isRangeMode) {
+      setRangeStart(null);
+      setRangeEnd(null);
+    }
+  }, [isRangeMode]);
+
+  // Map de operations para evitar lookups O(n) en filtros
+  const operationsMap = useMemo(() => {
+    const m = new Map<string, OperationCatalogModel>();
+    operations.forEach((op) => m.set(op.id, op));
+    return m;
+  }, [operations]);
+
+  // Tap en día: en single mode abre modal directo; en range mode arma start/end
+  const handleDayTap = useCallback(
+    (day: Date) => {
+      if (isRangeMode) {
+        if (!rangeStart || (rangeStart && rangeEnd)) {
+          // Inicia nuevo rango
+          setRangeStart(day);
+          setRangeEnd(null);
+          return;
+        }
+        // Cierra el rango (ordenando inicio/fin)
+        const start = isAfter(rangeStart, day) ? day : rangeStart;
+        const end = isAfter(rangeStart, day) ? rangeStart : day;
+        setRangeStart(start);
+        setRangeEnd(end);
+        setSelectedDate(start);
+        setProgModalInit({ initialDate: start, initialEndDate: end });
+        setIsProgModalVisible(true);
+        return;
+      }
+      // Single mode: seleccionar y abrir modal
+      setSelectedDate(day);
+      setProgModalInit({ initialDate: day, initialEndDate: null });
+      setIsProgModalVisible(true);
+    },
+    [isRangeMode, rangeStart, rangeEnd]
+  );
+
+  // Long press: solo selecciona sin abrir modal (preview de agenda)
+  const handleDayLongPress = useCallback((day: Date) => {
+    setSelectedDate(day);
+  }, []);
+
+  // Cerrar modal de programación reseteando rango (si estaba)
+  const handleCloseProgModal = useCallback(() => {
+    setIsProgModalVisible(false);
+    if (isRangeMode) {
+      setRangeStart(null);
+      setRangeEnd(null);
+    }
+  }, [isRangeMode]);
+
+  // Helpers de range visual
+  const isInRange = useCallback(
+    (day: Date) => {
+      if (!rangeStart || !rangeEnd) return false;
+      const t = day.getTime();
+      return t > rangeStart.getTime() && t < rangeEnd.getTime();
+    },
+    [rangeStart, rangeEnd]
+  );
+
   const filteredSchedules = useMemo(() => {
     if (!selectedLoteFilter) return schedules;
     return schedules.filter((e) => e.loteId === selectedLoteFilter);
@@ -584,31 +909,25 @@ function SanidadInner({ schedules, operations, logs, lotes, categorias }: {
     return operations.filter((o) => o.tipo === activeCategoryFilter);
   }, [operations, activeCategoryFilter]);
 
-  // Fix #3: filtrado en memoria del historial
+  // Filtrado de historial: usa tipoOperacion denormalizado o el catálogo cargado en memoria
   const filteredLogs = useMemo(() => {
     const mesStart = startOfMonth(historialMes).getTime();
     const mesEnd = endOfMonth(historialMes).getTime();
+    const knownTipos = ['Vacunas', 'Antiparasitarios', 'Antibióticos'];
 
     return logs.filter((log) => {
-      const fecha = log.fechaAplicacion;
-      const fechaTime = fecha.getTime();
-      const dentroDelMes = fechaTime >= mesStart && fechaTime <= mesEnd;
-      if (!dentroDelMes) return false;
-
+      const fechaTime = log.fechaAplicacion.getTime();
+      if (fechaTime < mesStart || fechaTime > mesEnd) return false;
       if (historialTipoFilter === null) return true;
-      if (historialTipoFilter === 'OTROS') {
-        const knownTipos = ['Vacunas', 'Antiparasitarios', 'Antibióticos'];
-        // Para filtrar necesitamos la operación relacionada; como no tenemos join síncrono
-        // aquí, filtramos por lo que podamos. En esta implementación MVP filtramos por
-        // operationId si está disponible — dejamos OTROS como pass-through sin join.
-        return true;
-      }
-      // Para tipos conocidos necesitaríamos un join; como WatermelonDB no permite joins
-      // síncronos fuera de observables, usamos una aproximación por tipo almacenado.
-      // Los logs no tienen el tipo directamente — esto es deuda técnica SAN-05.
-      return true;
+
+      // Resuelve tipo: primero campo denormalizado, luego catálogo
+      const op = operationsMap.get(log.operationId);
+      const tipo = log.tipoOperacion || op?.tipo || '';
+
+      if (historialTipoFilter === 'OTROS') return tipo !== '' && !knownTipos.includes(tipo);
+      return tipo === historialTipoFilter;
     });
-  }, [logs, historialMes, historialTipoFilter]);
+  }, [logs, historialMes, historialTipoFilter, operationsMap]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -638,65 +957,169 @@ function SanidadInner({ schedules, operations, logs, lotes, categorias }: {
       {activeTab === 'calendario' && (
         <View style={styles.flex}>
           {calendarMode === 'MONTH' ? (
-            <>
-              <View style={styles.calendarCard}>
-                <View style={styles.monthSelector}>
-                  <TouchableOpacity onPress={() => setCurrentMonth(subMonths(currentMonth, 1))}><Ionicons name="chevron-back" size={24} color={colors.primary} /></TouchableOpacity>
-                  <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy', { locale: es }).toUpperCase()}</Text>
-                  <TouchableOpacity onPress={() => setCurrentMonth(addMonths(currentMonth, 1))}><Ionicons name="chevron-forward" size={24} color={colors.primary} /></TouchableOpacity>
-                </View>
-                <View style={styles.weekDaysRow}>
-                  {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d, index) => <Text key={`wd-${index}`} style={styles.weekDayLabel}>{d}</Text>)}
-                </View>
-                <View style={styles.daysGrid}>
-                  {days.map((day, i) => {
-                    const isSelected = isSameDay(day, selectedDate);
-                    const isCurrMonth = isSameMonth(day, currentMonth);
-                    const dayEvts = schedules.filter((e) => isSameDay(new Date(e.fechaProgramada), day));
-
-                    return (
+            <FlatList
+              data={dayEvents}
+              keyExtractor={(e) => e.id}
+              renderItem={({ item }) => (
+                <ScheduledItem
+                  scheduled={item}
+                  onAction={() => Alert.alert('Acción', 'Acá se edita o cancela')}
+                />
+              )}
+              contentContainerStyle={styles.scrollList}
+              showsVerticalScrollIndicator={false}
+              ListHeaderComponent={() => (
+                <>
+                  <View style={styles.calendarCard}>
+                    <View style={styles.monthSelector}>
                       <TouchableOpacity
-                        key={`day-${i}`}
-                        style={[styles.dayCell, isSelected && styles.daySelected, !isCurrMonth && styles.dayDisabled]}
-                        onPress={() => setSelectedDate(day)}
-                        onLongPress={() => {
-                          setSelectedDate(day);
-                          setIsProgModalVisible(true);
-                        }}
-                        delayLongPress={400}
+                        onPress={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                        hitSlop={8}
                       >
-                        <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{format(day, 'd')}</Text>
-                        <View style={styles.eventBarsContainer}>
-                          {dayEvts.slice(0, 2).map((e) => <View key={`bar-${e.id}`} style={[styles.eventBar, isSelected && { backgroundColor: 'white' }]} />)}
-                          {dayEvts.length > 2 && <View style={styles.eventDot} />}
-                        </View>
+                        <Ionicons name="chevron-back" size={24} color={colors.primary} />
                       </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
+                      <Text style={styles.monthTitle}>
+                        {format(currentMonth, 'MMMM yyyy', { locale: es }).toUpperCase()}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                        hitSlop={8}
+                      >
+                        <Ionicons name="chevron-forward" size={24} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
 
-              <View style={styles.agendaHeader}>
-                <Text style={styles.agendaTitle}>Agenda {format(selectedDate, "d MMM")}</Text>
-                <TouchableOpacity onPress={() => setIsProgModalVisible(true)}><Ionicons name="add-circle" size={28} color={colors.primary} /></TouchableOpacity>
-              </View>
+                    <TouchableOpacity
+                      style={[styles.rangeToggleBar, isRangeMode && styles.rangeToggleBarActive]}
+                      onPress={() => setIsRangeMode((v) => !v)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={isRangeMode ? 'git-commit-outline' : 'calendar-outline'}
+                        size={14}
+                        color={isRangeMode ? colors.background : colors.primary}
+                      />
+                      <Text
+                        style={[
+                          styles.rangeToggleText,
+                          isRangeMode && { color: colors.background },
+                        ]}
+                      >
+                        {isRangeMode
+                          ? rangeStart && !rangeEnd
+                            ? 'Tocá el día final'
+                            : 'Modo rango activo'
+                          : 'Activar selección de rango'}
+                      </Text>
+                    </TouchableOpacity>
 
-              <ScrollView contentContainerStyle={styles.scrollList}>
-                {dayEvents.map((e) => (
-                  <ScheduledItem key={e.id} scheduled={e} onAction={() => Alert.alert('Acción', 'Acá se edita o cancela')} />
-                ))}
-                {dayEvents.length === 0 && (
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="calendar-outline" size={40} color={colors.textSecondary} />
-                    <Text style={styles.emptyText}>Mantené presionado un día para agendar rápido.</Text>
+                    <View style={styles.weekDaysRow}>
+                      {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d, index) => (
+                        <Text key={`wd-${index}`} style={styles.weekDayLabel}>{d}</Text>
+                      ))}
+                    </View>
+
+                    <View style={styles.daysGrid}>
+                      {days.map((day, i) => {
+                        const isSelected = !isRangeMode && isSameDay(day, selectedDate);
+                        const isCurrMonth = isSameMonth(day, currentMonth);
+                        const isCurrentDay = isToday(day);
+                        const dayEvts = schedules.filter((e) =>
+                          isSameDay(new Date(e.fechaProgramada), day)
+                        );
+
+                        const isStart = !!rangeStart && isSameDay(day, rangeStart);
+                        const isEnd = !!rangeEnd && isSameDay(day, rangeEnd);
+                        const inRange = isInRange(day);
+                        const isHighlighted = isSelected || isStart || isEnd;
+
+                        return (
+                          <TouchableOpacity
+                            key={`day-${i}`}
+                            style={[
+                              styles.dayCell,
+                              !isCurrMonth && styles.dayDisabled,
+                              inRange && styles.dayCellInRange,
+                              isHighlighted && styles.daySelected,
+                              isCurrentDay && !isHighlighted && styles.dayCellToday,
+                            ]}
+                            onPress={() => handleDayTap(day)}
+                            onLongPress={() => handleDayLongPress(day)}
+                            delayLongPress={350}
+                          >
+                            <Text
+                              style={[
+                                styles.dayText,
+                                isCurrentDay && !isHighlighted && styles.dayTextToday,
+                                isHighlighted && styles.dayTextSelected,
+                              ]}
+                            >
+                              {format(day, 'd')}
+                            </Text>
+                            <View style={styles.eventBarsContainer}>
+                              {dayEvts.slice(0, 2).map((e) => (
+                                <View
+                                  key={`bar-${e.id}`}
+                                  style={[
+                                    styles.eventBar,
+                                    isHighlighted && { backgroundColor: 'white' },
+                                  ]}
+                                />
+                              ))}
+                              {dayEvts.length > 2 && (
+                                <View
+                                  style={[
+                                    styles.eventDot,
+                                    isHighlighted && { backgroundColor: 'white' },
+                                  ]}
+                                />
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   </View>
-                )}
-              </ScrollView>
-            </>
+
+                  <View style={styles.agendaHeader}>
+                    <Text style={styles.agendaTitle}>
+                      Agenda {format(selectedDate, "d MMM")}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setProgModalInit({ initialDate: selectedDate, initialEndDate: null });
+                        setIsProgModalVisible(true);
+                      }}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="add-circle" size={28} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="calendar-outline" size={40} color={colors.textSecondary} />
+                  <Text style={styles.emptyText}>
+                    {isRangeMode
+                      ? 'Tocá un día de inicio y otro de fin para crear un rango'
+                      : 'Tocá un día para agendar · Mantené presionado para previsualizar'}
+                  </Text>
+                </View>
+              }
+            />
           ) : (
-            <YearlyView currentYear={currentMonth} schedules={schedules} onMonthSelect={(m: Date) => {
-              setCurrentMonth(m); setCalendarView('MONTH');
-            }} />
+            <YearlyView
+              currentYear={currentMonth}
+              currentMonth={currentMonth}
+              schedules={schedules}
+              onMonthSelect={(m: Date) => {
+                setCurrentMonth(m);
+                setCalendarView('MONTH');
+              }}
+              onPrevYear={() => setCurrentMonth((prev) => subYears(prev, 1))}
+              onNextYear={() => setCurrentMonth((prev) => addYears(prev, 1))}
+            />
           )}
         </View>
       )}
@@ -797,8 +1220,9 @@ function SanidadInner({ schedules, operations, logs, lotes, categorias }: {
 
       <ProgramacionFormModal
         visible={isProgModalVisible}
-        onClose={() => setIsProgModalVisible(false)}
-        initialDate={selectedDate}
+        onClose={handleCloseProgModal}
+        initialDate={progModalInit.initialDate}
+        initialEndDate={progModalInit.initialEndDate}
         lotes={lotes}
         operations={operations}
       />
@@ -856,7 +1280,7 @@ const SanidadWithData = withObservables([], () => ({
   schedules: database.get<ScheduledOperationModel>('scheduled_operations').query(Q.sortBy('fecha_programada', Q.asc)).observe(),
   operations: database.get<OperationCatalogModel>('operations_catalog').query(Q.sortBy('nombre', Q.asc)).observe(),
   logs: database.get<OperationLogModel>('operation_logs').query(Q.sortBy('fecha_aplicacion', Q.desc)).observe(),
-  lotes: database.get<LoteModel>('lotes').query().observe(),
+  lotes: database.get<PotreroModel>('potreros').query().observe(),
   categorias: database.get<CategoriaTratamientoModel>('categorias_tratamiento').query(Q.sortBy('nombre', Q.asc)).observe(),
 }))(SanidadInner);
 
@@ -892,18 +1316,38 @@ const styles = StyleSheet.create({
   daysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   dayCell: { width: DAY_SIZE, height: DAY_SIZE, alignItems: 'center', justifyContent: 'flex-start', borderRadius: 14, marginVertical: 2, paddingTop: 6 },
   daySelected: { backgroundColor: colors.primary },
-  dayDisabled: { opacity: 0.1 },
+  dayDisabled: { opacity: 0.25 },
+  dayCellInRange: { backgroundColor: colors.primaryAlpha, borderRadius: 6 },
+  dayCellToday: { borderWidth: 1.5, borderColor: colors.primary },
   dayText: { color: colors.textPrimary, fontSize: typography.sizes.sm },
+  dayTextToday: { color: colors.primary, fontWeight: typography.weights.bold },
   dayTextSelected: { color: colors.background, fontWeight: typography.weights.bold },
   eventBarsContainer: { width: '100%', alignItems: 'center', marginTop: 4, gap: 2 },
   eventBar: { width: '60%', height: 3, backgroundColor: colors.primary, borderRadius: 2 },
   eventDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primary },
 
-  yearlyGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: spacing.md, gap: spacing.md },
-  monthCard: { width: '47%', aspectRatio: 1, backgroundColor: colors.surface, borderRadius: 20, padding: 15, borderWidth: 1, borderColor: colors.border, justifyContent: 'space-between' },
-  monthCardTitle: { color: colors.textPrimary, fontSize: typography.sizes.xs, fontWeight: typography.weights.bold },
-  miniGrid: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  eventDotYear: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
+  rangeToggleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, marginBottom: spacing.sm, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+  rangeToggleBarActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  rangeToggleText: { color: colors.primary, fontSize: typography.sizes.xs, fontWeight: typography.weights.bold },
+
+  yearNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.sm },
+  yearNavBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  yearTitleBlock: { alignItems: 'center' },
+  yearTitle: { color: colors.textPrimary, fontSize: typography.sizes.xl, fontWeight: typography.weights.bold, letterSpacing: 1 },
+  yearSubtitle: { color: colors.textSecondary, fontSize: typography.sizes.xs, marginTop: 2 },
+  yearlyGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md },
+  monthCard: { width: '47%', aspectRatio: 1, backgroundColor: colors.surface, borderRadius: 20, padding: spacing.md, borderWidth: 1, borderColor: colors.border, justifyContent: 'space-between' },
+  monthCardCurrent: { borderColor: colors.primary, borderWidth: 2 },
+  monthCardSelected: { backgroundColor: colors.primaryAlpha, borderColor: colors.primary },
+  monthCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  monthCardTitle: { color: colors.textPrimary, fontSize: typography.sizes.sm, fontWeight: typography.weights.bold, letterSpacing: 1 },
+  monthCardBody: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 6 },
+  eventCountCircle: { minWidth: 48, height: 48, paddingHorizontal: 12, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  eventCountText: { color: colors.textPrimary, fontSize: typography.sizes.lg, fontWeight: typography.weights.bold },
+  eventCountLabel: { color: colors.textSecondary, fontSize: typography.sizes.xs },
+  emptyMonthText: { color: colors.textSecondary, fontSize: 28, fontWeight: typography.weights.bold },
+  todayBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.primary },
+  todayBadgeText: { color: colors.background, fontSize: 9, fontWeight: typography.weights.bold, letterSpacing: 0.5 },
 
   agendaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, marginTop: spacing.lg, marginBottom: spacing.sm },
   agendaTitle: { color: colors.textSecondary, fontSize: typography.sizes.xs, fontWeight: typography.weights.bold },
@@ -972,4 +1416,15 @@ const styles = StyleSheet.create({
   catListText: { color: colors.textPrimary, fontWeight: typography.weights.bold },
 
   fab: { position: 'absolute', bottom: 120, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
+
+  // Programación: rango de fechas
+  dateRangeBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surface, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, gap: 10 },
+  dateRangeColumn: { flex: 1, alignItems: 'center' },
+  dateRangeValue: { color: colors.textPrimary, fontSize: typography.sizes.lg, fontWeight: typography.weights.bold, marginTop: 4 },
+  dateRangeYear: { color: colors.textSecondary, fontSize: typography.sizes.xs, marginTop: 2 },
+  totalDaysHint: { textAlign: 'center', color: colors.primary, fontSize: typography.sizes.xs, fontWeight: typography.weights.bold, marginTop: 8 },
+  rangeAdjustRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  rangeAdjustBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
+  rangeAdjustText: { color: colors.textPrimary, fontSize: typography.sizes.xs, fontWeight: typography.weights.bold },
+  endDatePreview: { color: colors.primary, fontSize: typography.sizes.sm, fontWeight: typography.weights.bold, marginTop: 2 },
 });

@@ -14,6 +14,7 @@ import { useScanStore } from '@store/scanStore';
 import { useSyncStore } from '@store/syncStore';
 import { useRFIDScanner } from './hooks/useRFIDScanner';
 import { AnimalRegistrationModal } from './AnimalRegistrationModal';
+import { LinkGenericModal } from './LinkGenericModal';
 import { EventActionSheet } from './EventActionSheet';
 import { BatchActionSheet } from './BatchActionSheet';
 import { BulkRegistrationSheet } from './BulkRegistrationSheet';
@@ -42,8 +43,10 @@ export function ScanScreen() {
   const currentRfid = useScanStore(s => s.currentRfid);
   const phase = useScanStore(s => s.phase);
   const isRegistrationModalOpen = useScanStore(s => s.isRegistrationModalOpen);
+  const isLinkGenericModalOpen = useScanStore(s => s.isLinkGenericModalOpen);
   const isEventSheetOpen = useScanStore(s => s.isEventSheetOpen);
   const closeRegistrationModal = useScanStore(s => s.closeRegistrationModal);
+  const closeLinkGenericModal = useScanStore(s => s.closeLinkGenericModal);
   const closeEventSheet = useScanStore(s => s.closeEventSheet);
   const reset = useScanStore(s => s.reset);
   const batchMode = useScanStore(s => s.batchMode);
@@ -304,6 +307,16 @@ export function ScanScreen() {
         onClose={closeRegistrationModal}
         onSaved={() => {
           closeRegistrationModal();
+          ensureFocus();
+        }}
+      />
+
+      <LinkGenericModal
+        visible={isLinkGenericModalOpen}
+        rfid={currentRfid ?? ''}
+        onClose={closeLinkGenericModal}
+        onSaved={() => {
+          closeLinkGenericModal();
           ensureFocus();
         }}
       />

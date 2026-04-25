@@ -23,6 +23,7 @@ export default class AnimalModel extends Model {
   @text('raza') raza!: string;
   @date('fecha_nacimiento') fechaNacimiento!: Date | null;
   @text('estado') estado!: string;       // ACTIVO | VENDIDO | MUERTO
+  @field('is_generic') isGeneric!: boolean;
   @field('establecimiento_id') establecimientoId!: string;
   @field('lote_id') loteId!: string;
   @field('potrero_id') potreroId!: string;

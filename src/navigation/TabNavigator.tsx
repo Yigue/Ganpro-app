@@ -31,8 +31,22 @@ const TABS: TabConfig[] = [
   { name: 'Dashboard', label: 'Dashboard', icon: 'stats-chart-outline', iconFocused: 'stats-chart' },
 ];
 
+import { Keyboard } from 'react-native';
+
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const [isKeyboardVisible, setKeyboardVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  if (isKeyboardVisible) return null;
 
   return (
     <View style={tabStyles.container}>

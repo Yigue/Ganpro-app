@@ -96,7 +96,7 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
       await repo.createOperationLog({
         animalId: animal.id,
         operationId: selectedOpId,
-        loteId: animal.loteId ?? undefined,
+        loteId: animal.potreroId ?? animal.loteId ?? undefined,
         fechaAplicacion: Date.now(),
         dosis: dosis.trim(),
         responsable: responsable.trim(),

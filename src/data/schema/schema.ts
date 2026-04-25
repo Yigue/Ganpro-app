@@ -4,7 +4,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
  * Schema version must be incremented whenever tables or columns change.
  * Never mutate an existing schema — always add migrations.
  */
-export const DATABASE_SCHEMA_VERSION = 10;
+export const DATABASE_SCHEMA_VERSION = 11;
 
 export const schema = appSchema({
   version: DATABASE_SCHEMA_VERSION,
@@ -62,6 +62,7 @@ export const schema = appSchema({
         { name: 'establecimiento_id', type: 'string', isIndexed: true, isOptional: true },
         { name: 'lote_id', type: 'string', isIndexed: true, isOptional: true },
         { name: 'potrero_id', type: 'string', isIndexed: true, isOptional: true },
+        { name: 'is_generic', type: 'boolean', isIndexed: true, isOptional: true },
         { name: 'last_weight_kg', type: 'number', isOptional: true },
         { name: 'last_weight_date', type: 'number', isOptional: true },
         { name: 'repro_status', type: 'string', isOptional: true },

@@ -18,7 +18,7 @@ import {
   requestNotificationPermissions,
   scheduleIATFNotification,
 } from '@shared/services/notificationsService';
-import type LoteModel from '@data/models/LoteModel';
+import type PotreroModel from '@data/models/PotreroModel';
 import type EtapaProtocoloModel from '@data/models/EtapaProtocoloModel';
 
 interface EtapaInput {
@@ -48,7 +48,7 @@ export function ProtocoloFormModal({ visible, onClose }: Props) {
   const { triggerSuccess } = useHapticFeedback();
 
   const [nombre, setNombre] = useState('Protocolo IATF Ovsynch');
-  const [lotes, setLotes] = useState<LoteModel[]>([]);
+  const [lotes, setLotes] = useState<PotreroModel[]>([]);
   const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
   const [notas, setNotas] = useState('');
   const [saving, setSaving] = useState(false);
@@ -62,7 +62,7 @@ export function ProtocoloFormModal({ visible, onClose }: Props) {
 
       void (async () => {
         try {
-          const loaded = await database.get<LoteModel>('lotes').query().fetch();
+          const loaded = await database.get<PotreroModel>('potreros').query().fetch();
           setLotes(loaded);
         } catch (e) {
           console.error('[ProtocoloForm] load lotes error:', e);
