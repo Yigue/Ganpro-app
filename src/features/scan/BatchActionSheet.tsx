@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useDatabase } from '@shared/hooks/useDatabase';
+import { database } from '@data/database/database';
 import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { colors, spacing, typography } from '@theme/index';

@@ -317,8 +317,22 @@ function InventoryListInner({
     return groups;
   }, [animals, allAnimals, filterCategory, searchQuery]);
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleSelect = (idOrIds: string | string[]) => {
+    if (Array.isArray(idOrIds)) {
+      setSelectedIds(prev => {
+        const allIncluded = idOrIds.every(id => prev.includes(id));
+        if (allIncluded) {
+          // Remove all
+          return prev.filter(x => !idOrIds.includes(x));
+        } else {
+          // Add all
+          const newIds = idOrIds.filter(id => !prev.includes(id));
+          return [...prev, ...newIds];
+        }
+      });
+    } else {
+      setSelectedIds(prev => prev.includes(idOrIds) ? prev.filter(x => x !== idOrIds) : [...prev, idOrIds]);
+    }
   };
 
   const toggleBulkMode = () => {
