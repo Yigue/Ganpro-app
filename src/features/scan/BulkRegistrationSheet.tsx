@@ -68,7 +68,6 @@ export function BulkRegistrationSheet({ visible, unknownItems, onClose }: Props)
   const [step, setStep] = useState<RegistrationStep>('select-rfids');
   const [selectedRfids, setSelectedRfids] = useState<Set<string>>(new Set());
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<CategoriaType | null>(null);
-  const [lotes, setLotes] = useState<LoteModel[]>([]);
   const [loteId, setLoteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -498,3 +497,7 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.4 },
 });
+
+export const BulkRegistrationSheet = withObservables([], () => ({
+  lotes: globalDatabase.get<LoteModel>('lotes').query().observe(),
+}))(BulkRegistrationSheetInner);
