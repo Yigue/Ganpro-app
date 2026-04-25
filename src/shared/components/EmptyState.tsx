@@ -8,10 +8,17 @@ interface Props {
   subtitle?: string;
 }
 
+import { Ionicons } from '@expo/vector-icons';
+
 export function EmptyState({ icon = '🐄', title, subtitle }: Props) {
+  const isIonicon = icon.length > 2;
   return (
     <View style={styles.container}>
-      <Text style={styles.icon}>{icon}</Text>
+      {isIonicon ? (
+        <Ionicons name={icon as any} size={64} color={colors.textSecondary} />
+      ) : (
+        <Text style={styles.icon}>{icon}</Text>
+      )}
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
     </View>

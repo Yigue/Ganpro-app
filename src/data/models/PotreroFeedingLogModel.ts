@@ -1,18 +1,22 @@
-import { Model, Relation } from '@nozbe/watermelondb';
-import { field, date, readonly, relation } from '@nozbe/watermelondb/decorators';
+import { Model, Relation, Associations } from '@nozbe/watermelondb';
+import { field, date, readonly, relation, text } from '@nozbe/watermelondb/decorators';
 import type PotreroModel from './PotreroModel';
 
 export class PotreroFeedingLogModel extends Model {
   static table = 'potrero_feeding_logs';
 
+  static associations: Associations = {
+    potreros: { type: 'belongs_to', key: 'potrero_id' },
+  };
+
   @relation('potreros', 'potrero_id') potrero!: Relation<PotreroModel>;
-  @field('potrero_id') potreroId!: string;
-  @field('racion_id') racionId!: string;
+  @text('potrero_id') potreroId!: string;
+  @text('racion_id') racionId!: string;
   @field('cantidad_kg') cantidadKg!: number;
-  @date('fecha') fecha!: number;
-  @field('notas') notas!: string;
-  @readonly @date('created_at') createdAt!: number;
-  @readonly @date('updated_at') updatedAt!: number;
+  @date('fecha') fecha!: Date;
+  @text('notas') notas!: string;
+  @readonly @date('created_at') createdAt!: Date;
+  @readonly @date('updated_at') updatedAt!: Date;
 }
 
 export default PotreroFeedingLogModel;

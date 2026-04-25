@@ -13,9 +13,9 @@ export class AnimalMovementModel extends Model {
   @relation('lotes', 'lote_origen_id') loteOrigen!: Relation<LoteModel>;
   @relation('lotes', 'lote_destino_id') loteDestino!: Relation<LoteModel>;
   @field('animal_id') animalId!: string;
-  @date('fecha') fecha!: number;
-  @readonly @date('created_at') createdAt!: number;
-  @readonly @date('updated_at') updatedAt!: number;
+  @date('fecha') fecha!: Date;
+  @readonly @date('created_at') createdAt!: Date;
+  @readonly @date('updated_at') updatedAt!: Date;
 }
 
 export default AnimalMovementModel;

@@ -10,8 +10,8 @@ export class MangaActionQueueModel extends Model {
   @field('action_type') actionType!: string;
   @field('payload') payload!: string;
   @field('status') status!: string;
-  @readonly @date('created_at') createdAt!: number;
-  @readonly @date('updated_at') updatedAt!: number;
+  @readonly @date('created_at') createdAt!: Date;
+  @readonly @date('updated_at') updatedAt!: Date;
 }
 
 export default MangaActionQueueModel;

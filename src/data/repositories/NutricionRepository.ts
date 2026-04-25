@@ -54,22 +54,20 @@ export class NutricionRepository {
         r.descripcion = params.descripcion ?? '';
         r.activa = true;
         r.costoEstimadoKg = params.costoEstimadoKg;
-        r.moneda = 'USD'; // Default for calculations
+        r.moneda = 'USD';
         r.kgDiaAnimal = 0;
         r.loteId = '';
         r.notas = '';
       });
 
-      await Promise.all(
-        params.ingredientes.map((ing) =>
-          this.database.get<RacionIngredienteModel>('racion_ingredientes').create((ri) => {
-            ri.racionId = racion.id;
-            ri.suplementoId = ing.suplementoId;
-            ri.porcentaje = ing.porcentaje;
-            ri.cantidadKgPorTonelada = ing.kgPorTonelada;
-          })
-        )
-      );
+      for (const ing of params.ingredientes) {
+        await this.database.get<RacionIngredienteModel>('racion_ingredientes').create((ri) => {
+          ri.racionId = racion.id;
+          ri.suplementoId = ing.suplementoId;
+          ri.porcentaje = ing.porcentaje;
+          ri.cantidadKgPorTonelada = ing.kgPorTonelada;
+        });
+      }
 
       return racion;
     });
@@ -111,7 +109,7 @@ export class NutricionRepository {
       potreroId,
       racionId,
       cantidadKg: kilos,
-      fecha: Date.now(),
+      fecha: new Date(),
       notas: `Costo total estimado: $${costoTotal.toFixed(2)}`
     });
   }
@@ -132,7 +130,7 @@ export class NutricionRepository {
     potreroId: string;
     racionId: string;
     cantidadKg: number;
-    fecha: number;
+    fecha: Date;
     notas?: string;
   }): Promise<PotreroFeedingLogModel> {
     return this.database.write(async () => {

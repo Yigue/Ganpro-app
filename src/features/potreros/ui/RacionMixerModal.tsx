@@ -86,7 +86,7 @@ export function RacionMixerModal({ visible, onClose, suplementos }: Props) {
           />
           
           <Text style={styles.inputLabel}>COMPOSICIÓN (DEBE SUMAR 100%)</Text>
-          <ScrollView style={{ maxHeight: 300 }}>
+          <View style={{ maxHeight: 350 }}>
             {suplementos.map((s) => (
               <View key={s.id} style={styles.mixRow}>
                 <Ionicons name={SUP_ICONS[s.tipo] || 'cube-outline'} size={20} color={colors.primary} />
@@ -101,7 +101,7 @@ export function RacionMixerModal({ visible, onClose, suplementos }: Props) {
                 <Text style={styles.mixUnit}>%</Text>
               </View>
             ))}
-          </ScrollView>
+          </View>
 
           <View style={styles.calcResultsBox}>
             <View style={styles.calcRow}>

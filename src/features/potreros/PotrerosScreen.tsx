@@ -117,7 +117,7 @@ const PotreroDetailsInner = ({ visible, onClose, potrero, animalsCount, movement
           </TouchableOpacity>
 
           <Text style={styles.sectionTitleSmall}>ÚLTIMOS MOVIMIENTOS</Text>
-          <ScrollView style={{ flex: 1, marginTop: 10 }}>
+          <View style={{ flex: 1, marginTop: 10 }}>
             {movements.slice(0, 5).map((m: any) => (
               <View key={m.id} style={styles.movementItem}>
                 <Ionicons name="swap-horizontal" size={16} color={colors.textSecondary} style={{ marginRight: 10 }} />
@@ -125,7 +125,7 @@ const PotreroDetailsInner = ({ visible, onClose, potrero, animalsCount, movement
                 <Text style={styles.movementDate}>{format(new Date(m.fecha), 'dd/MM')}</Text>
               </View>
             ))}
-          </ScrollView>
+          </View>
 
           <View style={styles.modalActions}>
             <TouchableOpacity style={styles.gridBtn} onPress={() => { onClose(); onEdit(potrero); }}>
@@ -189,9 +189,11 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
             )}
             renderItem={({ item }) => <PotreroCard potrero={item} onPress={(p: any) => { setSelectedPotrero(p); setDetailsVisible(true); }} />}
           />
-          <TouchableOpacity style={styles.fab} onPress={() => { setSelectedPotrero(null); setPotreroFormVisible(true); }}>
-            <Ionicons name="add" size={30} color="white" />
-          </TouchableOpacity>
+          <View style={[styles.fabContainer, { bottom: 24 }]}>
+            <TouchableOpacity style={styles.fab} onPress={() => { setSelectedPotrero(null); setPotreroFormVisible(true); }}>
+              <Ionicons name="add" size={30} color="white" />
+            </TouchableOpacity>
+          </View>
         </>
       )}
 
@@ -279,9 +281,11 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
               </View>
             )}
           />
-          <TouchableOpacity style={styles.fab} onPress={() => setCCAuditModalVisible(true)}>
-            <Ionicons name="add" size={30} color="white" />
-          </TouchableOpacity>
+          <View style={[styles.fabContainer, { bottom: 24 }]}>
+            <TouchableOpacity style={styles.fab} onPress={() => setCCAuditModalVisible(true)}>
+              <Ionicons name="add" size={30} color="white" />
+            </TouchableOpacity>
+          </View>
         </>
       )}
 

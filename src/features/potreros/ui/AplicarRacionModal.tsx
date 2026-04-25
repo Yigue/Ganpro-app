@@ -56,7 +56,7 @@ export function AplicarRacionModal({ visible, onClose, potreroId, raciones }: Pr
           </View>
 
           <Text style={styles.inputLabel}>SELECCIONAR RACIÓN</Text>
-          <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+          <View style={{ maxHeight: 250 }}>
             {raciones.map(r => (
               <TouchableOpacity
                 key={r.id}
@@ -70,7 +70,7 @@ export function AplicarRacionModal({ visible, onClose, potreroId, raciones }: Pr
                 </View>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
 
           <Text style={[styles.inputLabel, { marginTop: 20 }]}>KILOS TOTALES A ENTREGAR</Text>
           <TextInput

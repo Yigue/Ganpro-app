@@ -1,8 +1,12 @@
-import { Model } from '@nozbe/watermelondb';
+import { Model, Associations } from '@nozbe/watermelondb';
 import { field, text, date, readonly } from '@nozbe/watermelondb/decorators';
 
 export default class SuplementoModel extends Model {
   static table = 'suplementos';
+
+  static associations: Associations = {
+    racion_ingredientes: { type: 'has_many', foreignKey: 'suplemento_id' },
+  };
 
   @text('nombre') nombre!: string;
   @text('tipo') tipo!: string; // MAIZ | SILO | HENO | PELLET | UREA | OTRO
