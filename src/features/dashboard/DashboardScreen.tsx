@@ -27,6 +27,7 @@ import { FinancialCategoryManagerModal } from './ui/FinancialCategoryManagerModa
 import { TaskCard } from './ui/TaskCard';
 import { AddTaskModal } from './ui/AddTaskModal';
 import { StockDistributionChart } from './ui/StockDistributionChart';
+import { ExportMenuModal } from './ui/ExportMenuModal';
 
 const { width } = Dimensions.get('window');
 
@@ -90,6 +91,9 @@ function DashboardInner({
   const [isTxModalVisible, setIsTxModalVisible] = useState(false);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [isCatModalVisible, setIsCatModalVisible] = useState(false);
+  const [isExportModalVisible, setIsExportModalVisible] = useState(false);
+
+  const pendingTasksCount = useMemo(() => tasks.filter((t: any) => t.status === 'PENDING').length, [tasks]);
 
   // Agregación de transacciones (ya filtradas por DB)
   const totalIngresos = useMemo(() =>
@@ -119,6 +123,27 @@ function DashboardInner({
 
   return (
     <View style={styles.flex}>
+      {/* Header integrado para acceder a notificaciones */}
+      <View style={styles.headerMain}>
+        <View>
+          <Text style={styles.title}>GanPro Intelligence</Text>
+          <Text style={styles.subtitle}>Dashboard Enterprise · Read Model V3</Text>
+        </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => setIsExportModalVisible(true)} style={styles.iconButton}>
+            <Ionicons name="cloud-download-outline" size={24} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
+            {pendingTasksCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{pendingTasksCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Filtros */}
       <View style={styles.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
@@ -282,6 +307,7 @@ function DashboardInner({
         });
         setIsTaskModalVisible(false);
       }} />
+      <ExportMenuModal visible={isExportModalVisible} onClose={() => setIsExportModalVisible(false)} />
     </View>
   );
 }
@@ -314,13 +340,6 @@ export function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.headerMain}>
-        <View>
-          <Text style={styles.title}>GanPro Intelligence</Text>
-          <Text style={styles.subtitle}>Dashboard Enterprise · Read Model V3</Text>
-        </View>
-        <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
-      </View>
       <ObservableErrorBoundary fallbackTitle="Error en Dashboard">
         <DashboardWithData
           selectedLoteId={selectedLoteId}
@@ -337,6 +356,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   headerMain: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  iconButton: { position: 'relative', padding: 4 },
+  notificationBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 2,
+    backgroundColor: colors.error,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.background,
+    paddingHorizontal: 3,
+  },
+  notificationBadgeText: { color: 'white', fontSize: 9, fontWeight: 'bold' },
   title: { color: colors.textPrimary, fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
   filterBar: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
