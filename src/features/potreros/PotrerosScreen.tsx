@@ -154,6 +154,7 @@ const PotreroDetailsModal = withObservables(['potrero'], ({ potrero }: { potrero
 // ── Modales de ABM ───────────────────────────────────────────────────────────
 
 import { RacionMixerModal } from './ui/RacionMixerModal';
+import { RacionCalculadoraModal } from './ui/RacionCalculadoraModal';
 import { PotreroFormModal } from './ui/PotreroFormModal';
 import { SuplementoFormModal } from './ui/SuplementoFormModal';
 import { CCAuditModal } from './ui/CCAuditModal';
@@ -169,7 +170,9 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
   const [isSuplementoFormVisible, setSuplementoFormVisible] = useState(false);
   const [isCCAuditModalVisible, setCCAuditModalVisible] = useState(false);
   const [isFeedingModalVisible, setFeedingModalVisible] = useState(false);
+  const [isCalcVisible, setCalcVisible] = useState(false);
   const [selectedPotrero, setSelectedPotrero] = useState<PotreroModel | null>(null);
+  const [racionCalc, setRacionCalc] = useState<RacionModel | null>(null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -203,7 +206,12 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
             data={raciones}
             keyExtractor={r => r.id}
             contentContainerStyle={styles.list}
-            renderItem={({ item }) => <RacionCardInner racion={item} />}
+            renderItem={({ item }) => (
+              <RacionCardInner
+                racion={item}
+                onPress={(r) => { setRacionCalc(r); setCalcVisible(true); }}
+              />
+            )}
             ListHeaderComponent={() => (
               <>
                 <View style={styles.header}>
@@ -321,6 +329,11 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
         potreroId={selectedPotrero?.id || ''}
         raciones={raciones}
       />
+      <RacionCalculadoraModal
+        visible={isCalcVisible}
+        onClose={() => setCalcVisible(false)}
+        racion={racionCalc}
+      />
     </SafeAreaView>
   );
 }
@@ -352,15 +365,17 @@ const PotreroCard = withObservables(['potrero'], ({ potrero }: { potrero: Potrer
   animalsCount: database.get<AnimalModel>('animals').query(Q.where('potrero_id', potrero.id)).observeCount(),
 }))(PotreroCardInner);
 
-const RacionCardInner = ({ racion }: any) => (
-  <View style={styles.card}>
+const RacionCardInner = ({ racion, onPress }: { racion: RacionModel; onPress?: (r: RacionModel) => void }) => (
+  <TouchableOpacity style={styles.card} onPress={() => onPress?.(racion)} activeOpacity={0.7}>
     <View style={styles.cardIcon}><Ionicons name="nutrition" size={24} color={colors.warning} /></View>
     <View style={{ flex: 1 }}>
       <Text style={styles.cardTitle}>{racion.nombre}</Text>
-      <Text style={styles.cardSub}>{racion.descripcion}</Text>
+      <Text style={styles.cardSub}>
+        {racion.descripcion || `$${(racion.costoEstimadoKg ?? 0).toFixed(3)}/kg`}
+      </Text>
     </View>
-    <Ionicons name="chevron-forward" size={20} color={colors.textDisabled} />
-  </View>
+    <Ionicons name="calculator-outline" size={20} color={colors.textSecondary} />
+  </TouchableOpacity>
 );
 
 const PotrerosWithData = withObservables([], () => ({
