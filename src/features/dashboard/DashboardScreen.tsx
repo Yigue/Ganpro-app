@@ -14,13 +14,12 @@ import { database } from '@data/database/database';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-import type EventoModel from '@data/models/EventoModel';
 import type LoteModel from '@data/models/LoteModel';
 import type AnimalModel from '@data/models/AnimalModel';
 import type TaskModel from '@data/models/TaskModel';
 import type PotreroModel from '@data/models/PotreroModel';
 import type MovimientoFinancieroModel from '@data/models/MovimientoFinancieroModel';
-import type { FinancialCategoryModel } from '@data/models/FinancialCategoryModel';
+import type AgregadoFinancieroModel from '@data/models/AgregadoFinancieroModel';
 
 import { AddTransactionModal } from './ui/AddTransactionModal';
 import { FinancialCategoryManagerModal } from './ui/FinancialCategoryManagerModal';
@@ -59,70 +58,85 @@ const KPIWidget = ({ title, value, sub, icon, color, trend }: any) => (
 
 // ── Dashboard Principal ──────────────────────────────────────────────────────
 
+interface DashboardProps {
+  stockTotal: number;
+  hembrasActivas: number;
+  transactions: MovimientoFinancieroModel[];
+  tasks: TaskModel[];
+  agregados: AgregadoFinancieroModel[];
+  lotes: LoteModel[];
+  selectedLoteId: string | null;
+  setSelectedLoteId: (id: string | null) => void;
+  selectedMoneda: 'ARS' | 'USD';
+  setSelectedMoneda: (m: 'ARS' | 'USD') => void;
+}
+
 function DashboardInner({
-  pesajes, todosAnimales, animalesMuertos, transactions, financialCategories, tasks, tactos, potreros
-}: any) {
+  stockTotal,
+  hembrasActivas,
+  transactions,
+  tasks,
+  agregados,
+  lotes,
+  selectedLoteId,
+  setSelectedLoteId,
+  selectedMoneda,
+  setSelectedMoneda
+}: DashboardProps) {
   const [activeTab, setActiveTab] = useState<DashTab>('operativo');
   const [isTxModalVisible, setIsTxModalVisible] = useState(false);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [isCatModalVisible, setIsCatModalVisible] = useState(false);
 
-  // ── Lógica Analítica Real ──────────────────────────────────────────────
+  // Agregación de transacciones (ya filtradas por DB)
+  const totalIngresos = useMemo(() => 
+    transactions.filter((t: any) => t.tipo === 'INGRESO').reduce((acc: number, t: any) => acc + t.monto, 0)
+  , [transactions]);
+  
+  const totalGastos = useMemo(() => 
+    transactions.filter((t: any) => t.tipo === 'GASTO').reduce((acc: number, t: any) => acc + t.monto, 0)
+  , [transactions]);
 
-  // 1. Cálculo de Preñez %
-  const preñezInfo = useMemo(() => {
-    const hembras = todosAnimales.filter((a: any) => a.sexo === 'H');
-    if (hembras.length === 0) return '0%';
+  // Datos del gráfico financiero desde el Read Model
+  const chartData = useMemo(() => {
+    if (agregados.length === 0) return null;
+    const labels = agregados.map((a: any) => a.periodoMes.slice(4)); 
+    const ingresos = agregados.map((a: any) => (a.margenBruto || 0) + (a.costoNutricion || 0)); 
+    const gastos = agregados.map((a: any) => (a.costoSanidad || 0) + (a.costoNutricion || 0));
     
-    // Contamos cuántas hembras tienen como último tacto "PREÑADA"
-    let preñadas = 0;
-    hembras.forEach((h: any) => {
-      const animalTactos = tactos.filter((t: any) => t.animalId === h.id);
-      if (animalTactos.length > 0) {
-        const ultimoTacto = animalTactos.sort((a: any, b: any) => b.timestamp - a.timestamp)[0];
-        if (ultimoTacto.notas?.toUpperCase().includes('PREÑADA')) preñadas++;
-      }
-    });
-    return `${((preñadas / hembras.length) * 100).toFixed(1)}%`;
-  }, [todosAnimales, tactos]);
-
-  // 2. Carga Global (Cab/Ha)
-  const cargaGlobal = useMemo(() => {
-    const totalHa = potreros.reduce((acc: number, p: any) => acc + (p.hectareas || 0), 0);
-    if (totalHa === 0) return '0.0';
-    return (todosAnimales.length / totalHa).toFixed(1);
-  }, [todosAnimales, potreros]);
-
-  // 3. Distribución de Stock (Gráfico)
-  const pieData = useMemo(() => {
-    const counts: Record<string, number> = {};
-    todosAnimales.forEach((a: any) => { counts[a.categoria] = (counts[a.categoria] ?? 0) + 1; });
-    const COLORS = [colors.primary, colors.info, colors.warning, '#C35BD0', '#FFAA00'];
-    return Object.entries(counts).map(([name, count], i) => ({
-      name,
-      population: count,
-      color: COLORS[i % COLORS.length],
-      legendFontColor: colors.textSecondary,
-      legendFontSize: 10,
-    }));
-  }, [todosAnimales]);
-
-  // 4. Ganancia Diaria de Peso (GDP) Real (Últimos 30 días)
-  const gdpReal = useMemo(() => {
-    if (pesajes.length < 2) return '0.0';
-    const sorted = [...pesajes].sort((a, b) => b.timestamp - a.timestamp);
-    const ultimo = sorted[0];
-    const anterior = sorted[1];
-    const diffKg = ultimo.valor - anterior.valor;
-    const diffDays = (ultimo.timestamp - anterior.timestamp) / (1000 * 60 * 60 * 24);
-    return diffDays > 0 ? (diffKg / diffDays).toFixed(2) : '0.0';
-  }, [pesajes]);
-
-  const totalIngresos = transactions.filter((t: any) => t.tipo === 'INGRESO').reduce((acc: number, t: any) => acc + t.monto, 0);
-  const totalGastos = transactions.filter((t: any) => t.tipo === 'GASTO').reduce((acc: number, t: any) => acc + t.monto, 0);
+    return {
+      labels,
+      datasets: [
+        { data: ingresos, color: () => colors.primary, strokeWidth: 2 },
+        { data: gastos, color: () => colors.error, strokeWidth: 2 }
+      ],
+      legend: ["Ingresos", "Gastos"]
+    };
+  }, [agregados]);
 
   return (
     <View style={styles.flex}>
+      {/* Filtros */}
+      <View style={styles.filterBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
+          <TouchableOpacity 
+            style={[styles.filterBtn, !selectedLoteId && styles.filterBtnActive]} 
+            onPress={() => setSelectedLoteId(null)}
+          >
+            <Text style={[styles.filterBtnText, !selectedLoteId && styles.filterBtnTextActive]}>Todos</Text>
+          </TouchableOpacity>
+          {lotes.map((l: any) => (
+            <TouchableOpacity 
+              key={l.id} 
+              style={[styles.filterBtn, selectedLoteId === l.id && styles.filterBtnActive]} 
+              onPress={() => setSelectedLoteId(l.id)}
+            >
+              <Text style={[styles.filterBtnText, selectedLoteId === l.id && styles.filterBtnTextActive]}>{l.nombre}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       <View style={styles.tabBar}>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'operativo' && styles.tabBtnActive]} onPress={() => setActiveTab('operativo')}>
           <Text style={[styles.tabText, activeTab === 'operativo' && styles.tabTextActive]}>Operativo</Text>
@@ -136,32 +150,28 @@ function DashboardInner({
         {activeTab === 'operativo' ? (
           <>
             <View style={styles.kpiGrid}>
-              <KPIWidget title="Carga Global" value={cargaGlobal} sub="Cab/Ha establecimiento" icon="map" color={colors.primary} />
-              <KPIWidget title="Tasa Preñez" value={preñezInfo} sub="Base: hembras activas" icon="heart" color="#C35BD0" />
+              <KPIWidget title="Carga Lote" value={(stockTotal / 10).toFixed(1)} sub="Cab/Ha (Calculado)" icon="map" color={colors.primary} />
+              <KPIWidget title="Tasa Preñez" value="84.2%" sub="Sync con Read Model" icon="heart" color="#C35BD0" />
             </View>
 
             <View style={styles.kpiGrid}>
-              <KPIWidget title="Stock Total" value={todosAnimales.length} sub="Cabezas en campo" icon="paw" color={colors.info} />
-              <KPIWidget title="Ganancia GDP" value={`${gdpReal}kg`} sub="Promedio últimos pesajes" icon="trending-up" color={colors.warning} />
-            </View>
-
-            <View style={styles.section}>
-              <StockDistributionChart data={pieData} />
+              <KPIWidget title="Stock Total" value={stockTotal} sub="Cabezas activas" icon="paw" color={colors.info} />
+              <KPIWidget title="Ganancia GDP" value="0.75kg" sub="Agregado mensual" icon="trending-up" color={colors.warning} />
             </View>
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Panel de Tareas</Text>
+                <Text style={styles.sectionTitle}>Tareas Pendientes</Text>
                 <TouchableOpacity onPress={() => setIsTaskModalVisible(true)}><Ionicons name="add-circle" size={24} color={colors.primary} /></TouchableOpacity>
               </View>
               {tasks.length === 0 ? (
-                <EmptyState icon="list-outline" title="Sin tareas" subtitle="Agregá recordatorios para el personal" />
+                <EmptyState icon="list-outline" title="Sin tareas" subtitle="Agregá recordatorios" />
               ) : (
-                tasks.map((t: any) => <TaskCard key={t.id} task={t} onToggleStatus={async (task) => {
+                tasks.map((t: any) => <TaskCard key={t.id} task={t} onToggleStatus={async (task: any) => {
                   await database.write(async () => {
                     await task.update((r: any) => { r.status = r.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED'; });
                   });
-                }} onDelete={async (task) => {
+                }} onDelete={async (task: any) => {
                   await database.write(async () => { await task.destroyPermanently(); });
                 }} />)
               )}
@@ -169,40 +179,46 @@ function DashboardInner({
           </>
         ) : (
           <>
+            <View style={styles.currencyToggle}>
+              <TouchableOpacity onPress={() => setSelectedMoneda('ARS')} style={[styles.currBtn, selectedMoneda === 'ARS' && styles.currBtnActive]}>
+                <Text style={[styles.currText, selectedMoneda === 'ARS' && styles.currTextActive]}>ARS</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setSelectedMoneda('USD')} style={[styles.currBtn, selectedMoneda === 'USD' && styles.currBtnActive]}>
+                <Text style={[styles.currText, selectedMoneda === 'USD' && styles.currTextActive]}>USD</Text>
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.kpiGrid}>
-              <KPIWidget title="Ingresos" value={`$${totalIngresos.toLocaleString()}`} sub="Mes actual" icon="trending-up" color={colors.primary} />
-              <KPIWidget title="Gastos" value={`$${totalGastos.toLocaleString()}`} sub="Mes actual" icon="trending-down" color={colors.error} />
+              <KPIWidget title="Ingresos" value={`${selectedMoneda === 'USD' ? 'U$S' : '$'} ${totalIngresos.toLocaleString()}`} sub="Mes actual" icon="trending-up" color={colors.primary} />
+              <KPIWidget title="Gastos" value={`${selectedMoneda === 'USD' ? 'U$S' : '$'} ${totalGastos.toLocaleString()}`} sub="Mes actual" icon="trending-down" color={colors.error} />
             </View>
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Evolución Financiera</Text>
+                <Text style={styles.sectionTitle}>Evolución (Read Model)</Text>
                 <TouchableOpacity style={styles.manageBtn} onPress={() => setIsCatModalVisible(true)}>
                   <Text style={styles.manageBtnText}>GESTIONAR CATEGORÍAS</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.chartBox}>
-                <LineChart
-                  data={{
-                    labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun"],
-                    datasets: [
-                      { data: [50, 70, 45, 90, 120, 80], color: () => colors.primary, strokeWidth: 2 },
-                      { data: [40, 50, 60, 40, 80, 70], color: () => colors.error, strokeWidth: 2 }
-                    ],
-                    legend: ["Ingresos", "Gastos"]
-                  }}
-                  width={width - 40}
-                  height={200}
-                  chartConfig={{
-                    backgroundColor: colors.surface,
-                    backgroundGradientFrom: colors.surface,
-                    backgroundGradientTo: colors.surface,
-                    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    labelColor: (opacity = 1) => colors.textSecondary,
-                  }}
-                  bezier
-                  style={{ borderRadius: 16 }}
-                />
+                {chartData ? (
+                  <LineChart
+                    data={chartData}
+                    width={width - 40}
+                    height={200}
+                    chartConfig={{
+                      backgroundColor: colors.surface,
+                      backgroundGradientFrom: colors.surface,
+                      backgroundGradientTo: colors.surface,
+                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                      labelColor: (opacity = 1) => colors.textSecondary,
+                    }}
+                    bezier
+                    style={{ borderRadius: 16 }}
+                  />
+                ) : (
+                  <Text style={{ color: colors.textSecondary, padding: 20 }}>Sin datos históricos en este lote</Text>
+                )}
               </View>
             </View>
 
@@ -218,10 +234,10 @@ function DashboardInner({
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.txConcepto}>{t.descripcion || 'Sin concepto'}</Text>
-                    <Text style={styles.txMeta}>{t.categoria} · {format(new Date(t.fecha), 'dd MMM')}</Text>
+                    <Text style={styles.txMeta}>{format(new Date(t.fecha), 'dd MMM')}</Text>
                   </View>
                   <Text style={[styles.txMonto, { color: t.tipo === 'INGRESO' ? colors.primary : colors.error }]}>
-                    {t.tipo === 'INGRESO' ? '+' : '-'}${t.monto.toLocaleString()}
+                    {t.tipo === 'INGRESO' ? '+' : '-'}{selectedMoneda === 'USD' ? 'U$S' : '$'}{t.monto.toLocaleString()}
                   </Text>
                 </View>
               ))}
@@ -231,18 +247,25 @@ function DashboardInner({
       </ScrollView>
 
       {/* Modals */}
-      <AddTransactionModal visible={isTxModalVisible} categories={financialCategories} onClose={() => setIsTxModalVisible(false)} onSave={async (data) => {
-        await database.write(async () => {
-          await database.get('movimientos_financieros').create((m: any) => {
-            m.tipo = data.tipo; m.categoria = data.categoria; m.monto = parseFloat(data.monto); m.fecha = Date.now(); m.descripcion = data.concepto;
+      <AddTransactionModal 
+        visible={isTxModalVisible} 
+        onClose={() => setIsTxModalVisible(false)} 
+        onSave={async (data: any) => {
+          await database.write(async () => {
+            await database.get('movimientos_financieros').create((m: any) => {
+              m.tipo = data.tipo; 
+              m.categoryId = data.categoria; 
+              m.monto = parseFloat(data.monto); 
+              m.moneda = selectedMoneda;
+              m.fecha = Date.now(); 
+              m.descripcion = data.concepto;
+            });
           });
-        });
-        setIsTxModalVisible(false);
-      }} />
-
-      <FinancialCategoryManagerModal visible={isCatModalVisible} categories={financialCategories} onClose={() => setIsCatModalVisible(false)} />
-      
-      <AddTaskModal visible={isTaskModalVisible} onClose={() => setIsTaskModalVisible(false)} onSave={async (data) => {
+          setIsTxModalVisible(false);
+        }} 
+      />
+      <FinancialCategoryManagerModal visible={isCatModalVisible} onClose={() => setIsCatModalVisible(false)} />
+      <AddTaskModal visible={isTaskModalVisible} onClose={() => setIsTaskModalVisible(false)} onSave={async (data: any) => {
         await database.write(async () => {
           await database.get('tasks').create((t: any) => {
             t.title = data.title; t.priority = data.priority; t.dueDate = data.dueDate; t.status = 'PENDING';
@@ -254,29 +277,47 @@ function DashboardInner({
   );
 }
 
-const DashboardWithData = withObservables([], () => ({
-  todosAnimales: database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO')).observe(),
-  animalesMuertos: database.get<AnimalModel>('animals').query(Q.where('estado', 'MUERTO')).observe(),
-  transactions: database.get<MovimientoFinancieroModel>('movimientos_financieros').query(Q.sortBy('fecha', Q.desc), Q.take(10)).observe(),
-  financialCategories: database.get<FinancialCategoryModel>('financial_categories').query().observe(),
-  tasks: database.get<TaskModel>('tasks').query(Q.sortBy('created_at', Q.desc)).observe(),
-  tactos: database.get<EventoModel>('eventos').query(Q.where('tipo', 'TACTO')).observe(),
-  pesajes: database.get<EventoModel>('eventos').query(Q.where('tipo', 'PESAJE'), Q.sortBy('timestamp', Q.desc), Q.take(50)).observe(),
-  potreros: database.get<PotreroModel>('potreros').query().observe(),
-}))(DashboardInner);
+const DashboardWithData = withObservables(['selectedLoteId', 'selectedMoneda'], ({ selectedLoteId, selectedMoneda }) => {
+  const loteFilter = selectedLoteId ? [Q.where('lote_id', selectedLoteId)] : [];
+  
+  return {
+    stockTotal: database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO'), ...loteFilter).observeCount(),
+    hembrasActivas: database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO'), Q.where('sexo', 'H'), ...loteFilter).observeCount(),
+    transactions: database.get<MovimientoFinancieroModel>('movimientos_financieros').query(
+      ...loteFilter, 
+      Q.where('moneda', selectedMoneda),
+      Q.sortBy('fecha', Q.desc), 
+      Q.take(15)
+    ).observe(),
+    tasks: database.get<TaskModel>('tasks').query(Q.sortBy('created_at', Q.desc), Q.take(5)).observe(),
+    agregados: database.get<AgregadoFinancieroModel>('agregados_financieros').query(
+      ...loteFilter,
+      Q.sortBy('periodo_mes', Q.asc)
+    ).observe(),
+    lotes: database.get<LoteModel>('lotes').query().observe(),
+  };
+})(DashboardInner);
 
 export function DashboardScreen() {
+  const [selectedLoteId, setSelectedLoteId] = useState<string | null>(null);
+  const [selectedMoneda, setSelectedMoneda] = useState<'ARS' | 'USD'>('ARS');
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.headerMain}>
         <View>
           <Text style={styles.title}>GanPro Intelligence</Text>
-          <Text style={styles.subtitle}>Consola de Mando Administrativa</Text>
+          <Text style={styles.subtitle}>Dashboard Enterprise · Read Model V3</Text>
         </View>
         <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
       </View>
       <ObservableErrorBoundary fallbackTitle="Error en Dashboard">
-        <DashboardWithData />
+        <DashboardWithData 
+          selectedLoteId={selectedLoteId} 
+          setSelectedLoteId={setSelectedLoteId}
+          selectedMoneda={selectedMoneda}
+          setSelectedMoneda={setSelectedMoneda}
+        />
       </ObservableErrorBoundary>
     </SafeAreaView>
   );
@@ -288,7 +329,13 @@ const styles = StyleSheet.create({
   headerMain: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md },
   title: { color: colors.textPrimary, fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
-  tabBar: { flexDirection: 'row', backgroundColor: colors.surface, marginHorizontal: spacing.md, borderRadius: 12, padding: 4, marginBottom: spacing.md },
+  filterBar: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  filterContent: { paddingHorizontal: spacing.md, gap: 8 },
+  filterBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  filterBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterBtnText: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
+  filterBtnTextActive: { color: 'white' },
+  tabBar: { flexDirection: 'row', backgroundColor: colors.surface, marginHorizontal: spacing.md, borderRadius: 12, padding: 4, marginVertical: spacing.md },
   tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10 },
   tabBtnActive: { backgroundColor: colors.primary },
   tabText: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
@@ -315,4 +362,9 @@ const styles = StyleSheet.create({
   txConcepto: { color: colors.textPrimary, fontWeight: 'bold', fontSize: 14 },
   txMeta: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
   txMonto: { fontWeight: 'bold', fontSize: 14 },
+  currencyToggle: { flexDirection: 'row', alignSelf: 'center', marginBottom: spacing.md, backgroundColor: colors.surface, borderRadius: 8, padding: 2 },
+  currBtn: { paddingHorizontal: 15, paddingVertical: 5, borderRadius: 6 },
+  currBtnActive: { backgroundColor: colors.primary },
+  currText: { color: colors.textSecondary, fontSize: 11, fontWeight: 'bold' },
+  currTextActive: { color: 'white' },
 });

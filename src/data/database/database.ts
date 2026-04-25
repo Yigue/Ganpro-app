@@ -2,29 +2,8 @@ import { Database } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 import { schema } from '../schema/schema';
 import { migrations } from '../schema/migrations';
-import {
-  AnimalModel,
-  LoteModel,
-  EventoModel,
-  SyncLogModel,
-  ProtocoloIATFModel,
-  EtapaProtocoloModel,
-  CondicionCorporalModel,
-  SuplementoModel,
-  RacionModel,
-  MovimientoFinancieroModel,
-  PrecioMercadoModel,
-  AgregadoFinancieroModel,
-} from '../models';
-import { OperationCatalogModel } from '../models/OperationCatalogModel';
-import { OperationLogModel } from '../models/OperationLogModel';
-import { ScheduledOperationModel } from '../models/ScheduledOperationModel';
-import { AnimalMovementModel } from '../models/AnimalMovementModel';
-import { MangaActionQueueModel } from '../models/MangaActionQueueModel';
-import PotreroModel from '../models/PotreroModel';
-import { PotreroFeedingLogModel } from '../models/PotreroFeedingLogModel';
-import { TaskModel } from '../models/TaskModel';
-import { FinancialCategoryModel } from '../models/FinancialCategoryModel';
+
+import * as Models from '../models';
 
 const adapter = new SQLiteAdapter({
   schema,
@@ -37,30 +16,5 @@ const adapter = new SQLiteAdapter({
 
 export const database = new Database({
   adapter,
-  modelClasses: [
-    AnimalModel,
-    LoteModel,
-    EventoModel,
-    SyncLogModel,
-    ProtocoloIATFModel,
-    EtapaProtocoloModel,
-    CondicionCorporalModel,
-    SuplementoModel,
-    RacionModel,
-    MovimientoFinancieroModel,
-    PrecioMercadoModel,
-    AgregadoFinancieroModel,
-    // V3 models
-    OperationCatalogModel,
-    OperationLogModel,
-    ScheduledOperationModel,
-    AnimalMovementModel,
-    MangaActionQueueModel,
-    PotreroModel,
-    PotreroFeedingLogModel,
-    // V4 models
-    TaskModel,
-    FinancialCategoryModel,
-  ],
+  modelClasses: Object.values(Models), // Registra todos los modelos exportados en models/index.ts
 });
-

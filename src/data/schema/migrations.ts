@@ -7,6 +7,38 @@ import { schemaMigrations, addColumns, createTable } from '@nozbe/watermelondb/S
 export const migrations = schemaMigrations({
   migrations: [
     {
+      toVersion: 6,
+      steps: [
+        createTable({
+          name: 'racion_ingredientes',
+          columns: [
+            { name: 'racion_id', type: 'string', isIndexed: true },
+            { name: 'suplemento_id', type: 'string', isIndexed: true },
+            { name: 'porcentaje', type: 'number' },
+            { name: 'cantidad_kg_por_tonelada', type: 'number' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+      ],
+    },
+    {
+      toVersion: 5,
+      steps: [
+        createTable({
+          name: 'categorias_tratamiento',
+          columns: [
+            { name: 'nombre', type: 'string' },
+            { name: 'descripcion', type: 'string', isOptional: true },
+            { name: 'color', type: 'string', isOptional: true },
+            { name: 'es_sistema', type: 'boolean' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+      ],
+    },
+    {
       toVersion: 4,
       steps: [
         createTable({

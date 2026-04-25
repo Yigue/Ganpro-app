@@ -4,7 +4,7 @@ import { field, text, date, readonly } from '@nozbe/watermelondb/decorators';
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
 export type TaskPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 
-export class TaskModel extends Model {
+export default class TaskModel extends Model {
   static table = 'tasks';
 
   @text('title') title!: string;

@@ -9,8 +9,8 @@ export class OperationCatalogModel extends Model {
   @field('dias_carencia') diasCarencia!: number;
   @field('costo_unitario') costoUnitario!: number;
   @field('notas') notas!: string;
-  @readonly @date('created_at') createdAt!: number;
-  @readonly @date('updated_at') updatedAt!: number;
+  @readonly @date('created_at') createdAt!: Date;
+  @date('updated_at') updatedAt!: Date;
 }
 
 export default OperationCatalogModel;

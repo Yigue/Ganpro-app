@@ -1,4 +1,4 @@
-// ─── V1/V2 Models (default exports) ────────────────────────────────────────
+// ─── Models (Unificados como Default Exports) ──────────────────────────────
 export { default as AgregadoFinancieroModel } from './AgregadoFinancieroModel';
 export { default as AnimalModel } from './AnimalModel';
 export { default as CondicionCorporalModel } from './CondicionCorporalModel';
@@ -11,19 +11,18 @@ export { default as ProtocoloIATFModel } from './ProtocoloIATFModel';
 export { default as RacionModel } from './RacionModel';
 export { default as SuplementoModel } from './SuplementoModel';
 export { default as SyncLogModel } from './SyncLogModel';
+export { default as EstablecimientoModel } from './EstablecimientoModel';
+export { default as BatchCcAuditModel } from './BatchCcAuditModel';
 
-// ─── V4 Models (named exports) ──────────────────────────────────────────────
-export { TaskModel } from './TaskModel';
-export { FinancialCategoryModel } from './FinancialCategoryModel';
-
-// ─── V3 Models (named exports) ──────────────────────────────────────────────
-export { AnimalMovementModel } from './AnimalMovementModel';
-export { MangaActionQueueModel } from './MangaActionQueueModel';
-export { OperationCatalogModel } from './OperationCatalogModel';
-export { OperationLogModel } from './OperationLogModel';
-export { PotreroFeedingLogModel } from './PotreroFeedingLogModel';
-export { PotreroModel } from './PotreroModel';
-export { ScheduledOperationModel } from './ScheduledOperationModel';
-
-// REMOVED: MedicamentoModel (deleted in V3 migration)
-// REMOVED: TratamientoSanidadModel (deleted in V3 migration)
+// V3/V4/V5/V6 Models
+export { default as TaskModel } from './TaskModel';
+export { default as FinancialCategoryModel } from './FinancialCategoryModel';
+export { default as CategoriaTratamientoModel } from './CategoriaTratamientoModel';
+export { default as RacionIngredienteModel } from './RacionIngredienteModel';
+export { default as AnimalMovementModel } from './AnimalMovementModel';
+export { default as MangaActionQueueModel } from './MangaActionQueueModel';
+export { default as OperationCatalogModel } from './OperationCatalogModel';
+export { default as OperationLogModel } from './OperationLogModel';
+export { default as PotreroFeedingLogModel } from './PotreroFeedingLogModel';
+export { default as PotreroModel } from './PotreroModel';
+export { default as ScheduledOperationModel } from './ScheduledOperationModel';

@@ -3,11 +3,14 @@ import type { Query } from '@nozbe/watermelondb';
 import SuplementoModel from '../models/SuplementoModel';
 import RacionModel from '../models/RacionModel';
 import CondicionCorporalModel from '../models/CondicionCorporalModel';
+import RacionIngredienteModel from '../models/RacionIngredienteModel';
+import { PotreroFeedingLogModel } from '../models/PotreroFeedingLogModel';
+import { AnimalMovementModel } from '../models/AnimalMovementModel';
 
 export class NutricionRepository {
   constructor(private database: Database) {}
 
-  // ── Suplementos ─────────────────────────────────────────────────────────────
+  // ── Suplementos (Ingredientes Base) ────────────────────────────────────────
 
   async createSuplemento(params: {
     nombre: string;
@@ -37,18 +40,32 @@ export class NutricionRepository {
     return this.database.get<SuplementoModel>('suplementos').query();
   }
 
-  // ── Raciones ────────────────────────────────────────────────────────────────
+  // ── Raciones & Ingredientes ──────────────────────────────────────────────────
 
-  async createRacion(params: {
+  async createRacionConIngredientes(params: {
     nombre: string;
-    descripcion?: string; // Usaremos esto para JSON de ingredientes
+    descripcion?: string;
+    ingredientes: { suplementoId: string; porcentaje: number; kgPorTonelada: number }[];
   }): Promise<RacionModel> {
     return this.database.write(async () => {
-      return this.database.get<RacionModel>('raciones').create((r) => {
+      const racion = await this.database.get<RacionModel>('raciones').create((r) => {
         r.nombre = params.nombre;
         r.descripcion = params.descripcion ?? '';
         r.activa = true;
       });
+
+      await Promise.all(
+        params.ingredientes.map((ing) =>
+          this.database.get<RacionIngredienteModel>('racion_ingredientes').create((ri) => {
+            ri.racionId = racion.id;
+            ri.suplementoId = ing.suplementoId;
+            ri.porcentaje = ing.porcentaje;
+            ri.cantidadKgPorTonelada = ing.kgPorTonelada;
+          })
+        )
+      );
+
+      return racion;
     });
   }
 
@@ -58,18 +75,37 @@ export class NutricionRepository {
       .query(Q.where('activa', true));
   }
 
-  // ── Feeding Logs ────────────────────────────────────────────────────────────
-  // Como aún no tenemos el Model definido explícitamente en el repo importado,
-  // podemos interactuar directamente con la tabla para registrar entregas.
+  queryIngredientesByRacion(racionId: string): Query<RacionIngredienteModel> {
+    return this.database
+      .get<RacionIngredienteModel>('racion_ingredientes')
+      .query(Q.where('racion_id', racionId));
+  }
+
+  // ── Movimientos de Potrero ──────────────────────────────────────────────────
+
+  queryMovimientosByPotrero(potreroId: string): Query<AnimalMovementModel> {
+    return this.database
+      .get<AnimalMovementModel>('animal_movements')
+      .query(
+        Q.or(
+          Q.where('potrero_origen_id', potreroId),
+          Q.where('potrero_destino_id', potreroId)
+        ),
+        Q.sortBy('fecha', Q.desc)
+      );
+  }
+
+  // ── Feeding Logs (Entregas de Ración) ───────────────────────────────────────
+
   async logFeeding(params: {
     potreroId: string;
     racionId: string;
     cantidadKg: number;
     fecha: number;
     notas?: string;
-  }): Promise<any> {
+  }): Promise<PotreroFeedingLogModel> {
     return this.database.write(async () => {
-      return this.database.get('potrero_feeding_logs').create((log: any) => {
+      return this.database.get<PotreroFeedingLogModel>('potrero_feeding_logs').create((log) => {
         log.potreroId = params.potreroId;
         log.racionId = params.racionId;
         log.cantidadKg = params.cantidadKg;
@@ -77,6 +113,12 @@ export class NutricionRepository {
         log.notas = params.notas ?? '';
       });
     });
+  }
+
+  queryFeedingLogs(limit = 20): Query<PotreroFeedingLogModel> {
+    return this.database
+      .get<PotreroFeedingLogModel>('potrero_feeding_logs')
+      .query(Q.sortBy('fecha', Q.desc), Q.take(limit));
   }
 
   // ── Condición Corporal ──────────────────────────────────────────────────────
@@ -103,7 +145,6 @@ export class NutricionRepository {
     });
   }
 
-  /** Returns all body condition records for a lote, sorted by fecha descending. */
   queryCondicionCorporalByLote(loteId: string): Query<CondicionCorporalModel> {
     return this.database
       .get<CondicionCorporalModel>('condicion_corporal')

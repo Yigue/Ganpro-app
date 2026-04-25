@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   TextInput as RNTextInput,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useDatabase } from '@shared/hooks/useDatabase';
@@ -14,14 +13,13 @@ import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
 import { colors, spacing, typography } from '@theme/index';
 import { EVENTO_TIPO, type EventoTipoType } from '@core/constants/eventTypes';
-import { calcularDensidadCarga } from '@core/utils/gisEngine';
 import type AnimalModel from '@data/models/AnimalModel';
 import type LoteModel from '@data/models/LoteModel';
-import { OperationLogModel } from '@data/models/OperationLogModel';
-import { AnimalRepository } from '@data/repositories/AnimalRepository';
-import { EventoRepository } from '@data/repositories/EventoRepository';
-import { SanidadRepository } from '@data/repositories/SanidadRepository';
-import { CATEGORIA, CATEGORIAS_MACHO, CATEGORIAS_HEMBRA, type CategoriaType } from '@core/constants/categories';
+import { AnimalMovementService } from '@core/services/AnimalMovementService';
+import { SanitaryOperationService } from '@core/services/SanitaryOperationService';
+import { ReproductionService } from '@core/services/ReproductionService';
+import { WeightService } from '@core/services/WeightService';
+import { CATEGORIAS_MACHO, CATEGORIAS_HEMBRA, type CategoriaType } from '@core/constants/categories';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Q } from '@nozbe/watermelondb';
@@ -40,7 +38,7 @@ const ACTIONS: { tipo: EventoTipoType; label: string; icon: string; color: strin
   { tipo: EVENTO_TIPO.OTRO, label: 'Otro', icon: '📋', color: colors.textSecondary },
 ];
 
-type TactoResultado = 'prenada' | 'vacia' | null;
+type TactoResultado = 'PREÑADA' | 'VACIA' | null;
 type LocalAction = EventoTipoType | 'CAMBIO_CATEGORIA';
 
 export function EventActionSheet({ visible, rfid, onClose }: Props) {
@@ -58,12 +56,11 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
   const [loteDestinoId, setLoteDestinoId] = useState<string | null>(null);
   const [nuevaCategoria, setNuevaCategoria] = useState<CategoriaType | null>(null);
   const [tactoResultado, setTactoResultado] = useState<TactoResultado>(null);
-  const [dteNumero, setDteNumero] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Carencia state
-  const [carenciaDetalle, setCarenciaDetalle] = useState<OperationLogModel | null>(null);
-  const enCarencia = carenciaDetalle != null;
+  const enCarencia = useMemo(() => {
+    return animal?.lastWeightDate && new Date() < animal.lastWeightDate;
+  }, [animal]);
 
   useEffect(() => {
     if (visible) {
@@ -74,26 +71,16 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
       setLoteDestinoId(null);
       setNuevaCategoria(null);
       setTactoResultado(null);
-      setDteNumero('');
-      setCarenciaDetalle(null);
 
       void (async () => {
         try {
-          const animalRepo = new AnimalRepository(database);
-          const sanidadRepo = new SanidadRepository(database);
-
-          const [foundAnimal, loadedLotes] = await Promise.all([
-            animalRepo.findByRfid(rfid),
+          const [foundAnimals, loadedLotes] = await Promise.all([
+            database.get<AnimalModel>('animals').query(Q.where('rfid', rfid)).fetch(),
             database.get<LoteModel>('lotes').query().fetch(),
           ]);
 
-          setAnimal(foundAnimal);
+          setAnimal(foundAnimals[0] || null);
           setLotes(loadedLotes);
-
-          if (foundAnimal) {
-            const carencia = await sanidadRepo.getCarenciaActivaDetalle(foundAnimal.id);
-            setCarenciaDetalle(carencia);
-          }
         } catch (e) {
           console.error('[EventActionSheet] load error:', e);
         }
@@ -107,91 +94,42 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
     if (!selectedAction || !animal) return;
     setSaving(true);
     try {
-      const animalRepo = new AnimalRepository(database);
-      const eventoRepo = new EventoRepository(database);
-
-      if (selectedAction === 'CAMBIO_CATEGORIA' && nuevaCategoria) {
-        await animalRepo.updateCategoria(animal, nuevaCategoria);
-      } else if (selectedAction === EVENTO_TIPO.CAMBIO_LOTE && loteDestinoId) {
-        const loteOrigenId = animal.loteId;
-
-        await animalRepo.transferToLote(animal, loteDestinoId, notas);
-
-        // Recalculate densidad for both lotes after transfer
-        const [countOrigen, countDestino, loteOrigen, loteDest] = await Promise.all([
-          database.get<AnimalModel>('animals')
-            .query(Q.where('lote_id', loteOrigenId), Q.where('estado', 'ACTIVO'))
-            .fetchCount(),
-          database.get<AnimalModel>('animals')
-            .query(Q.where('lote_id', loteDestinoId), Q.where('estado', 'ACTIVO'))
-            .fetchCount(),
-          database.get<LoteModel>('lotes').find(loteOrigenId),
-          database.get<LoteModel>('lotes').find(loteDestinoId),
-        ]);
-
-        await database.write(async () => {
-          await loteOrigen.update((l) => {
-            l.densidadCarga = calcularDensidadCarga(countOrigen, l.hectareas ?? 0);
-          });
-          await loteDest.update((l) => {
-            l.densidadCarga = calcularDensidadCarga(countDestino, l.hectareas ?? 0);
-          });
-        });
-      } else if (selectedAction === EVENTO_TIPO.TACTO) {
-        const notasTacto = tactoResultado != null
-          ? `tacto:${tactoResultado}${notas.trim() ? ' ' + notas.trim() : ''}`
-          : notas;
-
-        await eventoRepo.create({
-          animalId: animal.id,
-          tipo: selectedAction,
-          notas: notasTacto,
-        });
-
-        const categoriaFinal = tactoResultado === 'vacia'
-          ? ('Vaca Descarte' as CategoriaType)
-          : nuevaCategoria;
-
-        if (categoriaFinal && categoriaFinal !== animal.categoria) {
-          await animalRepo.updateCategoria(animal, categoriaFinal);
-        }
-      } else {
-        await eventoRepo.create({
-          animalId: animal.id,
-          tipo: selectedAction as EventoTipoType,
-          valor: selectedAction === EVENTO_TIPO.PESAJE ? parseFloat(peso) || undefined : undefined,
-          notas,
-        });
+      switch (selectedAction) {
+        case EVENTO_TIPO.CAMBIO_LOTE:
+          if (loteDestinoId) {
+            await AnimalMovementService.transferAnimals([animal.id], loteDestinoId);
+          }
+          break;
+        case EVENTO_TIPO.VACUNACION:
+          await SanitaryOperationService.applyTreatment([animal.id], 'demo-vacuna-id', 1);
+          break;
+        case EVENTO_TIPO.TACTO:
+          if (tactoResultado) {
+            await ReproductionService.registerTacto(animal.id, tactoResultado);
+          }
+          break;
+        case EVENTO_TIPO.PESAJE:
+          await WeightService.registerWeight(animal.id, parseFloat(peso));
+          break;
+        default:
+          Alert.alert('Info', 'Acción no implementada aún con Application Services.');
       }
 
       triggerSuccess();
       onClose();
     } catch (error) {
       console.error('[EventActionSheet] Save error:', error);
-      Alert.alert('Error', 'No se pudo guardar el evento. Intente nuevamente.');
+      Alert.alert('Error', 'No se pudo guardar el evento.');
     } finally {
       setSaving(false);
     }
-  }, [
-    selectedAction,
-    animal,
-    database,
-    peso,
-    notas,
-    loteDestinoId,
-    nuevaCategoria,
-    tactoResultado,
-    dteNumero,
-    triggerSuccess,
-    onClose,
-  ]);
+  }, [selectedAction, animal, database, peso, loteDestinoId, tactoResultado, triggerSuccess, onClose]);
 
   const isSaveEnabled =
     selectedAction !== null &&
     (selectedAction !== EVENTO_TIPO.PESAJE || peso.length > 0) &&
     (selectedAction !== EVENTO_TIPO.CAMBIO_LOTE || loteDestinoId !== null) &&
     (selectedAction !== EVENTO_TIPO.VACUNACION || !enCarencia) &&
-    (selectedAction !== 'CAMBIO_CATEGORIA' || nuevaCategoria !== null) &&
     !saving;
 
   return (
@@ -208,53 +146,19 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
         <Text style={styles.title}>Registrar Evento</Text>
         <Text style={styles.rfidText}>{animal?.idCaravana ?? rfid}</Text>
 
-        {/* Carencia banner */}
-        {enCarencia && carenciaDetalle != null && (
+        {enCarencia && animal?.lastWeightDate && (
           <View style={styles.carenciaBanner}>
-            <Text style={styles.carenciaBannerTitle}>
-              ⚠️ EN CARENCIA
-            </Text>
+            <Text style={styles.carenciaBannerTitle}>⚠️ EN CARENCIA</Text>
             <Text style={styles.carenciaBannerBody}>
-              Libre el{' '}
-              {format(new Date(carenciaDetalle.fechaFinCarencia), 'dd/MM/yyyy', { locale: es })}
-              {' · '}
-              {Math.ceil((carenciaDetalle.fechaFinCarencia - Date.now()) / 86_400_000)} días restantes
+              Libre el {format(animal.lastWeightDate, 'dd/MM/yyyy', { locale: es })}
             </Text>
             <Text style={styles.carenciaBannerSub}>
-              Vacunación deshabilitada hasta que expire la carencia
+              Acciones sanitarias y de venta bloqueadas preventivamente.
             </Text>
           </View>
         )}
 
-        {/* Action buttons */}
         <View style={styles.actionsGrid}>
-          {/* Cambio de Categoría — fuera del loop de ACTIONS */}
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              selectedAction === 'CAMBIO_CATEGORIA' && {
-                borderColor: colors.success,
-                backgroundColor: `${colors.success}20`,
-              },
-            ]}
-            onPress={() => {
-              triggerSelection();
-              setSelectedAction('CAMBIO_CATEGORIA');
-            }}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-          >
-            <Text style={styles.actionIcon}>🏷️</Text>
-            <Text
-              style={[
-                styles.actionLabel,
-                selectedAction === 'CAMBIO_CATEGORIA' && { color: colors.success },
-              ]}
-            >
-              Categoría
-            </Text>
-          </TouchableOpacity>
-
           {ACTIONS.map((action) => {
             const isDisabled = action.tipo === EVENTO_TIPO.VACUNACION && enCarencia;
             return (
@@ -262,10 +166,7 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
                 key={action.tipo}
                 style={[
                   styles.actionButton,
-                  selectedAction === action.tipo && {
-                    borderColor: action.color,
-                    backgroundColor: `${action.color}20`,
-                  },
+                  selectedAction === action.tipo && { borderColor: action.color, backgroundColor: `${action.color}20` },
                   isDisabled && styles.actionButtonDisabled,
                 ]}
                 onPress={() => {
@@ -274,165 +175,41 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
                   setSelectedAction(action.tipo);
                 }}
                 activeOpacity={isDisabled ? 1 : 0.8}
-                accessibilityState={{ disabled: isDisabled }}
               >
-                <Text style={[styles.actionIcon, isDisabled && styles.actionIconDisabled]}>
-                  {action.icon}
-                </Text>
-                <Text
-                  style={[
-                    styles.actionLabel,
-                    selectedAction === action.tipo && { color: action.color },
-                    isDisabled && styles.actionLabelDisabled,
-                  ]}
-                >
+                <Text style={[styles.actionIcon, isDisabled && styles.actionIconDisabled]}>{action.icon}</Text>
+                <Text style={[styles.actionLabel, selectedAction === action.tipo && { color: action.color }, isDisabled && styles.actionLabelDisabled]}>
                   {action.label}
                 </Text>
-                {isDisabled && (
-                  <Text style={styles.actionDisabledTag}>carencia</Text>
-                )}
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* PESAJE */}
         {selectedAction === EVENTO_TIPO.PESAJE && (
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>PESO (kg)</Text>
             <RNTextInput
               style={styles.textInput}
               placeholder="Ej: 320"
-              placeholderTextColor={colors.textDisabled}
               keyboardType="numeric"
               value={peso}
               onChangeText={setPeso}
-              returnKeyType="done"
             />
           </View>
         )}
 
-        {/* CAMBIO_LOTE */}
         {selectedAction === EVENTO_TIPO.CAMBIO_LOTE && (
           <View style={styles.fieldSection}>
             <Text style={styles.fieldLabel}>LOTE DESTINO</Text>
             <View style={styles.loteGrid}>
-              {lotes
-                .filter((l) => l.id !== animal?.loteId)
-                .map((lote) => (
-                  <TouchableOpacity
-                    key={lote.id}
-                    style={[
-                      styles.loteOption,
-                      loteDestinoId === lote.id && styles.loteOptionSelected,
-                    ]}
-                    onPress={() => {
-                      triggerSelection();
-                      setLoteDestinoId(lote.id);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.loteOptionText,
-                        loteDestinoId === lote.id && styles.loteOptionTextSelected,
-                      ]}
-                    >
-                      {lote.nombre}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-            </View>
-            <Text style={styles.fieldLabel}>N° DTe / DTA (opcional)</Text>
-            <RNTextInput
-              style={styles.textInput}
-              placeholder="Ej: DTA-2025-001"
-              placeholderTextColor={colors.textDisabled}
-              value={dteNumero}
-              onChangeText={setDteNumero}
-            />
-          </View>
-        )}
-
-        {/* TACTO — resultado rápido */}
-        {selectedAction === EVENTO_TIPO.TACTO && (
-          <View style={styles.fieldSection}>
-            <Text style={styles.fieldLabel}>RESULTADO DEL TACTO</Text>
-            <View style={styles.tactoRow}>
-              <TouchableOpacity
-                style={[
-                  styles.tactoBtn,
-                  tactoResultado === 'prenada' && styles.tactoBtnPrenada,
-                ]}
-                onPress={() => {
-                  triggerSelection();
-                  setTactoResultado(tactoResultado === 'prenada' ? null : 'prenada');
-                  if (tactoResultado !== 'prenada') setNuevaCategoria(null);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.tactoBtnIcon}>✓</Text>
-                <Text style={[
-                  styles.tactoBtnText,
-                  tactoResultado === 'prenada' && styles.tactoBtnTextPrenada,
-                ]}>
-                  Preñada
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.tactoBtn,
-                  tactoResultado === 'vacia' && styles.tactoBtnVacia,
-                ]}
-                onPress={() => {
-                  triggerSelection();
-                  setTactoResultado(tactoResultado === 'vacia' ? null : 'vacia');
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.tactoBtnIcon}>🗑️</Text>
-                <Text style={[
-                  styles.tactoBtnText,
-                  tactoResultado === 'vacia' && styles.tactoBtnTextVacia,
-                ]}>
-                  Vacía — Descarte
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {tactoResultado === 'vacia' && (
-              <Text style={styles.tactoDescarteNote}>
-                Categoría cambiará a Vaca Descarte
-              </Text>
-            )}
-          </View>
-        )}
-
-        {/* CAMBIO_CATEGORIA */}
-        {selectedAction === 'CAMBIO_CATEGORIA' && (
-          <View style={styles.fieldSection}>
-            <Text style={styles.fieldLabel}>NUEVA CATEGORÍA</Text>
-            <View style={styles.loteGrid}>
-              {(animal?.sexo === 'M' ? CATEGORIAS_MACHO : animal?.sexo === 'H' ? CATEGORIAS_HEMBRA : [...CATEGORIAS_MACHO, ...CATEGORIAS_HEMBRA]).map((cat) => (
+              {lotes.filter(l => l.id !== animal?.loteId).map((lote) => (
                 <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.loteOption,
-                    nuevaCategoria === cat && styles.loteOptionSelected,
-                  ]}
-                  onPress={() => {
-                    triggerSelection();
-                    setNuevaCategoria(cat);
-                  }}
-                  activeOpacity={0.8}
+                  key={lote.id}
+                  style={[styles.loteOption, loteDestinoId === lote.id && styles.loteOptionSelected]}
+                  onPress={() => setLoteDestinoId(lote.id)}
                 >
-                  <Text
-                    style={[
-                      styles.loteOptionText,
-                      nuevaCategoria === cat && styles.loteOptionTextSelected,
-                    ]}
-                  >
-                    {cat}
+                  <Text style={[styles.loteOptionText, loteDestinoId === lote.id && styles.loteOptionTextSelected]}>
+                    {lote.nombre}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -440,23 +217,28 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
           </View>
         )}
 
-        {/* NOTAS — para todos excepto PESAJE */}
-        {selectedAction && selectedAction !== EVENTO_TIPO.PESAJE && selectedAction !== 'CAMBIO_CATEGORIA' && (
+        {selectedAction === EVENTO_TIPO.TACTO && (
           <View style={styles.fieldSection}>
-            <Text style={styles.fieldLabel}>NOTAS (opcional)</Text>
-            <RNTextInput
-              style={[styles.textInput, styles.textInputMultiline]}
-              placeholder="Observaciones..."
-              placeholderTextColor={colors.textDisabled}
-              multiline
-              value={notas}
-              onChangeText={setNotas}
-            />
+            <Text style={styles.fieldLabel}>RESULTADO TACTO</Text>
+            <View style={styles.tactoRow}>
+              <TouchableOpacity
+                style={[styles.tactoBtn, tactoResultado === 'PREÑADA' && styles.tactoBtnPrenada]}
+                onPress={() => setTactoResultado('PREÑADA')}
+              >
+                <Text style={styles.tactoBtnText}>PREÑADA</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tactoBtn, tactoResultado === 'VACIA' && styles.tactoBtnVacia]}
+                onPress={() => setTactoResultado('VACIA')}
+              >
+                <Text style={styles.tactoBtnText}>VACÍA</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
         <Button
-          label="REGISTRAR EVENTO"
+          label="REGISTRAR"
           onPress={handleSave}
           size="lg"
           disabled={!isSaveEnabled}
@@ -471,175 +253,32 @@ export function EventActionSheet({ visible, rfid, onClose }: Props) {
 const styles = StyleSheet.create({
   sheet: { backgroundColor: colors.surfaceElevated },
   indicator: { backgroundColor: colors.border, width: 40 },
-  content: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
-  },
-  rfidText: {
-    color: colors.primary,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-    fontVariant: ['tabular-nums'],
-  },
-  // Carencia banner
-  carenciaBanner: {
-    backgroundColor: colors.errorAlpha,
-    borderWidth: 1,
-    borderColor: colors.error,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: 4,
-  },
-  carenciaBannerTitle: {
-    color: colors.error,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-  },
-  carenciaBannerBody: {
-    color: colors.error,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-  },
-  carenciaBannerSub: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.xs,
-  },
-  // Actions grid
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  actionButton: {
-    width: '30%',
-    flexGrow: 1,
-    minHeight: spacing.touchTargetLg,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-  },
-  actionButtonDisabled: {
-    opacity: 0.35,
-  },
-  actionIcon: { fontSize: 28 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  title: { color: colors.textPrimary, fontSize: typography.sizes.xl, fontWeight: typography.weights.bold },
+  rfidText: { color: colors.primary, fontSize: typography.sizes.md, fontWeight: typography.weights.bold },
+  carenciaBanner: { backgroundColor: colors.errorAlpha, borderWidth: 1, borderColor: colors.error, borderRadius: 12, padding: spacing.md, gap: 4 },
+  carenciaBannerTitle: { color: colors.error, fontSize: typography.sizes.md, fontWeight: typography.weights.bold },
+  carenciaBannerBody: { color: colors.error, fontSize: typography.sizes.sm, fontWeight: typography.weights.semibold },
+  carenciaBannerSub: { color: colors.textSecondary, fontSize: typography.sizes.xs },
+  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  actionButton: { width: '30%', flexGrow: 1, minHeight: 80, borderRadius: 16, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  actionButtonDisabled: { opacity: 0.3 },
+  actionIcon: { fontSize: 24 },
   actionIconDisabled: { opacity: 0.5 },
-  actionLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    textAlign: 'center',
-  },
+  actionLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: 'bold' },
   actionLabelDisabled: { color: colors.textDisabled },
-  actionDisabledTag: {
-    color: colors.error,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.semibold,
-  },
-  // Fields
-  fieldSection: { gap: spacing.sm },
-  fieldLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  textInput: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.textPrimary,
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    paddingHorizontal: spacing.md,
-    height: spacing.touchTarget,
-  },
-  textInputMultiline: {
-    height: 80,
-    paddingTop: spacing.sm,
-    textAlignVertical: 'top',
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.regular,
-  },
-  loteGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  loteOption: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    minHeight: spacing.touchTarget,
-    justifyContent: 'center',
-  },
-  loteOptionSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryAlpha,
-  },
-  loteOptionText: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.medium,
-  },
-  loteOptionTextSelected: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-  },
-  // Tacto
-  tactoRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  tactoBtn: {
-    flex: 1,
-    minHeight: spacing.touchTargetLg,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-  },
-  tactoBtnPrenada: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryAlpha,
-  },
-  tactoBtnVacia: {
-    borderColor: colors.error,
-    backgroundColor: colors.errorAlpha,
-  },
-  tactoBtnIcon: { fontSize: 24 },
-  tactoBtnText: {
-    color: colors.textSecondary,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    textAlign: 'center',
-  },
-  tactoBtnTextPrenada: { color: colors.primary },
-  tactoBtnTextVacia: { color: colors.error },
-  tactoDescarteNote: {
-    color: colors.error,
-    fontSize: typography.sizes.xs,
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  saveButton: { marginTop: spacing.sm },
+  fieldSection: { gap: spacing.sm, marginTop: spacing.md },
+  fieldLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
+  textInput: { backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.textPrimary, fontSize: 18, fontWeight: 'bold', paddingHorizontal: spacing.md, height: 50 },
+  loteGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  loteOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
+  loteOptionSelected: { borderColor: colors.primary, backgroundColor: colors.primaryAlpha },
+  loteOptionText: { color: colors.textSecondary, fontSize: 14 },
+  loteOptionTextSelected: { color: colors.primary, fontWeight: 'bold' },
+  tactoRow: { flexDirection: 'row', gap: spacing.sm },
+  tactoBtn: { flex: 1, height: 50, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  tactoBtnPrenada: { borderColor: colors.primary, backgroundColor: colors.primaryAlpha },
+  tactoBtnVacia: { borderColor: colors.error, backgroundColor: colors.errorAlpha },
+  tactoBtnText: { fontWeight: 'bold' },
+  saveButton: { marginTop: spacing.lg },
 });

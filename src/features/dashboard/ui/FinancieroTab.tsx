@@ -1,10 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  FlatList,
   TouchableOpacity,
   Alert,
 } from 'react-native';
@@ -18,7 +17,9 @@ import { database } from '@data/database/database';
 import { BarChart, type BarChartMonth } from './BarChart';
 import { TransactionListItem } from './TransactionListItem';
 import { AddTransactionModal, type TransactionTipo } from './AddTransactionModal';
+import { FinancialCategoryManagerModal } from './FinancialCategoryManagerModal';
 import type MovimientoFinancieroModel from '@data/models/MovimientoFinancieroModel';
+import type FinancialCategoryModel from '@data/models/FinancialCategoryModel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,9 +29,39 @@ interface FinancieroTabOuterProps {
 
 interface FinancieroTabProps extends FinancieroTabOuterProps {
   transactions: MovimientoFinancieroModel[];
+  financialCategories: FinancialCategoryModel[];
 }
 
 type FiltroTipo = 'TODOS' | 'INGRESO' | 'GASTO';
+
+// ─── Default seed data ────────────────────────────────────────────────────────
+
+const DEFAULT_CATEGORIES = [
+  { name: 'Sanidad',         type: 'EXPENSE', color: '#FF3D71' },
+  { name: 'Nutrición',       type: 'EXPENSE', color: '#FFAA00' },
+  { name: 'Sueldos',         type: 'EXPENSE', color: '#FF6B9D' },
+  { name: 'Combustible',     type: 'EXPENSE', color: '#8F9BB3' },
+  { name: 'Alquiler',        type: 'EXPENSE', color: '#C35BD0' },
+  { name: 'Mantenimiento',   type: 'EXPENSE', color: '#0095FF' },
+  { name: 'Venta Hacienda',  type: 'INCOME',  color: '#00D68F' },
+  { name: 'Venta Fardos',    type: 'INCOME',  color: '#4DFFC0' },
+  { name: 'Subsidio',        type: 'INCOME',  color: '#00B4D8' },
+] as const;
+
+async function seedDefaultCategories(): Promise<void> {
+  const existing = await database.get<FinancialCategoryModel>('financial_categories').query().fetchCount();
+  if (existing > 0) return;
+
+  await database.write(async () => {
+    for (const cat of DEFAULT_CATEGORIES) {
+      await database.get<FinancialCategoryModel>('financial_categories').create((c) => {
+        c.name  = cat.name;
+        c.type  = cat.type as any;
+        c.color = cat.color;
+      });
+    }
+  });
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -82,10 +113,18 @@ function parseFechaText(text: string): number {
 
 // ─── Inner View ───────────────────────────────────────────────────────────────
 
-function FinancieroTabView({ transactions, loteId }: FinancieroTabProps) {
+function FinancieroTabView({ transactions, financialCategories, loteId }: FinancieroTabProps) {
   const [filtro, setFiltro] = useState<FiltroTipo>('TODOS');
   const [modalVisible, setModalVisible] = useState(false);
   const [initialTipo, setInitialTipo] = useState<TransactionTipo>('INGRESO');
+  const [categoriasModalVisible, setCategoriasModalVisible] = useState(false);
+
+  // Seed categorías por defecto una sola vez si la tabla está vacía
+  useEffect(() => {
+    seedDefaultCategories().catch((err) =>
+      console.warn('[FinancieroTab] seed error:', err)
+    );
+  }, []);
 
   // ── Métricas del mes actual ──────────────────────────────────────────────
   const { ingresosDelMes, egresosDelMes, balanceNeto } = useMemo(() => {
@@ -211,30 +250,40 @@ function FinancieroTabView({ transactions, loteId }: FinancieroTabProps) {
           </View>
         </View>
 
-        {/* ── Sección 3: Filtro rápido ── */}
+        {/* ── Sección 3: Filtro rápido + gestionar categorías ── */}
         <View style={styles.section}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipRow}
-          >
-            {(['TODOS', 'INGRESOS', 'EGRESOS'] as const).map((f) => {
-              const active = filtro === (f === 'INGRESOS' ? 'INGRESO' : f === 'EGRESOS' ? 'GASTO' : 'TODOS');
-              return (
-                <TouchableOpacity
-                  key={f}
-                  style={[styles.filterChip, active && styles.filterChipActive]}
-                  onPress={() =>
-                    setFiltro(f === 'INGRESOS' ? 'INGRESO' : f === 'EGRESOS' ? 'GASTO' : 'TODOS')
-                  }
-                >
-                  <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-                    {f}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
+              style={styles.chipScroll}
+            >
+              {(['TODOS', 'INGRESOS', 'EGRESOS'] as const).map((f) => {
+                const active = filtro === (f === 'INGRESOS' ? 'INGRESO' : f === 'EGRESOS' ? 'GASTO' : 'TODOS');
+                return (
+                  <TouchableOpacity
+                    key={f}
+                    style={[styles.filterChip, active && styles.filterChipActive]}
+                    onPress={() =>
+                      setFiltro(f === 'INGRESOS' ? 'INGRESO' : f === 'EGRESOS' ? 'GASTO' : 'TODOS')
+                    }
+                  >
+                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                      {f}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.gearBtn}
+              onPress={() => setCategoriasModalVisible(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ── Sección 4: Historial ── */}
@@ -266,8 +315,15 @@ function FinancieroTabView({ transactions, loteId }: FinancieroTabProps) {
       <AddTransactionModal
         visible={modalVisible}
         initialTipo={initialTipo}
+        categories={financialCategories}
         onClose={() => setModalVisible(false)}
         onSave={handleSave}
+      />
+
+      <FinancialCategoryManagerModal
+        visible={categoriasModalVisible}
+        onClose={() => setCategoriasModalVisible(false)}
+        categories={financialCategories}
       />
     </>
   );
@@ -283,6 +339,10 @@ const FinancieroTabConnected = withObservables(
       transactions: database
         .get<MovimientoFinancieroModel>('movimientos_financieros')
         .query(...loteFilter, Q.sortBy('fecha', Q.desc))
+        .observe(),
+      financialCategories: database
+        .get<FinancialCategoryModel>('financial_categories')
+        .query(Q.sortBy('name', Q.asc))
         .observe(),
     };
   }
@@ -370,8 +430,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  chipScroll: {
+    flex: 1,
+  },
   chipRow: {
     gap: spacing.xs,
+  },
+  gearBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   filterChip: {
     paddingHorizontal: spacing.md,

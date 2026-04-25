@@ -1,19 +1,30 @@
-import { Model, Relation } from '@nozbe/watermelondb';
+import { Model } from '@nozbe/watermelondb';
 import { field, date, readonly, relation } from '@nozbe/watermelondb/decorators';
-import { OperationCatalogModel } from './OperationCatalogModel';
+import type { Relation } from '@nozbe/watermelondb';
+import type AnimalModel from './AnimalModel';
 import type LoteModel from './LoteModel';
+import type OperationCatalogModel from './OperationCatalogModel';
 
-export class ScheduledOperationModel extends Model {
+export default class ScheduledOperationModel extends Model {
   static table = 'scheduled_operations';
+
+  static associations = {
+    operations_catalog: { type: 'belongs_to' as const, key: 'operation_id' },
+    lotes: { type: 'belongs_to' as const, key: 'lote_id' },
+    animals: { type: 'belongs_to' as const, key: 'animal_id' },
+  };
+
+  @field('operation_id') operationId!: string;
+  @field('lote_id') loteId!: string | null;
+  @field('animal_id') animalId!: string | null;
+  @field('iatf_protocol_id') iatfProtocolId!: string | null;
+  @date('fecha_programada') fechaProgramada!: Date;
+  @field('estado') estado!: string; // PENDIENTE | COMPLETADO | CANCELADO
+
+  @readonly @date('created_at') createdAt!: Date;
+  @date('updated_at') updatedAt!: Date;
 
   @relation('operations_catalog', 'operation_id') operation!: Relation<OperationCatalogModel>;
   @relation('lotes', 'lote_id') lote!: Relation<LoteModel>;
-  @field('operation_id') operationId!: string;
-  @field('lote_id') loteId!: string;
-  @date('fecha_programada') fechaProgramada!: number;
-  @field('estado') estado!: string;
-  @readonly @date('created_at') createdAt!: number;
-  @readonly @date('updated_at') updatedAt!: number;
+  @relation('animals', 'animal_id') animal!: Relation<AnimalModel>;
 }
-
-export default ScheduledOperationModel;

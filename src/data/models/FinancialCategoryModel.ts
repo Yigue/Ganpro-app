@@ -3,7 +3,7 @@ import { field, text, date, readonly } from '@nozbe/watermelondb/decorators';
 
 export type FinancialCategoryType = 'INCOME' | 'EXPENSE';
 
-export class FinancialCategoryModel extends Model {
+export default class FinancialCategoryModel extends Model {
   static table = 'financial_categories';
 
   @text('name') name!: string;

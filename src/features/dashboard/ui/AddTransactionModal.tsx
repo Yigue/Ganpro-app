@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -11,8 +11,8 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
 import { colors, spacing, typography } from '@theme/index';
+import type { FinancialCategoryModel } from '@data/models/FinancialCategoryModel';
 
 export type TransactionTipo = 'INGRESO' | 'GASTO';
 
@@ -20,6 +20,7 @@ interface AddTransactionModalProps {
   visible: boolean;
   initialTipo?: TransactionTipo;
   onClose: () => void;
+  categories: FinancialCategoryModel[]; // Categorías reales de la DB
   onSave: (data: {
     tipo: TransactionTipo;
     monto: string;
@@ -28,9 +29,6 @@ interface AddTransactionModalProps {
     fechaText: string;
   }) => void;
 }
-
-const CATEGORIAS_INGRESO = ['Venta Hacienda', 'Venta Fardos', 'Subsidio', 'Otro'];
-const CATEGORIAS_GASTO = ['Sanidad', 'Nutrición', 'Sueldos', 'Combustible', 'Alquiler', 'Otro'];
 
 function todayFormatted(): string {
   const d = new Date();
@@ -43,11 +41,13 @@ function todayFormatted(): string {
 /**
  * AddTransactionModal — modal para registrar un movimiento financiero.
  * Tipo pre-seleccionable (INGRESO | GASTO). Fecha como texto libre.
+ * Usa categorías reales inyectadas desde la DB.
  */
 export function AddTransactionModal({
   visible,
   initialTipo = 'INGRESO',
   onClose,
+  categories,
   onSave,
 }: AddTransactionModalProps) {
   const [tipo, setTipo] = useState<TransactionTipo>(initialTipo);
@@ -67,12 +67,18 @@ export function AddTransactionModal({
     }
   }, [visible, initialTipo]);
 
-  // Reset categoría cuando cambia el tipo
-  useEffect(() => {
-    setCategoria('');
-  }, [tipo]);
+  // Filtrar categorías por tipo (Income/Expense)
+  const filteredCategories = useMemo(() => {
+    const dbType = tipo === 'INGRESO' ? 'INCOME' : 'EXPENSE';
+    return categories.filter(c => c.type === dbType);
+  }, [categories, tipo]);
 
-  const categorias = tipo === 'INGRESO' ? CATEGORIAS_INGRESO : CATEGORIAS_GASTO;
+  // Reset categoría cuando cambia el tipo si la actual no pertenece al nuevo tipo
+  useEffect(() => {
+    if (categoria && !filteredCategories.find(c => c.name === categoria)) {
+      setCategoria('');
+    }
+  }, [tipo, filteredCategories]);
 
   const handleSave = () => {
     if (monto.trim().length === 0 || isNaN(parseFloat(monto))) {
@@ -169,23 +175,27 @@ export function AddTransactionModal({
             {/* Categoría */}
             <Text style={styles.fieldLabel}>Categoría *</Text>
             <View style={styles.chipRow}>
-              {categorias.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.chip,
-                    categoria === cat && { borderColor: tipoColor, backgroundColor: tipoAlpha },
-                  ]}
-                  onPress={() => setCategoria(cat)}
-                >
-                  <Text style={[
-                    styles.chipText,
-                    categoria === cat && { color: tipoColor, fontWeight: typography.weights.bold },
-                  ]}>
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {filteredCategories.length === 0 ? (
+                <Text style={styles.noCatsText}>No hay categorías para este tipo. Agregalas desde el Dashboard.</Text>
+              ) : (
+                filteredCategories.map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.chip,
+                      categoria === cat.name && { borderColor: tipoColor, backgroundColor: tipoAlpha },
+                    ]}
+                    onPress={() => setCategoria(cat.name)}
+                  >
+                    <Text style={[
+                      styles.chipText,
+                      categoria === cat.name && { color: tipoColor, fontWeight: typography.weights.bold },
+                    ]}>
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
             </View>
 
             {/* Fecha */}
@@ -258,6 +268,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: spacing.xs,
     marginTop: spacing.sm,
+  },
+  noCatsText: {
+    color: colors.textDisabled,
+    fontSize: typography.sizes.xs,
+    fontStyle: 'italic',
+    paddingVertical: spacing.sm,
   },
   tipoRow: {
     flexDirection: 'row',
