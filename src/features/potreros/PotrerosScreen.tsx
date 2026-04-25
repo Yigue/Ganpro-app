@@ -156,6 +156,7 @@ const PotreroDetailsModal = withObservables(['potrero'], ({ potrero }: { potrero
 import { RacionMixerModal } from './ui/RacionMixerModal';
 import { PotreroFormModal } from './ui/PotreroFormModal';
 import { SuplementoFormModal } from './ui/SuplementoFormModal';
+import { CCAuditModal } from './ui/CCAuditModal';
 
 // ── Pantalla Principal ───────────────────────────────────────────────────────
 
@@ -165,6 +166,7 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
   const [isMixerVisible, setMixerVisible] = useState(false);
   const [isPotreroFormVisible, setPotreroFormVisible] = useState(false);
   const [isSuplementoFormVisible, setSuplementoFormVisible] = useState(false);
+  const [isCCAuditModalVisible, setCCAuditModalVisible] = useState(false);
   const [selectedPotrero, setSelectedPotrero] = useState<PotreroModel | null>(null);
 
   return (
@@ -222,48 +224,62 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
       )}
 
       {activeTab === 'cc' && (
-        <FlatList
-          data={ccs}
-          keyExtractor={c => c.id}
-          contentContainerStyle={styles.list}
-          ListHeaderComponent={() => (
-            <>
-              <View style={styles.header}>
-                <View><Text style={styles.title}>GanPro Establecimiento</Text><Text style={styles.subtitle}>Gestión de recursos y nutrición</Text></View>
+        <>
+          <FlatList
+            data={ccs}
+            keyExtractor={c => c.id}
+            contentContainerStyle={styles.list}
+            ListHeaderComponent={() => {
+              const recentCcs = ccs.slice(0, 6).reverse();
+              const chartData = recentCcs.length > 0 ? recentCcs.map((c: any) => c.score) : [0];
+              const chartLabels = recentCcs.length > 0 ? recentCcs.map((c: any) => format(new Date(c.fecha), 'dd/MM')) : ['N/A'];
+              return (
+                <>
+                  <View style={styles.header}>
+                    <View><Text style={styles.title}>GanPro Establecimiento</Text><Text style={styles.subtitle}>Gestión de recursos y nutrición</Text></View>
+                  </View>
+                  <SegmentedControl active={activeTab} onChange={setActiveTab} />
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Evolución de Peso y CC</Text>
+                    <View style={styles.chartContainer}>
+                      {recentCcs.length > 0 ? (
+                        <LineChart
+                          data={{
+                            labels: chartLabels,
+                            datasets: [{ data: chartData }]
+                          }}
+                          width={width - 40}
+                          height={180}
+                          chartConfig={{
+                            backgroundColor: colors.surface,
+                            backgroundGradientFrom: colors.surface,
+                            backgroundGradientTo: colors.surface,
+                            color: (opacity = 1) => `rgba(0, 214, 143, ${opacity})`,
+                            labelColor: (opacity = 1) => colors.textSecondary,
+                          }}
+                          bezier
+                          style={{ borderRadius: 16, marginVertical: 10 }}
+                        />
+                      ) : (
+                        <EmptyState icon="analytics-outline" title="Sin auditorías" subtitle="No hay datos de condición corporal" />
+                      )}
+                    </View>
+                  </View>
+                </>
+              );
+            }}
+            renderItem={({ item }: any) => (
+              <View style={styles.card}>
+                <View style={styles.cardIcon}><Text style={{ color: colors.primary, fontWeight: 'bold' }}>{item.score}</Text></View>
+                <View style={{ flex: 1 }}><Text style={styles.cardTitle}>Auditoría CC</Text><Text style={styles.cardSub}>{format(new Date(item.fecha), 'dd MMM')}</Text></View>
+                <Ionicons name="checkmark-done" size={20} color={colors.primary} />
               </View>
-              <SegmentedControl active={activeTab} onChange={setActiveTab} />
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Evolución de Peso y CC</Text>
-                <View style={styles.chartContainer}>
-                  <LineChart
-                    data={{
-                      labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun"],
-                      datasets: [{ data: [320, 335, 345, 360, 355, 380] }]
-                    }}
-                    width={width - 40}
-                    height={180}
-                    chartConfig={{
-                      backgroundColor: colors.surface,
-                      backgroundGradientFrom: colors.surface,
-                      backgroundGradientTo: colors.surface,
-                      color: (opacity = 1) => `rgba(0, 214, 143, ${opacity})`,
-                      labelColor: (opacity = 1) => colors.textSecondary,
-                    }}
-                    bezier
-                    style={{ borderRadius: 16, marginVertical: 10 }}
-                  />
-                </View>
-              </View>
-            </>
-          )}
-          renderItem={({ item }: any) => (
-            <View style={styles.card}>
-              <View style={styles.cardIcon}><Text style={{ color: colors.primary, fontWeight: 'bold' }}>{item.score}</Text></View>
-              <View style={{ flex: 1 }}><Text style={styles.cardTitle}>Auditoría CC</Text><Text style={styles.cardSub}>{format(new Date(item.fecha), 'dd MMM')}</Text></View>
-              <Ionicons name="checkmark-done" size={20} color={colors.primary} />
-            </View>
-          )}
-        />
+            )}
+          />
+          <TouchableOpacity style={styles.fab} onPress={() => setCCAuditModalVisible(true)}>
+            <Ionicons name="add" size={30} color="white" />
+          </TouchableOpacity>
+        </>
       )}
 
       <PotreroDetailsModal 
@@ -286,6 +302,11 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
       <SuplementoFormModal 
         visible={isSuplementoFormVisible} 
         onClose={() => setSuplementoFormVisible(false)} 
+      />
+      <CCAuditModal
+        visible={isCCAuditModalVisible}
+        onClose={() => setCCAuditModalVisible(false)}
+        potreros={potreros}
       />
     </SafeAreaView>
   );

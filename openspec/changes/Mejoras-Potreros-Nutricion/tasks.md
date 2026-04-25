@@ -15,10 +15,10 @@
 
 ## Phase 3: Condicion Corporal (CC) & Integration
 
-- [ ] 3.1 Create `src/features/potreros/ui/CCAuditModal.tsx` with date selector, 1-5 scale slider, and WatermelonDB save logic.
-- [ ] 3.2 In `src/features/potreros/PotrerosScreen.tsx`, integrate `CCAuditModal` triggered by a new FAB (+) in the C.C. tab.
-- [ ] 3.3 In `src/features/potreros/PotrerosScreen.tsx`, update CC LineChart to use `ccs.map(c => c.score)` injected via `withObservables` instead of hardcoded data.
-- [ ] 3.4 In `src/features/potreros/PotrerosScreen.tsx`, integrate `PotreroFormModal` (triggered by FAB) and `SuplementoFormModal` in their respective tabs.
+- [x] 3.1 Create `src/features/potreros/ui/CCAuditModal.tsx` with date selector, 1-5 scale slider, and WatermelonDB save logic.
+- [x] 3.2 In `src/features/potreros/PotrerosScreen.tsx`, integrate `CCAuditModal` triggered by a new FAB (+) in the C.C. tab.
+- [x] 3.3 In `src/features/potreros/PotrerosScreen.tsx`, update CC LineChart to use `ccs.map(c => c.score)` injected via `withObservables` instead of hardcoded data.
+- [x] 3.4 In `src/features/potreros/PotrerosScreen.tsx`, integrate `PotreroFormModal` (triggered by FAB) and `SuplementoFormModal` in their respective tabs.
 
 ## Phase 4: Testing & Verification
 
