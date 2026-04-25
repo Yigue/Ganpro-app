@@ -62,6 +62,7 @@ const KPIWidget = ({ title, value, sub, icon, color, trend }: any) => (
 
 interface DashboardProps {
   stockTotal: number;
+  muertosTotal: number;
   hembrasActivas: number;
   transactions: MovimientoFinancieroModel[];
   tasks: TaskModel[];
@@ -76,6 +77,7 @@ interface DashboardProps {
 
 function DashboardInner({
   stockTotal,
+  muertosTotal,
   hembrasActivas,
   transactions,
   tasks,
@@ -184,7 +186,12 @@ function DashboardInner({
 
             <View style={styles.kpiGrid}>
               <KPIWidget title="Stock Total" value={stockTotal} sub="Cabezas activas" icon="paw" color={colors.info} />
+              <KPIWidget title="Tasa Mermas" value={`${((muertosTotal / (stockTotal + muertosTotal || 1)) * 100).toFixed(1)}%`} sub={`${muertosTotal} bajas totales`} icon="warning" color={colors.error} />
+            </View>
+            
+            <View style={styles.kpiGrid}>
               <KPIWidget title="Ganancia GDP" value="0.75kg" sub="Agregado mensual" icon="trending-up" color={colors.warning} />
+              <View style={{ flex: 1 }} />
             </View>
 
             <View style={styles.section}>
@@ -219,6 +226,17 @@ function DashboardInner({
             <View style={styles.kpiGrid}>
               <KPIWidget title="Ingresos" value={`${selectedMoneda === 'USD' ? 'U$S' : '$'} ${totalIngresos.toLocaleString()}`} sub="Mes actual" icon="trending-up" color={colors.primary} />
               <KPIWidget title="Gastos" value={`${selectedMoneda === 'USD' ? 'U$S' : '$'} ${totalGastos.toLocaleString()}`} sub="Mes actual" icon="trending-down" color={colors.error} />
+            </View>
+
+            <View style={styles.kpiGrid}>
+              <KPIWidget 
+                title="Capital en Pie" 
+                value={`${selectedMoneda === 'USD' ? 'U$S' : '$'} ${(stockTotal * 350 * (selectedMoneda === 'USD' ? 1.5 : 1500)).toLocaleString()}`} 
+                sub="Proyección estimada" 
+                icon="cash" 
+                color={colors.info} 
+              />
+              <View style={{ flex: 1 }} />
             </View>
 
             <View style={styles.section}>
@@ -317,6 +335,7 @@ const DashboardWithData = withObservables(['selectedLoteId', 'selectedMoneda'], 
 
   return {
     stockTotal: database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO'), ...loteFilter).observeCount(),
+    muertosTotal: database.get<AnimalModel>('animals').query(Q.where('estado', 'MUERTO'), ...loteFilter).observeCount(),
     hembrasActivas: database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO'), Q.where('sexo', 'H'), ...loteFilter).observeCount(),
     transactions: database.get<MovimientoFinancieroModel>('movimientos_financieros').query(
       ...loteFilter,
