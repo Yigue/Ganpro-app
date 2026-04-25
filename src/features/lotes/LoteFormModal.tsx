@@ -63,6 +63,7 @@ export function LoteFormModal({ visible, lote, onClose }: Props) {
             l.nombre = nombre.trim();
             l.ubicacion = ubicacion.trim();
             l.descripcion = descripcion.trim();
+            l.establecimientoId = 'default_est';
           });
         }
       });
