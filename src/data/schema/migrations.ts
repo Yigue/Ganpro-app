@@ -7,6 +7,17 @@ import { schemaMigrations, addColumns, createTable } from '@nozbe/watermelondb/S
 export const migrations = schemaMigrations({
   migrations: [
     {
+      toVersion: 10,
+      steps: [
+        addColumns({
+          table: 'raciones',
+          columns: [
+            { name: 'descripcion', type: 'string', isOptional: true },
+          ],
+        }),
+      ],
+    },
+    {
       toVersion: 9,
       steps: [
         createTable({
