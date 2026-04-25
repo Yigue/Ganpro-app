@@ -189,7 +189,7 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
             )}
             renderItem={({ item }) => <PotreroCard potrero={item} onPress={(p: any) => { setSelectedPotrero(p); setDetailsVisible(true); }} />}
           />
-          <View style={[styles.fabContainer, { bottom: 24 }]}>
+          <View style={styles.fabContainer}>
             <TouchableOpacity style={styles.fab} onPress={() => { setSelectedPotrero(null); setPotreroFormVisible(true); }}>
               <Ionicons name="add" size={30} color="white" />
             </TouchableOpacity>
@@ -281,7 +281,7 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
               </View>
             )}
           />
-          <View style={[styles.fabContainer, { bottom: 24 }]}>
+          <View style={styles.fabContainer}>
             <TouchableOpacity style={styles.fab} onPress={() => setCCAuditModalVisible(true)}>
               <Ionicons name="add" size={30} color="white" />
             </TouchableOpacity>
