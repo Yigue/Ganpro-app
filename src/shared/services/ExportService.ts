@@ -74,7 +74,7 @@ export class ExportService {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const tempPath = `${FileSystem.cacheDirectory}Inventario_GanPro_${timestamp}.csv`;
 
-    await FileSystem.writeAsStringAsync(tempPath, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+    await FileSystem.writeAsStringAsync(tempPath, csvContent, { encoding: 'utf8' });
 
     await Sharing.shareAsync(tempPath, {
       mimeType: 'text/csv',
