@@ -426,5 +426,5 @@ const styles = StyleSheet.create({
   calcValue: { color: colors.textPrimary, fontWeight: 'bold' },
   emptyTextSmall: { color: colors.textSecondary, fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginVertical: 10 },
   modalTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
-  fab: { position: 'absolute', bottom: 30, right: 30, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
+  fab: { position: 'absolute', bottom: 110, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
 });
