@@ -51,6 +51,7 @@ export function RacionMixerModal({ visible, onClose, suplementos }: Props) {
       await nutRepo.createRacionConIngredientes({
         nombre,
         descripcion: `Costo: $${costoFinal.toFixed(2)}/kg`,
+        costoEstimadoKg: costoFinal,
         ingredientes: Object.entries(mix).map(([id, pct]) => ({
           suplementoId: id,
           porcentaje: pct,
@@ -59,8 +60,9 @@ export function RacionMixerModal({ visible, onClose, suplementos }: Props) {
       });
       Alert.alert('Éxito', 'Ración formulada correctamente');
       onClose();
-    } catch(e) { 
-      Alert.alert('Error', 'No se pudo guardar'); 
+    } catch(e: any) { 
+      console.error('[RacionMixer] Error saving:', e);
+      Alert.alert('Error', `No se pudo guardar: ${e.message || 'Error desconocido'}`); 
     }
   };
 

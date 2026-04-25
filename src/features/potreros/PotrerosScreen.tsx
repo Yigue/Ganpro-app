@@ -157,6 +157,7 @@ import { RacionMixerModal } from './ui/RacionMixerModal';
 import { PotreroFormModal } from './ui/PotreroFormModal';
 import { SuplementoFormModal } from './ui/SuplementoFormModal';
 import { CCAuditModal } from './ui/CCAuditModal';
+import { AplicarRacionModal } from './ui/AplicarRacionModal';
 
 // ── Pantalla Principal ───────────────────────────────────────────────────────
 
@@ -167,6 +168,7 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
   const [isPotreroFormVisible, setPotreroFormVisible] = useState(false);
   const [isSuplementoFormVisible, setSuplementoFormVisible] = useState(false);
   const [isCCAuditModalVisible, setCCAuditModalVisible] = useState(false);
+  const [isFeedingModalVisible, setFeedingModalVisible] = useState(false);
   const [selectedPotrero, setSelectedPotrero] = useState<PotreroModel | null>(null);
 
   return (
@@ -194,33 +196,34 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
       )}
 
       {activeTab === 'nutricion' && (
-        <FlatList
-          data={raciones}
-          keyExtractor={r => r.id}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => <RacionCardInner racion={item} />}
-          ListHeaderComponent={() => (
-            <>
-              <View style={styles.header}>
-                <View><Text style={styles.title}>GanPro Establecimiento</Text><Text style={styles.subtitle}>Gestión de recursos y nutrición</Text></View>
-              </View>
-              <SegmentedControl active={activeTab} onChange={setActiveTab} />
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Componentes / Suplementos</Text>
-                <TouchableOpacity style={[styles.mixerBtn, { backgroundColor: colors.info, marginBottom: 15 }]} onPress={() => setSuplementoFormVisible(true)}>
-                  <Ionicons name="add-circle" size={24} color="white" />
-                  <Text style={styles.mixerBtnText}>NUEVO COMPONENTE</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.sectionTitle}>Mi Vademécum Nutricional</Text>
-                <TouchableOpacity style={styles.mixerBtn} onPress={() => setMixerVisible(true)}>
-                  <Ionicons name="flask" size={24} color="white" />
-                  <Text style={styles.mixerBtnText}>NUEVA MEZCLA (FORMULADOR)</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        />
+        <>
+          <FlatList
+            data={raciones}
+            keyExtractor={r => r.id}
+            contentContainerStyle={styles.list}
+            renderItem={({ item }) => <RacionCardInner racion={item} />}
+            ListHeaderComponent={() => (
+              <>
+                <View style={styles.header}>
+                  <View><Text style={styles.title}>GanPro Establecimiento</Text><Text style={styles.subtitle}>Gestión de recursos y nutrición</Text></View>
+                </View>
+                <SegmentedControl active={activeTab} onChange={setActiveTab} />
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Mi Vademécum Nutricional</Text>
+                  {raciones.length === 0 && <EmptyState icon="nutrition-outline" title="Sin raciones" subtitle="Formulá tu primera mezcla" />}
+                </View>
+              </>
+            )}
+          />
+          <View style={styles.fabContainer}>
+            <TouchableOpacity style={[styles.fabSmall, { backgroundColor: colors.info }]} onPress={() => setSuplementoFormVisible(true)}>
+              <Ionicons name="leaf" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.fab} onPress={() => setMixerVisible(true)}>
+              <Ionicons name="flask" size={30} color="white" />
+            </TouchableOpacity>
+          </View>
+        </>
       )}
 
       {activeTab === 'cc' && (
@@ -287,7 +290,7 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
         onClose={() => setDetailsVisible(false)} 
         potrero={selectedPotrero} 
         onEdit={() => { setDetailsVisible(false); setPotreroFormVisible(true); }} 
-        onFeeding={() => Alert.alert('Alimentar', 'Abre Selector de Ración rápido')} 
+        onFeeding={(p: any) => { setDetailsVisible(false); setSelectedPotrero(p); setFeedingModalVisible(true); }} 
       />
       <RacionMixerModal 
         visible={isMixerVisible} 
@@ -307,6 +310,12 @@ function PotrerosInner({ potreros, raciones, ccs, suplementos }: any) {
         visible={isCCAuditModalVisible}
         onClose={() => setCCAuditModalVisible(false)}
         potreros={potreros}
+      />
+      <AplicarRacionModal
+        visible={isFeedingModalVisible}
+        onClose={() => setFeedingModalVisible(false)}
+        potreroId={selectedPotrero?.id || ''}
+        raciones={raciones}
       />
     </SafeAreaView>
   );
@@ -426,5 +435,7 @@ const styles = StyleSheet.create({
   calcValue: { color: colors.textPrimary, fontWeight: 'bold' },
   emptyTextSmall: { color: colors.textSecondary, fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginVertical: 10 },
   modalTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
-  fab: { position: 'absolute', bottom: 110, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
+  fabContainer: { position: 'absolute', bottom: 110, right: 24, gap: 15, alignItems: 'center' },
+  fabSmall: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.info, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 5 },
+  fab: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
 });

@@ -45,6 +45,7 @@ export class NutricionRepository {
   async createRacionConIngredientes(params: {
     nombre: string;
     descripcion?: string;
+    costoEstimadoKg: number;
     ingredientes: { suplementoId: string; porcentaje: number; kgPorTonelada: number }[];
   }): Promise<RacionModel> {
     return this.database.write(async () => {
@@ -52,6 +53,11 @@ export class NutricionRepository {
         r.nombre = params.nombre;
         r.descripcion = params.descripcion ?? '';
         r.activa = true;
+        r.costoEstimadoKg = params.costoEstimadoKg;
+        r.moneda = 'USD'; // Default for calculations
+        r.kgDiaAnimal = 0;
+        r.loteId = '';
+        r.notas = '';
       });
 
       await Promise.all(
