@@ -37,15 +37,15 @@ type FiltroTipo = 'TODOS' | 'INGRESO' | 'GASTO';
 // ─── Default seed data ────────────────────────────────────────────────────────
 
 const DEFAULT_CATEGORIES = [
-  { name: 'Sanidad',         type: 'EXPENSE', color: '#FF3D71' },
-  { name: 'Nutrición',       type: 'EXPENSE', color: '#FFAA00' },
-  { name: 'Sueldos',         type: 'EXPENSE', color: '#FF6B9D' },
-  { name: 'Combustible',     type: 'EXPENSE', color: '#8F9BB3' },
-  { name: 'Alquiler',        type: 'EXPENSE', color: '#C35BD0' },
-  { name: 'Mantenimiento',   type: 'EXPENSE', color: '#0095FF' },
-  { name: 'Venta Hacienda',  type: 'INCOME',  color: '#00D68F' },
-  { name: 'Venta Fardos',    type: 'INCOME',  color: '#4DFFC0' },
-  { name: 'Subsidio',        type: 'INCOME',  color: '#00B4D8' },
+  { name: 'Sanidad', type: 'EXPENSE', color: '#FF3D71' },
+  { name: 'Nutrición', type: 'EXPENSE', color: '#FFAA00' },
+  { name: 'Sueldos', type: 'EXPENSE', color: '#FF6B9D' },
+  { name: 'Combustible', type: 'EXPENSE', color: '#8F9BB3' },
+  { name: 'Alquiler', type: 'EXPENSE', color: '#C35BD0' },
+  { name: 'Mantenimiento', type: 'EXPENSE', color: '#0095FF' },
+  { name: 'Venta Hacienda', type: 'INCOME', color: '#00D68F' },
+  { name: 'Venta Fardos', type: 'INCOME', color: '#4DFFC0' },
+  { name: 'Subsidio', type: 'INCOME', color: '#00B4D8' },
 ] as const;
 
 async function seedDefaultCategories(): Promise<void> {
@@ -55,8 +55,8 @@ async function seedDefaultCategories(): Promise<void> {
   await database.write(async () => {
     for (const cat of DEFAULT_CATEGORIES) {
       await database.get<FinancialCategoryModel>('financial_categories').create((c) => {
-        c.name  = cat.name;
-        c.type  = cat.type as any;
+        c.name = cat.name;
+        c.type = cat.type as 'INCOME' | 'EXPENSE';
         c.color = cat.color;
       });
     }

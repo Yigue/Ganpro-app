@@ -1,0 +1,80 @@
+src/features/inventory/InventoryScreen.tsx(651,8): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(651,9): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(652,51): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(652,67): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(652,77): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(653,58): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(653,73): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(653,78): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(656,17): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(657,12): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(658,17): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(659,8): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(660,16): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(661,16): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(662,3): error TS1109: Expression expected.
+src/features/inventory/InventoryScreen.tsx(662,4): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(663,52): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(663,81): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(663,93): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(664,59): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(664,74): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(664,88): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(665,55): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(665,61): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(666,53): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(666,69): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(666,79): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(667,47): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(667,60): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(667,88): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(667,107): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(670,11): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(671,20): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(672,17): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(673,15): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(674,19): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(675,8): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(676,16): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(677,16): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(678,3): error TS1109: Expression expected.
+src/features/inventory/InventoryScreen.tsx(678,4): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(679,53): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(679,69): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(679,79): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(683,11): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(684,9): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(685,10): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(686,20): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(687,17): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(688,12): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(689,18): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(690,15): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(691,19): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(692,16): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(693,17): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(693,37): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(693,42): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(695,17): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(696,14): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(697,16): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(698,16): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(699,3): error TS1109: Expression expected.
+src/features/inventory/InventoryScreen.tsx(699,4): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(702,13): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(703,15): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(704,3): error TS1109: Expression expected.
+src/features/inventory/InventoryScreen.tsx(704,4): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(707,15): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(708,8): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(709,22): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(710,20): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(711,17): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(712,3): error TS1109: Expression expected.
+src/features/inventory/InventoryScreen.tsx(712,4): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(715,13): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(716,15): error TS1005: ';' expected.
+src/features/inventory/InventoryScreen.tsx(717,3): error TS1109: Expression expected.
+src/features/inventory/InventoryScreen.tsx(717,4): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(718,1): error TS1128: Declaration or statement expected.
+src/features/inventory/InventoryScreen.tsx(718,2): error TS1128: Declaration or statement expected.

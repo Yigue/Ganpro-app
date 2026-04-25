@@ -89,21 +89,21 @@ function DashboardInner({
   const [isCatModalVisible, setIsCatModalVisible] = useState(false);
 
   // Agregación de transacciones (ya filtradas por DB)
-  const totalIngresos = useMemo(() => 
+  const totalIngresos = useMemo(() =>
     transactions.filter((t: any) => t.tipo === 'INGRESO').reduce((acc: number, t: any) => acc + t.monto, 0)
-  , [transactions]);
-  
-  const totalGastos = useMemo(() => 
+    , [transactions]);
+
+  const totalGastos = useMemo(() =>
     transactions.filter((t: any) => t.tipo === 'GASTO').reduce((acc: number, t: any) => acc + t.monto, 0)
-  , [transactions]);
+    , [transactions]);
 
   // Datos del gráfico financiero desde el Read Model
   const chartData = useMemo(() => {
     if (agregados.length === 0) return null;
-    const labels = agregados.map((a: any) => a.periodoMes.slice(4)); 
-    const ingresos = agregados.map((a: any) => (a.margenBruto || 0) + (a.costoNutricion || 0)); 
+    const labels = agregados.map((a: any) => a.periodoMes.slice(4));
+    const ingresos = agregados.map((a: any) => (a.margenBruto || 0) + (a.costoNutricion || 0));
     const gastos = agregados.map((a: any) => (a.costoSanidad || 0) + (a.costoNutricion || 0));
-    
+
     return {
       labels,
       datasets: [
@@ -119,16 +119,16 @@ function DashboardInner({
       {/* Filtros */}
       <View style={styles.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
-          <TouchableOpacity 
-            style={[styles.filterBtn, !selectedLoteId && styles.filterBtnActive]} 
+          <TouchableOpacity
+            style={[styles.filterBtn, !selectedLoteId && styles.filterBtnActive]}
             onPress={() => setSelectedLoteId(null)}
           >
             <Text style={[styles.filterBtnText, !selectedLoteId && styles.filterBtnTextActive]}>Todos</Text>
           </TouchableOpacity>
           {lotes.map((l: any) => (
-            <TouchableOpacity 
-              key={l.id} 
-              style={[styles.filterBtn, selectedLoteId === l.id && styles.filterBtnActive]} 
+            <TouchableOpacity
+              key={l.id}
+              style={[styles.filterBtn, selectedLoteId === l.id && styles.filterBtnActive]}
               onPress={() => setSelectedLoteId(l.id)}
             >
               <Text style={[styles.filterBtnText, selectedLoteId === l.id && styles.filterBtnTextActive]}>{l.nombre}</Text>
@@ -247,22 +247,22 @@ function DashboardInner({
       </ScrollView>
 
       {/* Modals */}
-      <AddTransactionModal 
-        visible={isTxModalVisible} 
-        onClose={() => setIsTxModalVisible(false)} 
+      <AddTransactionModal
+        visible={isTxModalVisible}
+        onClose={() => setIsTxModalVisible(false)}
         onSave={async (data: any) => {
           await database.write(async () => {
             await database.get('movimientos_financieros').create((m: any) => {
-              m.tipo = data.tipo; 
-              m.categoryId = data.categoria; 
-              m.monto = parseFloat(data.monto); 
+              m.tipo = data.tipo;
+              m.categoryId = data.categoria;
+              m.monto = parseFloat(data.monto);
               m.moneda = selectedMoneda;
-              m.fecha = Date.now(); 
+              m.fecha = Date.now();
               m.descripcion = data.concepto;
             });
           });
           setIsTxModalVisible(false);
-        }} 
+        }}
       />
       <FinancialCategoryManagerModal visible={isCatModalVisible} onClose={() => setIsCatModalVisible(false)} />
       <AddTaskModal visible={isTaskModalVisible} onClose={() => setIsTaskModalVisible(false)} onSave={async (data: any) => {
@@ -279,14 +279,14 @@ function DashboardInner({
 
 const DashboardWithData = withObservables(['selectedLoteId', 'selectedMoneda'], ({ selectedLoteId, selectedMoneda }) => {
   const loteFilter = selectedLoteId ? [Q.where('lote_id', selectedLoteId)] : [];
-  
+
   return {
     stockTotal: database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO'), ...loteFilter).observeCount(),
     hembrasActivas: database.get<AnimalModel>('animals').query(Q.where('estado', 'ACTIVO'), Q.where('sexo', 'H'), ...loteFilter).observeCount(),
     transactions: database.get<MovimientoFinancieroModel>('movimientos_financieros').query(
-      ...loteFilter, 
+      ...loteFilter,
       Q.where('moneda', selectedMoneda),
-      Q.sortBy('fecha', Q.desc), 
+      Q.sortBy('fecha', Q.desc),
       Q.take(15)
     ).observe(),
     tasks: database.get<TaskModel>('tasks').query(Q.sortBy('created_at', Q.desc), Q.take(5)).observe(),
@@ -312,8 +312,8 @@ export function DashboardScreen() {
         <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
       </View>
       <ObservableErrorBoundary fallbackTitle="Error en Dashboard">
-        <DashboardWithData 
-          selectedLoteId={selectedLoteId} 
+        <DashboardWithData
+          selectedLoteId={selectedLoteId}
           setSelectedLoteId={setSelectedLoteId}
           selectedMoneda={selectedMoneda}
           setSelectedMoneda={setSelectedMoneda}
