@@ -21,6 +21,7 @@ App GanPro (WatermelonDB, offline)  ──sync──►  Dashboard Next.js (Verc
 | `/costos` | Directos y estructura, costo por lote, por kg y por ternero, simulador de cría |
 | `/finanzas` | Ingresos y gastos en ARS/USD, margen bruto julio-junio, flujo proyectado, cobros, valuación |
 | `/config` | Establecimiento, potreros, lotes, usuarios y roles, coeficientes EV, precios, estado del sync |
+| `/proyeccion` | Escenarios: negocio de invernada/recría, precios históricos, ganancia de peso, plan de compras y ventas, crecimiento del rodeo de cría |
 
 ## Estructura
 
@@ -56,6 +57,18 @@ En local: `cp .env.example .env.local`, completá los valores y `npm install && 
 - El push se rechaza con 409 si un registro cambió en el servidor después del último pull; WatermelonDB hace pull y reintenta.
 - Las columnas nuevas del dashboard (por ejemplo `acta_numero` o `dolar_oficial`) son opcionales: la app v3 las ignora y el push solo actualiza las columnas que manda.
 - Las tablas propias del dashboard (`servicios`, `racion_ingredientes`, `sigsa_stock`, `revisacion_toros`) todavía no se envían al celular; quedan listas para el esquema v4 de la app.
+
+## Proyección
+
+Cinco herramientas en `/proyeccion`, cada una guarda escenarios en `escenarios` (supuestos y resultado en JSON) y, el plan, sus líneas en `escenario_lineas`:
+
+- **Negocio** (`/negocio`): hasta 4 modelos lado a lado con gastos comerciales, desbaste y mortandad; margen bruto y neto, renta del ciclo y anualizada, costo por kg y **precio de venta de equilibrio**; tabla de sensibilidad precio × ganancia diaria. Un escenario guardado se puede cerrar contra los movimientos reales del lote.
+- **Precios** (`/precios`): series en pesos y dólares, relación ternero/novillo, insumo-producto con el maíz de Nutrición, estacionalidad de 5 años y carga histórica por CSV.
+- **Peso** (`/peso`): proyección desde la última pesada con la ganancia histórica (o elegida) y curva estacional opcional; fecha a la que llega cada animal al objetivo.
+- **Compras y ventas** (`/plan`): 12 a 24 meses con flujo de caja, stock por categoría y alerta de carga; cada línea guardada se registra como real en Finanzas con su DTE.
+- **Rodeo de cría** (`/cria`): modelo año por año con retención, refugo, demora de entore y tope de hectáreas; comparación entre escenarios guardados.
+
+Las fórmulas están en `lib/calc/proyeccion.ts` y sus tests verifican las reglas del análisis de RTC (margen neto = margen bruto − costo de la tierra; renta anualizada = renta × 365 / días). Los cuatro modelos de partida son de ejemplo: para que reproduzcan exactamente las columnas de RTC hay que cargar sus números.
 
 ## Roles
 

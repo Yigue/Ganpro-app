@@ -4,6 +4,7 @@ import {
   Calculator,
   HeartHandshake,
   LayoutDashboard,
+  LineChart,
   Settings,
   Syringe,
   Wallet,
@@ -26,5 +27,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/nutricion', label: 'Nutrición y forraje', icon: Wheat },
   { href: '/costos', label: 'Costos', icon: Calculator },
   { href: '/finanzas', label: 'Finanzas', icon: Wallet },
+  { href: '/proyeccion', label: 'Proyección', icon: LineChart },
   { href: '/config', label: 'Configuración', icon: Settings },
 ];

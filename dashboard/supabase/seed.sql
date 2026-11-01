@@ -136,10 +136,17 @@ begin
   insert into public.potrero_feeding_logs (potrero_id, racion_id, cantidad_kg, fecha)
     select (array['pot-1', 'pot-2'])[1 + k % 2], 'rac-sal', 25, hoy - k * 7 * d from generate_series(1, 8) k;
 
-  -- Precios de referencia (ARS/kg vivo) y dólar
+  -- Precios de referencia (ARS/kg vivo) y dólar: 5 años mensuales con inflación y
+  -- estacionalidad (el ternero sube en otoño, cuando hay menos oferta).
   insert into public.precios_mercado (fecha, novillo_kg, ternero_kg, vaca_kg, vaca_descarte_kg, ternera_kg, vaquillona_kg, toro_kg, dolar_oficial, dolar_mep, fuente)
-    select hoy - k * 30 * d, 2900 - k * 60, 3600 - k * 70, 2100 - k * 40, 1800 - k * 35, 3400 - k * 70, 3000 - k * 60, 1900 - k * 40, 1450 - k * 25, 1500 - k * 25, 'MANUAL'
-      from generate_series(0, 11) k;
+    select f, n, t, n * 0.72, n * 0.62, t * 0.94, n * 1.03, n * 0.66, dol, dol * 1.04, 'MANUAL'
+      from (
+        select hoy - k * 30 * d as f,
+               2900 * power(0.975, k) as n,
+               2900 * power(0.975, k) * (1.22 + 0.06 * sin(2 * pi() * (extract(month from to_timestamp((hoy - k * 30 * d) / 1000)) - 2) / 12)) as t,
+               1450 * power(0.977, k) as dol
+          from generate_series(0, 59) k
+      ) x;
 
   -- Movimientos financieros de 12 meses
   insert into public.movimientos_financieros (tipo, categoria, lote_id, monto, fecha, descripcion)

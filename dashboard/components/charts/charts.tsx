@@ -70,6 +70,7 @@ export function BarChartView({
             fill={CHART_COLORS[i % CHART_COLORS.length]}
             radius={stacked ? 0 : [4, 4, 0, 0]}
             maxBarSize={48}
+            isAnimationActive={false}
           />
         ))}
       </BarChart>
@@ -108,6 +109,7 @@ export function LineChartView({
             strokeWidth={2}
             dot={{ r: 3 }}
             connectNulls
+            isAnimationActive={false}
           />
         ))}
       </LineChart>
@@ -119,7 +121,7 @@ export function DonutChartView({ data, height = 220 }: { data: { name: string; v
   return (
     <ResponsiveContainer width="100%" height={height}>
       <PieChart>
-        <Pie data={data} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={2}>
+        <Pie data={data} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={2} isAnimationActive={false}>
           {data.map((_, i) => (
             <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} stroke="hsl(var(--card))" />
           ))}
