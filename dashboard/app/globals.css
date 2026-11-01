@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 97%;
+    --foreground: 150 15% 12%;
+    --card: 0 0% 100%;
+    --muted: 40 15% 93%;
+    --muted-foreground: 150 6% 40%;
+    --border: 40 12% 86%;
+    --primary: 145 40% 28%;
+    --primary-foreground: 40 30% 98%;
+    --accent: 38 85% 52%;
+    --accent-foreground: 30 40% 12%;
+    --success: 145 50% 36%;
+    --warning: 36 90% 48%;
+    --danger: 4 70% 50%;
+    --info: 205 60% 45%;
+    --chart-1: 145 40% 32%;
+    --chart-2: 38 80% 50%;
+    --chart-3: 205 55% 45%;
+    --chart-4: 20 55% 45%;
+    --chart-5: 280 30% 50%;
+    --chart-6: 90 35% 45%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 150 12% 8%;
+      --foreground: 40 20% 94%;
+      --card: 150 10% 11%;
+      --muted: 150 8% 16%;
+      --muted-foreground: 40 8% 65%;
+      --border: 150 8% 20%;
+      --primary: 145 40% 45%;
+      --primary-foreground: 150 20% 8%;
+      --accent: 38 85% 55%;
+      --accent-foreground: 30 40% 10%;
+      --success: 145 45% 48%;
+      --warning: 38 90% 55%;
+      --danger: 4 70% 60%;
+      --info: 205 60% 60%;
+      --chart-1: 145 40% 50%;
+      --chart-2: 38 80% 58%;
+      --chart-3: 205 55% 60%;
+      --chart-4: 20 55% 58%;
+      --chart-5: 280 30% 65%;
+      --chart-6: 90 35% 55%;
+    }
+  }
+
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground antialiased; }
+}
