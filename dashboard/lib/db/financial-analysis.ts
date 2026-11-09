@@ -1,11 +1,13 @@
 import 'server-only';
+import {getLedger} from '@/lib/db/ledger';
+import {businessToday} from '@/lib/calc/business-date';
 import { ejercicioAnterior, ejercicioDe, mesKey, mesLabel, ultimosMeses } from '@/lib/calc/fechas';
-import { cuentasPorCobrar, dolarEn, enRango, flujoProyectado, margenBruto, porMes, precioVigente, valuacionRodeo } from '@/lib/calc/finanzas';
+import { dolarEn, enRango, flujoProyectado, margenBruto, porMes, precioVigente, valuacionRodeo } from '@/lib/calc/finanzas';
 import { fmtARS, fmtUSD } from '@/lib/calc/format';
 import { canEdit, getSessionPerfil } from '@/lib/db/auth';
 import { getAnimals, getCategoriasConfig, getEstablecimiento, getLotes, getMovimientosFinancieros, getPrecios } from '@/lib/db/client';
 export async function financialAnalysis(searchParams:Promise<{moneda?:string}>){
-  const [{ moneda }, movs, precios, animals, config, lotes, est, perfil] = await Promise.all([
+  const [{ moneda }, movs, precios, animals, config, lotes, est, perfil, ledger] = await Promise.all([
     searchParams,
     getMovimientosFinancieros(),
     getPrecios(),
@@ -14,6 +16,7 @@ export async function financialAnalysis(searchParams:Promise<{moneda?:string}>){
     getLotes(),
     getEstablecimiento(),
     getSessionPerfil(),
+    getLedger(businessToday().slice(0,7)),
   ]);
 
   const usd = moneda === 'usd';
@@ -35,7 +38,8 @@ export async function financialAnalysis(searchParams:Promise<{moneda?:string}>){
     Gastos: usd ? m.gastosUSD : m.gastos,
   }));
 
-  const pendientes = cuentasPorCobrar(movs);
+  const balances=new Map(ledger.documentos.map(d=>[d.id,d]));
+  const pendientes=movs.filter(m=>m.tipo==='INGRESO'&&Number(balances.get(m.id)?.pendiente??0)>0).map(m=>({...m,monto:Number(balances.get(m.id)!.pendiente),fecha_cobro:balances.get(m.id)!.vencimiento}));
   const futuros = Array.from({ length: 6 }, (_, i) => mesKey(new Date(new Date(ahora).getFullYear(), new Date(ahora).getMonth() + i + 1, 1).getTime()));
   const flujo = flujoProyectado(mensual, pendientes, futuros);
 
@@ -48,9 +52,9 @@ export async function financialAnalysis(searchParams:Promise<{moneda?:string}>){
     { label: 'Ingresos por ventas', a: mbActual.ingresos, b: mbAnterior.ingresos },
     { label: 'Diferencia de inventario', a: mbActual.difInventario, b: mbAnterior.difInventario },
     { label: 'Costos directos', a: -mbActual.costosDirectos, b: -mbAnterior.costosDirectos },
-    { label: 'Margen bruto', a: mbActual.margenBruto, b: mbAnterior.margenBruto, bold: true },
+    { label: 'Margen parcial sin ajuste de inventario', a: mbActual.margenBruto, b: mbAnterior.margenBruto, bold: true },
     { label: 'Estructura', a: -mbActual.estructura, b: -mbAnterior.estructura },
-    { label: 'Resultado', a: mbActual.resultado, b: mbAnterior.resultado, bold: true },
+    { label: 'Resultado parcial', a: mbActual.resultado, b: mbAnterior.resultado, bold: true },
   ];
 
 

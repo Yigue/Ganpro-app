@@ -26,7 +26,7 @@ export function AnalysisHeader({data}:{data:FinancialAnalysis}){const {dolarMep,
         <StatCard label="Ingresos" value={fmt(mbActual.ingresos)} hint={`Ejercicio ${actual.label}`} />
         <StatCard label="Gastos" value={fmt(mbActual.costosDirectos + mbActual.estructura)} hint={`Ejercicio ${actual.label}`} />
         <StatCard label="Resultado parcial" value={fmt(mbActual.margenBruto)} tone={mbActual.margenBruto >= 0 ? 'success' : 'danger'} hint="Ventas − costos directos" />
-        <StatCard label="Por cobrar" value={fmt(pendientes.reduce((a, p) => a + p.monto, 0))} hint={`${pendientes.length} ventas a plazo`} />
+        <StatCard label="Por cobrar" value={fmt(pendientes.reduce((a, p) => a + p.monto, 0))} hint={`${pendientes.length} comprobantes con saldo pendiente`} />
         <StatCard label="Valor del rodeo" value={fmt(valorRodeo)} hint={usd ? fmtARS(valorRodeo) : fmtUSD(dolar && valorRodeo != null ? valorRodeo / dolar : null)} />
       </div>
       <Section title="Ingresos y gastos por mes" description={usd ? 'En dólares a la cotización oficial de cada mes' : 'En pesos corrientes'}>
