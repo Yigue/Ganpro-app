@@ -1,5 +1,9 @@
 'use client';
 
+import {CommerceFields,DteFields} from './commerce-fields';
+import type {LedgerSnapshot} from '@/lib/db/ledger-types';
+import type {EscenarioLinea} from '@/lib/db/types';
+import {businessToday} from '@/lib/calc/business-date';
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { registrarMovimiento } from '@/app/(dashboard)/movimientos/actions';
@@ -17,9 +21,9 @@ const TIPOS = {
 
 type Tipo = keyof typeof TIPOS;
 
-export function MovimientoForm({ lotes, potreros, categorias }: { lotes: Lote[]; potreros: Potrero[]; categorias: CategoriaConfig[] }) {
-  const [tipo, setTipo] = useState<Tipo>('VENTA');
-  const hoy = new Date().toISOString().slice(0, 10);
+export function MovimientoForm({ lotes, potreros, categorias,cuentas=[],linea }: { lotes: Lote[]; potreros: Potrero[]; categorias: CategoriaConfig[];cuentas?:LedgerSnapshot['cuentas'];linea?:EscenarioLinea|null }) {
+  const [tipo, setTipo] = useState<Tipo>(linea?.tipo??'VENTA');
+  const hoy = businessToday();
   const ingresa = tipo === 'COMPRA' || tipo === 'NACIMIENTO';
   const conDte = tipo !== 'TRASLADO' && tipo !== 'NACIMIENTO';
   const conPlata = tipo === 'VENTA' || tipo === 'COMPRA';
@@ -27,7 +31,7 @@ export function MovimientoForm({ lotes, potreros, categorias }: { lotes: Lote[];
   return (
     <FormDialog
       title="Registrar movimiento"
-      description="Las ventas se bloquean si algún animal está en período de retiro."
+      description={linea?`Ejecución del plan: ${linea.cabezas} ${linea.categoria}. Stock y comprobante se registran juntos.`:"Las ventas se bloquean durante el retiro. Sin pago inmediato se registra una obligación pendiente."}
       trigger={
         <>
           <Plus className="h-4 w-4" /> Registrar movimiento
@@ -35,6 +39,7 @@ export function MovimientoForm({ lotes, potreros, categorias }: { lotes: Lote[];
       }
       action={registrarMovimiento}
     >
+      {linea&&<input type="hidden" name="escenario_linea_id" value={linea.id}/>}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Tipo">
           <Select name="tipo" value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)}>
@@ -94,33 +99,8 @@ export function MovimientoForm({ lotes, potreros, categorias }: { lotes: Lote[];
           </Field>
         </div>
       )}
-      {conPlata && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Kg totales">
-            <Input name="kg" type="number" min="0" step="1" />
-          </Field>
-          <Field label="Monto total (ARS)">
-            <Input name="monto" type="number" min="0" step="1" />
-          </Field>
-        </div>
-      )}
-      {conDte && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="N° de DTE">
-            <Input name="dte_numero" placeholder="07-2026-000000" />
-          </Field>
-          {tipo === 'VENTA' && (
-            <Field label="RENSPA destino">
-              <Input name="renspa_destino" placeholder="00.000.0.00000/00" />
-            </Field>
-          )}
-        </div>
-      )}
-      {tipo === 'VENTA' && (
-        <Field label="Fecha de cobro (si es a plazo)">
-          <Input name="fecha_cobro" type="date" />
-        </Field>
-      )}
+      {conPlata && <CommerceFields sale={tipo==='VENTA'} cuentas={cuentas} monto={linea?.monto} kg={linea?.kg!=null?linea.kg*linea.cabezas:undefined}/>}
+      {conDte && <DteFields sale={tipo==='VENTA'}/>}
       <Field label={tipo === 'MUERTE' ? 'Causa' : 'Notas'}>
         <Input name="notas" />
       </Field>

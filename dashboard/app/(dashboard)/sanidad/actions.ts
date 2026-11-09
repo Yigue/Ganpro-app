@@ -1,7 +1,8 @@
 'use server';
 
 import { z } from 'zod';
-import { finCarencia } from '@/lib/calc/sanidad';
+import {runOperation} from '@/lib/commands/rpc';
+import {operationMessage} from '@/lib/commands/message';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
 
 const RUTAS = ['/sanidad', '/stock', '/'];
@@ -19,39 +20,8 @@ export const registrarAplicacion = crearAccion(
     responsable: z.string().trim().optional(),
     scheduled_id: z.string().optional(),
   }),
-  async (d, supabase) => {
-    let animal_id: string | null = null;
-    let lote_id: string | null = null;
-    if (d.destino === 'animal') {
-      if (!d.caravana) throw new Error('Indicá la caravana');
-      const { data } = await supabase.from('animals').select('id').eq('id_caravana', d.caravana).maybeSingle();
-      if (!data) throw new Error(`No existe la caravana ${d.caravana}`);
-      animal_id = data.id;
-    } else {
-      if (!d.lote_id) throw new Error('Elegí el lote');
-      lote_id = d.lote_id;
-    }
-    const { data: op } = await supabase.from('operations_catalog').select('dias_carencia').eq('id', d.operation_id).single();
-    const fecha = fechaMs(d.fecha);
-    check(
-      await supabase.from('operation_logs').insert({
-        animal_id,
-        lote_id,
-        operation_id: d.operation_id,
-        fecha_aplicacion: fecha,
-        fecha_fin_carencia: finCarencia(fecha, op?.dias_carencia),
-        dosis: d.dosis ?? null,
-        producto_lote: d.producto_lote ?? null,
-        acta_numero: d.acta_numero ?? null,
-        responsable: d.responsable ?? null,
-      }),
-    );
-    if (d.scheduled_id) {
-      check(await supabase.from('scheduled_operations').update({ estado: 'COMPLETADO' }).eq('id', d.scheduled_id));
-    }
-    return 'Aplicación registrada';
-  },
-  { revalidate: RUTAS },
+  async (d,supabase)=>operationMessage(await runOperation(supabase,'health.apply',{...d,fecha:fechaMs(d.fecha)})),
+  { name: 'sanidad.registrarAplicacion', revalidate: RUTAS },
 );
 
 export const programarOperacion = crearAccion(
@@ -68,7 +38,7 @@ export const programarOperacion = crearAccion(
     );
     return 'Operación programada';
   },
-  { revalidate: RUTAS },
+  { name: 'sanidad.programarOperacion', revalidate: RUTAS },
 );
 
 export const cambiarEstadoProgramada = crearAccion(
@@ -76,7 +46,7 @@ export const cambiarEstadoProgramada = crearAccion(
   async (d, supabase) => {
     check(await supabase.from('scheduled_operations').update({ estado: d.estado }).eq('id', d.id));
   },
-  { revalidate: RUTAS },
+  { name: 'sanidad.cambiarEstadoProgramada', revalidate: RUTAS },
 );
 
 export const crearProducto = crearAccion(
@@ -98,5 +68,5 @@ export const crearProducto = crearAccion(
     );
     return `${d.nombre} agregado`;
   },
-  { revalidate: ['/sanidad'] },
+  { name: 'sanidad.crearProducto', revalidate: ['/sanidad'] },
 );

@@ -8,9 +8,11 @@ interface Base {
   id: string;
   created_at: number;
   updated_at: number;
+  server_updated_at?: number;
 }
 
 export interface Potrero extends Base {
+  map_version?:number;perimetro_m?:number|null;tipo_potrero?:string;capacidad_cabezas?:number|null;estado_forraje?:string;agua?:boolean|null;sombra?:boolean|null;notas?:string|null;
   nombre: string;
   hectareas: number | null;
   recurso_forrajero: string | null;

@@ -1,4 +1,5 @@
 'use server';
+import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
@@ -12,12 +13,12 @@ export const guardarFormula = crearAccion(
       .array(z.object({ suplemento_id: z.string().min(1), porcentaje: z.number().positive().max(100) }))
       .parse(JSON.parse(d.formula));
     const total = items.reduce((a, i) => a + i.porcentaje, 0);
-    if (Math.abs(total - 100) > 0.5) throw new Error(`Los porcentajes suman ${total.toFixed(1)} %, tienen que sumar 100 %`);
+    if (Math.abs(total - 100) > 0.5) throw new InputError({_form:[`Los porcentajes suman ${total.toFixed(1)} %, tienen que sumar 100 %`]});
     check(await supabase.from('racion_ingredientes').delete().eq('racion_id', d.racion_id));
     check(await supabase.from('racion_ingredientes').insert(items.map((i) => ({ ...i, racion_id: d.racion_id }))));
     return 'Fórmula guardada';
   },
-  { revalidate: RUTAS },
+  { name: 'nutricion.guardarFormula', revalidate: RUTAS },
 );
 
 export const crearRacion = crearAccion(
@@ -26,7 +27,7 @@ export const crearRacion = crearAccion(
     check(await supabase.from('raciones').insert({ nombre: d.nombre, descripcion: d.descripcion ?? null, activa: true }));
     return `Ración ${d.nombre} creada`;
   },
-  { revalidate: RUTAS },
+  { name: 'nutricion.crearRacion', revalidate: RUTAS },
 );
 
 export const guardarSuplemento = crearAccion(
@@ -53,7 +54,7 @@ export const guardarSuplemento = crearAccion(
     check(id ? await supabase.from('suplementos').update(fila).eq('id', id) : await supabase.from('suplementos').insert(fila));
     return `${d.nombre} guardado`;
   },
-  { revalidate: RUTAS },
+  { name: 'nutricion.guardarSuplemento', revalidate: RUTAS },
 );
 
 export const registrarEntrega = crearAccion(
@@ -85,5 +86,5 @@ export const registrarEntrega = crearAccion(
     }
     return 'Entrega registrada';
   },
-  { revalidate: RUTAS },
+  { name: 'nutricion.registrarEntrega', revalidate: RUTAS },
 );

@@ -1,3 +1,4 @@
+import {databaseError} from '@/lib/commands/errors';
 import 'server-only';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
@@ -23,7 +24,7 @@ export async function selectAll<T extends TableName>(
     if (options.filter) q = options.filter(q);
     if (options.order) q = q.order(options.order, { ascending: options.ascending ?? true });
     const { data, error } = await q.range(from, from + PAGE - 1);
-    if (error) throw new Error(`${table}: ${error.message}`);
+    if (error) throw databaseError(error);
     rows.push(...((data ?? []) as unknown as TableMap[T][]));
     if (!data || data.length < PAGE) break;
   }
@@ -33,7 +34,7 @@ export async function selectAll<T extends TableName>(
 export async function selectOne<T extends TableName>(table: T, id: string | number): Promise<TableMap[T] | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.from(table).select('*').eq('id', id).maybeSingle();
-  if (error) throw new Error(`${table}: ${error.message}`);
+  if (error) throw databaseError(error);
   return data as TableMap[T] | null;
 }
 
@@ -45,24 +46,17 @@ export const getAnimals = cache(() => selectAll('animals', { order: 'id_caravana
 export const getCategoriasConfig = cache(() => selectAll('categorias_config', { order: 'orden' }));
 export const getEventos = cache(() => selectAll('eventos', { order: 'timestamp' }));
 export const getPrecios = cache(() => selectAll('precios_mercado', { order: 'fecha', ascending: false }));
-export const getMovimientosFinancieros = cache(() => selectAll('movimientos_financieros', { order: 'fecha', ascending: false }));
+export const getMovimientosFinancieros = cache(() => selectAll('movimientos_financieros', { order: 'fecha', ascending: false,filter:q=>q.is('anulado_en',null) }));
 export const getCatalogo = cache(() => selectAll('operations_catalog', { order: 'nombre' }));
 export const getSuplementos = cache(() => selectAll('suplementos', { order: 'nombre' }));
 
 export const getEstablecimiento = cache(async () => {
   const supabase = await createClient();
-  const { data } = await supabase.from('establecimiento').select('*').eq('id', 1).maybeSingle();
-  return (data as TableMap['establecimiento'] | null) ?? {
-    id: 1 as const,
-    nombre: 'Loma Alta',
-    renspa: null,
-    localidad: null,
-    provincia: null,
-    hectareas_ganaderas: null,
-    inicio_ejercicio_mes: 7,
-    dias_alerta_pesada: 90,
-    dias_alerta_sanidad: 15,
-  };
+  const { data,error } = await supabase.from('establecimiento').select('*').eq('id', 1).maybeSingle();
+  if(error)throw databaseError(error);
+  if(!data)throw databaseError({code:'MISSING_ESTABLISHMENT'});
+  return (data as TableMap['establecimiento']);
+
 });
 
 export function byId<T extends { id: string }>(rows: T[]): Map<string, T> {

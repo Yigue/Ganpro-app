@@ -1,3 +1,4 @@
+import {CommandNotifications} from '@/components/ui/command-notifications';
 import { redirect } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { getSessionPerfil } from '@/lib/db/auth';
@@ -10,7 +11,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!perfil) redirect('/login');
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="flex min-h-screen flex-col lg:flex-row"><CommandNotifications/>
       <Sidebar
         establecimiento={est.nombre}
         renspa={est.renspa}

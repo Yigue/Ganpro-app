@@ -1,6 +1,9 @@
 'use server';
+import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
+import {DomainError} from '@/lib/commands/errors';
+import {databaseError} from '@/lib/commands/errors';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
 import type { MovimientoFinanciero } from '@/lib/db/types';
 
@@ -41,7 +44,7 @@ export const guardarEscenario = crearAccion(
       check(await supabase.from('escenarios').update(fila).eq('id', id));
     } else {
       const { data, error } = await supabase.from('escenarios').insert(fila).select('id').single();
-      if (error) throw new Error(error.message);
+      if (error) throw databaseError(error);
       id = data.id as string;
     }
     if (d.lineas !== undefined) {
@@ -67,7 +70,7 @@ export const guardarEscenario = crearAccion(
     }
     return `Escenario "${d.nombre}" guardado`;
   },
-  { revalidate: RUTAS },
+  { name: 'proyeccion.guardarEscenario', revalidate: RUTAS },
 );
 
 export const eliminarEscenario = crearAccion(
@@ -76,7 +79,7 @@ export const eliminarEscenario = crearAccion(
     check(await supabase.from('escenarios').delete().eq('id', d.id));
     return 'Escenario eliminado';
   },
-  { revalidate: RUTAS },
+  { name: 'proyeccion.eliminarEscenario', revalidate: RUTAS },
 );
 
 /**
@@ -90,9 +93,10 @@ export const cerrarConReal = crearAccion(
       .from('movimientos_financieros')
       .select('*')
       .eq('lote_id', d.lote_id)
+      .is('anulado_en',null)
       .gte('fecha', fechaMs(d.desde))
       .lte('fecha', fechaMs(d.hasta));
-    if (error) throw new Error(error.message);
+    if (error) throw databaseError(error);
     const movs = (data ?? []) as MovimientoFinanciero[];
     const ventas = movs.filter((m) => m.tipo === 'INGRESO');
     const compras = movs.filter((m) => m.tipo === 'GASTO' && m.categoria === 'COMPRA');
@@ -117,44 +121,11 @@ export const cerrarConReal = crearAccion(
     check(await supabase.from('escenarios').update({ resultado_real: real, estado: 'CERRADO', lote_id: d.lote_id }).eq('id', d.id));
     return movs.length ? `Cerrado con ${movs.length} movimientos reales` : 'Cerrado, pero el lote no tiene movimientos en esas fechas';
   },
-  { revalidate: RUTAS },
+  { name: 'proyeccion.cerrarConReal', revalidate: RUTAS },
 );
 
 /** Pasa una venta o compra proyectada a movimiento financiero real, con su DTE. */
-export const convertirLineaEnReal = crearAccion(
-  z.object({
-    id: z.string().min(1),
-    fecha: z.string().min(1),
-    dte_numero: z.string().trim().optional(),
-    monto: z.coerce.number().positive().optional(),
-  }),
-  async (d, supabase) => {
-    const { data: l, error } = await supabase.from('escenario_lineas').select('*').eq('id', d.id).single();
-    if (error || !l) throw new Error('No se encontró la línea');
-    if (l.movimiento_id) throw new Error('Esta línea ya está registrada como real');
-    const { data: mov, error: e2 } = await supabase
-      .from('movimientos_financieros')
-      .insert({
-        tipo: l.tipo === 'VENTA' ? 'INGRESO' : 'GASTO',
-        categoria: l.tipo === 'VENTA' ? 'VENTA' : 'COMPRA',
-        monto: d.monto ?? l.monto,
-        fecha: fechaMs(d.fecha),
-        descripcion: `${l.tipo === 'VENTA' ? 'Venta' : 'Compra'} ${l.cabezas} ${l.categoria} (plan)`,
-        dte_numero: d.dte_numero ?? null,
-        dte_estado: d.dte_numero ? 'EMITIDO' : null,
-        cabezas: l.cabezas,
-        kg: l.kg != null ? l.kg * l.cabezas : null,
-        categoria_animal: l.categoria,
-        cobrado: l.tipo === 'VENTA' ? true : null,
-      })
-      .select('id')
-      .single();
-    if (e2) throw new Error(e2.message);
-    check(await supabase.from('escenario_lineas').update({ movimiento_id: mov.id }).eq('id', d.id));
-    return 'Registrado en Finanzas. Para bajar el stock, cargá el movimiento de hacienda en Movimientos.';
-  },
-  { revalidate: [...RUTAS, '/finanzas', '/movimientos'] },
-);
+export const convertirLineaEnReal=crearAccion(z.object({id:z.string().min(1)}),async()=>{throw new DomainError('PLAN_REQUIRES_STOCK');},{name:'projection.legacy-real',revalidate:RUTAS});
 
 const COLUMNAS_PRECIO = ['novillo_kg', 'ternero_kg', 'ternera_kg', 'vaquillona_kg', 'vaca_kg', 'vaca_descarte_kg', 'toro_kg', 'dolar_oficial', 'dolar_mep'] as const;
 
@@ -170,7 +141,7 @@ export const importarPrecios = crearAccion(
     const sep = [';', '\t', ','].find((s) => lineas[0]?.includes(s)) ?? ';';
     const header = lineas[0].split(sep).map((h) => h.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z_]/g, ''));
     const mapa = header.map((h) => COLUMNAS_PRECIO.find((c) => c === h || c === `${h}_kg` || c.replace('_kg', '') === h) ?? null);
-    if (!mapa.slice(1).some(Boolean)) throw new Error('No reconozco las columnas. Ejemplo de encabezado: fecha;novillo;ternero;vaca;dolar_oficial');
+    if (!mapa.slice(1).some(Boolean)) throw new InputError({_form:['No reconozco las columnas. Ejemplo de encabezado: fecha;novillo;ternero;vaca;dolar_oficial']});
     const filas = [];
     for (const linea of lineas.slice(1)) {
       const cel = linea.split(sep).map((c) => c.trim());
@@ -186,9 +157,9 @@ export const importarPrecios = crearAccion(
       });
       filas.push(fila);
     }
-    if (!filas.length) throw new Error('No hay filas con fecha válida');
+    if (!filas.length) throw new InputError({_form:['No hay filas con fecha válida']});
     check(await supabase.from('precios_mercado').insert(filas));
     return `${filas.length} fechas de precios cargadas`;
   },
-  { revalidate: [...RUTAS, '/finanzas', '/config'] },
+  { name: 'proyeccion.importarPrecios', revalidate: [...RUTAS, '/finanzas', '/config'] },
 );

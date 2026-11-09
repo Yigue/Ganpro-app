@@ -50,12 +50,9 @@ export function AnimalFormFields({
       </Field>
       {conEstado && (
         <Field label="Estado">
-          <Select name="estado" defaultValue={animal?.estado ?? 'ACTIVO'}>
-            <option>ACTIVO</option>
-            <option>VENDIDO</option>
-            <option>MUERTO</option>
-            <option>DESCARTE</option>
-          </Select>
+          <input type="hidden" name="estado" value={animal?.estado ?? 'ACTIVO'} />
+          <Input value={animal?.estado ?? 'ACTIVO'} readOnly aria-label="Estado actual" />
+          <p className="text-xs text-muted-foreground">Las ventas y bajas se registran desde Movimientos para conservar stock y finanzas.</p>
         </Field>
       )}
       <Field label="Lote">

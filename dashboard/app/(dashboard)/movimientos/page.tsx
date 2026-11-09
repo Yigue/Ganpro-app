@@ -1,3 +1,6 @@
+import {getLedger} from '@/lib/db/ledger';
+import {businessToday} from '@/lib/calc/business-date';
+import {selectOne} from '@/lib/db/client';
 import { ConciliacionSection } from '@/components/movimientos/conciliacion-section';
 import { DteSection } from '@/components/movimientos/dte-section';
 import { HistorialTable, type FilaHistorial } from '@/components/movimientos/historial-section';
@@ -23,7 +26,9 @@ import {
 
 export const metadata = { title: 'Movimientos y SIGSA' };
 
-export default async function MovimientosPage() {
+export default async function MovimientosPage({searchParams}:{searchParams:Promise<{linea?:string}>}) {
+  const {linea:lineaId}=await searchParams;
+  const [libro,linea]=await Promise.all([getLedger(businessToday().slice(0,7)),lineaId?selectOne('escenario_lineas',lineaId):Promise.resolve(null)]);
   const [animals, eventos, movimientos, movsFin, sigsa, lotes, potreros, config, est, perfil] = await Promise.all([
     getAnimals(),
     getEventos(),
@@ -56,10 +61,10 @@ export default async function MovimientosPage() {
       dte: null,
     })),
     ...eventos
-      .filter((e) => e.tipo === 'VENTA' || e.tipo === 'MUERTE')
+      .filter((e) => ['VENTA','MUERTE','COMPRA','NACIMIENTO','ANULACION','RECATEGORIZACION'].includes(e.tipo))
       .map((e) => ({ fecha: e.timestamp, tipo: e.tipo, animal: caravana(e.animal_id), detalle: e.notas ?? '', dte: e.dte_numero })),
     ...animals
-      .filter((a) => a.fecha_nacimiento && a.fecha_nacimiento >= ahora - 365 * 86_400_000 && ['Ternero', 'Ternera'].includes(a.categoria))
+      .filter((a) => !eventos.some(e=>e.animal_id===a.id&&e.tipo==='NACIMIENTO') && a.fecha_nacimiento && a.fecha_nacimiento >= ahora - 365 * 86_400_000 && ['Ternero', 'Ternera'].includes(a.categoria))
       .map((a) => ({ fecha: a.fecha_nacimiento!, tipo: 'NACIMIENTO', animal: a.id_caravana, detalle: a.categoria, dte: null })),
   ].sort((a, b) => b.fecha - a.fecha);
 
@@ -74,7 +79,7 @@ export default async function MovimientosPage() {
       <PageHeader
         title="Movimientos y trazabilidad"
         description={`RENSPA ${est.renspa ?? '—'} · ventas, compras, muertes, nacimientos y traslados`}
-        actions={editable && <MovimientoForm lotes={lotes} potreros={potreros} categorias={config} />}
+        actions={editable && <MovimientoForm lotes={lotes} potreros={potreros} categorias={config} cuentas={libro.cuentas} linea={linea}/>}
       />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Ventas del ejercicio" value={enEjercicio.filter((e) => e.tipo === 'VENTA').length} hint={`Cabezas · ejercicio ${ejercicio.label}`} />

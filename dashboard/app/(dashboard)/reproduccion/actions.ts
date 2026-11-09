@@ -1,4 +1,5 @@
 'use server';
+import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
@@ -21,7 +22,7 @@ export const crearServicio = crearAccion(
     const lista = caravanas(d.toros);
     const { data } = await supabase.from('animals').select('id, id_caravana').in('id_caravana', lista);
     const faltan = lista.filter((c) => !(data ?? []).some((a) => a.id_caravana === c));
-    if (faltan.length) throw new Error(`No existen los toros: ${faltan.join(', ')}`);
+    if (faltan.length) throw new InputError({_form:[`No existen los toros: ${faltan.join(', ')}`]});
     let vientres = d.vientres;
     if (!vientres) {
       const { count } = await supabase
@@ -46,7 +47,7 @@ export const crearServicio = crearAccion(
     );
     return 'Servicio registrado';
   },
-  { revalidate: RUTAS },
+  { name: 'reproduccion.crearServicio', revalidate: RUTAS },
 );
 
 export const registrarRevisacion = crearAccion(
@@ -60,7 +61,7 @@ export const registrarRevisacion = crearAccion(
   }),
   async (d, supabase) => {
     const { data } = await supabase.from('animals').select('id').eq('id_caravana', d.caravana).maybeSingle();
-    if (!data) throw new Error(`No existe la caravana ${d.caravana}`);
+    if (!data) throw new InputError({_form:[`No existe la caravana ${d.caravana}`]});
     check(
       await supabase.from('revisacion_toros').insert({
         animal_id: data.id,
@@ -73,7 +74,7 @@ export const registrarRevisacion = crearAccion(
     );
     return 'Revisación registrada';
   },
-  { revalidate: RUTAS },
+  { name: 'reproduccion.registrarRevisacion', revalidate: RUTAS },
 );
 
 export const completarEtapa = crearAccion(
@@ -81,5 +82,5 @@ export const completarEtapa = crearAccion(
   async (d, supabase) => {
     check(await supabase.from('etapas_protocolo').update({ completada: true, fecha_completada: Date.now() }).eq('id', d.id));
   },
-  { revalidate: RUTAS },
+  { name: 'reproduccion.completarEtapa', revalidate: RUTAS },
 );

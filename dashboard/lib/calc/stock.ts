@@ -82,15 +82,20 @@ export function historicoCabezas(
   eventos: Evento[],
   meses: { key: string; fin: number }[],
 ): { mes: string; [categoria: string]: number | string }[] {
-  const bajas = fechasBaja(animals, eventos);
-  return meses.map(({ key, fin }) => {
-    const fila: { mes: string; [categoria: string]: number | string } = { mes: key };
-    for (const a of animals) {
-      const alta = Math.min(a.created_at, a.fecha_nacimiento ?? a.created_at);
-      const baja = bajas.get(a.id);
-      if (alta <= fin && (baja == null || baja > fin)) {
-        fila[a.categoria] = ((fila[a.categoria] as number) ?? 0) + 1;
+  const histories = new Map(animals.map(a => [a.id, eventos.filter(e => e.animal_id === a.id).sort((a,b) => a.timestamp-b.timestamp)]));
+  return meses.map(({key,fin}) => {
+    const fila: {mes:string;[categoria:string]:number|string} = {mes:key};
+    for(const a of animals){
+      const history=histories.get(a.id)??[];
+      const entries=history.filter(e=>['COMPRA','NACIMIENTO'].includes(e.tipo));
+      const alta=entries.length?Math.min(...entries.map(e=>e.timestamp)):a.created_at;
+      let present=alta<=fin;
+      for(const e of history.filter(e=>e.timestamp<=fin)){
+        if(['VENTA','MUERTE'].includes(e.tipo))present=false;
+        if(e.tipo==='ANULACION'&&e.valor!=null)present=e.valor>0;
       }
+      if(a.estado!=='ACTIVO'&&a.updated_at<=fin&&!history.some(e=>['VENTA','MUERTE','ANULACION'].includes(e.tipo)))present=false;
+      if(present)fila[a.categoria]=((fila[a.categoria] as number)??0)+1;
     }
     return fila;
   });

@@ -2,12 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import { CheckCircle2, Plus, Trash2 } from 'lucide-react';
-import { convertirLineaEnReal } from '@/app/(dashboard)/proyeccion/actions';
+import Link from 'next/link';
 import { BarChartView } from '@/components/charts/charts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FormDialog } from '@/components/ui/form-dialog';
-import { Field, Input } from '@/components/ui/input';
 import { Section } from '@/components/ui/section';
 import { StatCard } from '@/components/ui/stat-card';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -31,31 +29,7 @@ function sumarMeses(inicio: string, n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function RegistrarReal({ linea }: { linea: LineaPlan }) {
-  return (
-    <FormDialog
-      title={`Registrar ${linea.tipo === 'VENTA' ? 'venta' : 'compra'} real`}
-      description="Crea el movimiento en Finanzas con el DTE. El stock se baja cargando el movimiento de hacienda en Movimientos."
-      trigger={<CheckCircle2 className="h-4 w-4" />}
-      triggerVariant="ghost"
-      action={convertirLineaEnReal}
-      submitLabel="Registrar"
-    >
-      <input type="hidden" name="id" value={linea.id} />
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Fecha">
-          <Input name="fecha" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required />
-        </Field>
-        <Field label="N° de DTE">
-          <Input name="dte_numero" />
-        </Field>
-        <Field label="Monto real (ARS)">
-          <Input name="monto" type="number" min="0" defaultValue={Math.round(montoLinea(linea))} />
-        </Field>
-      </div>
-    </FormDialog>
-  );
-}
+function RegistrarReal({linea}:{linea:LineaPlan}){return <Link title="Registrar ganado y comprobante juntos" aria-label="Registrar operación real" href={`/movimientos?linea=${encodeURIComponent(linea.id??'')}`}><CheckCircle2 className="h-4 w-4"/></Link>;}
 
 export function PlanCompraVenta({
   datos,

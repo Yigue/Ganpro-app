@@ -1,4 +1,5 @@
 'use server';
+import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
@@ -31,7 +32,7 @@ export const guardarEstablecimiento = crearAccion(
         .eq('id', 1),
     );
   },
-  { roles: ['admin'], revalidate: ['/', '/config'] },
+  { name: 'config.guardarEstablecimiento', roles: ['admin'], revalidate: ['/', '/config'] },
 );
 
 export const guardarPotrero = crearAccion(
@@ -47,7 +48,7 @@ export const guardarPotrero = crearAccion(
     check(id ? await supabase.from('potreros').update(fila).eq('id', id) : await supabase.from('potreros').insert(fila));
     return `Potrero ${d.nombre} guardado`;
   },
-  { revalidate: ['/config', '/nutricion', '/'] },
+  { name: 'config.guardarPotrero', revalidate: ['/config', '/nutricion', '/'] },
 );
 
 export const guardarLote = crearAccion(
@@ -63,7 +64,7 @@ export const guardarLote = crearAccion(
     check(id ? await supabase.from('lotes').update(fila).eq('id', id) : await supabase.from('lotes').insert(fila));
     return `Lote ${d.nombre} guardado`;
   },
-  { revalidate: ['/config', '/costos', '/'] },
+  { name: 'config.guardarLote', revalidate: ['/config', '/costos', '/'] },
 );
 
 export const cambiarRol = crearAccion(
@@ -71,7 +72,7 @@ export const cambiarRol = crearAccion(
   async (d, supabase) => {
     check(await supabase.from('perfiles').update({ rol: d.rol }).eq('id', d.id));
   },
-  { roles: ['admin'], revalidate: ['/config'] },
+  { name: 'config.cambiarRol', roles: ['admin'], revalidate: ['/config'] },
 );
 
 export const guardarCategorias = crearAccion(
@@ -86,7 +87,7 @@ export const guardarCategorias = crearAccion(
         return typeof raw === 'string' && raw !== '' ? raw : null;
       };
       const ev = Number(v('ev'));
-      if (!Number.isFinite(ev) || ev <= 0) throw new Error(`EV inválido para ${categoria}`);
+      if (!Number.isFinite(ev) || ev <= 0) throw new InputError({_form:[`EV inválido para ${categoria}`]});
       check(
         await supabase
           .from('categorias_config')
@@ -101,7 +102,7 @@ export const guardarCategorias = crearAccion(
     }
     return 'Categorías guardadas';
   },
-  { roles: ['admin'], revalidate: ['/config', '/', '/stock', '/nutricion'] },
+  { name: 'config.guardarCategorias', roles: ['admin'], revalidate: ['/config', '/', '/stock', '/nutricion'] },
 );
 
 export const cargarPrecios = crearAccion(
@@ -122,5 +123,5 @@ export const cargarPrecios = crearAccion(
     check(await supabase.from('precios_mercado').insert({ ...fila, fecha: fechaMs(fecha), fuente: 'MANUAL' }));
     return 'Precios cargados';
   },
-  { revalidate: ['/config', '/finanzas', '/'] },
+  { name: 'config.cargarPrecios', revalidate: ['/config', '/finanzas', '/'] },
 );
