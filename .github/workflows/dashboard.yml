@@ -27,7 +27,7 @@ jobs:
           POSTGRES_PASSWORD: ganpro_local_test
           POSTGRES_DB: ganpro_dashboard_tests
         ports: ['5432:5432']
-        options: --health-cmd "pg_isready -U ganpro" --health-interval 5s --health-timeout 5s --health-retries 10
+        options: --health-cmd "pg_isready -U ganpro -d ganpro_dashboard_tests" --health-interval 5s --health-timeout 5s --health-retries 10
       postgrest:
         image: postgrest/postgrest:v12.2.12
         env:
@@ -49,6 +49,17 @@ jobs:
       - run: npm test
       - run: npm run test:db:migrate
       - run: npm run test:db
+      - name: Start REST after database roles and schema exist
+        env:
+          REST_CONTAINER: ${{ job.services.postgrest.id }}
+        run: |
+          docker restart "$REST_CONTAINER"
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:55441/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          docker logs "$REST_CONTAINER"
+          exit 1
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Browser with real PostgreSQL, PostgREST and test Auth
