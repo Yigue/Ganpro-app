@@ -12,7 +12,8 @@
     "db:types": "supabase gen types typescript --linked --schema public > lib/db/database.types.ts",
     "test:db": "vitest run --config vitest.integration.config.ts",
     "test:db:migrate": "node tests/db/migrate.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "db:upgrade:bundle": "python3 scripts/build-upgrade.py"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
