@@ -1,6 +1,6 @@
 'use server';
 import {z} from 'zod';
-import {crearAccion,fechaMs} from '@/lib/db/actions';
+import {crearAccion,fechaMs,fechaOperacionMs,fechaVencimientoMs} from '@/lib/db/actions';
 import {runOperation} from '@/lib/commands/rpc';
 import {operationMessage} from '@/lib/commands/message';
 import {applyBatch} from '@/lib/commands/batch';
@@ -12,7 +12,7 @@ const movementSchema=z.object({tipo:z.enum(['TRASLADO','VENTA','COMPRA','MUERTE'
 
 const RUTAS=['/movimientos','/stock','/','/finanzas','/mapa','/proyeccion/plan'];
 export const registrarMovimiento=crearAccion(movementSchema,async(d,c)=>operationMessage(await runOperation(c,'stock.movement',{
- ...d,fecha:fechaMs(d.fecha),vencimiento:d.vencimiento?fechaMs(d.vencimiento):undefined,
+ ...d,fecha:fechaOperacionMs(d.fecha),vencimiento:d.vencimiento?fechaVencimientoMs(d.vencimiento):undefined,
  animal_ids:d.animal_ids,
  caravanas:(d.caravanas??'').split(/[\s,;]+/).map(t=>t.trim()).filter(Boolean),
 })),{name:'stock.movement',revalidate:RUTAS});

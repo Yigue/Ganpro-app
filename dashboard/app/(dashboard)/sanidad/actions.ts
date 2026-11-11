@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import {runOperation} from '@/lib/commands/rpc';
 import {operationMessage} from '@/lib/commands/message';
-import { check, crearAccion, fechaMs } from '@/lib/db/actions';
+import { check, crearAccion, fechaMs, fechaOperacionMs } from '@/lib/db/actions';
 
 const RUTAS = ['/sanidad', '/stock', '/'];
 
@@ -21,7 +21,7 @@ export const registrarAplicacion = crearAccion(
     responsable: z.string().trim().optional(),
     scheduled_id: z.string().optional(),
   }),
-  async (d,supabase)=>operationMessage(await runOperation(supabase,'health.apply',{...d,fecha:fechaMs(d.fecha)})),
+  async (d,supabase)=>operationMessage(await runOperation(supabase,'health.apply',{...d,fecha:fechaOperacionMs(d.fecha)})),
   { name: 'sanidad.registrarAplicacion', revalidate: RUTAS },
 );
 

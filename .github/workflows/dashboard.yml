@@ -47,7 +47,7 @@ jobs:
       - name: Verify generated SQL bundle
         run: |
           npm run db:upgrade:bundle
-          git diff --exit-code -- supabase/upgrade-existing.sql supabase/upgrade-47-to-56.sql
+          git diff --exit-code -- supabase/upgrade-existing.sql supabase/upgrade-47-to-56.sql supabase/upgrade-stock-operations.sql
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -65,7 +65,14 @@ jobs:
           docker logs "$REST_CONTAINER"
           exit 1
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Select browser for Playwright
+        run: |
+          if command -v google-chrome > /dev/null; then
+            echo "GANPRO_CHROMIUM_PATH=$(command -v google-chrome)" >> "$GITHUB_ENV"
+            google-chrome --version
+          else
+            npx playwright install --with-deps chromium
+          fi
       - name: Browser with real PostgreSQL, PostgREST and test Auth
         run: |
           node tests/e2e/local-services.mjs > /tmp/ganpro-local-services.log 2>&1 &

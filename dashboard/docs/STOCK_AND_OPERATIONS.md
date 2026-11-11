@@ -78,3 +78,35 @@ Pruebas de PostgreSQL verifican alta/vinculación sin duplicados, rollback,
 cotización y destinatarios de aplicaciones. Las pruebas de navegador usan Next,
 PostgREST y RLS reales sobre PostgreSQL local; Auth/Storage son emulados. No
 constituyen prueba sobre Supabase/Vercel reales ni sobre un bastón físico.
+
+### Dashboard nuevo con base anterior
+
+Si sólo se actualizó Vercel, un alta genérica o una venta seleccionada por ficha
+puede devolver GANPRO_INVALID_INPUT desde el dispatcher anterior. No indica que
+el peso, el precio o la selección sean inválidos. Antes de enviar estas escrituras,
+el dashboard comprueba con consultas de cero filas las columnas del contrato
+nuevo; si faltan, indica actualización pendiente y no intenta la operación.
+Una caída de red o un rechazo de permisos conserva el tratamiento de error técnico.
+
+`supabase/diagnostics/stock-operations.sql` es sólo lectura y distingue columnas,
+funciones y dispatcher instalados. Para una base con 01–47 completas, ejecutar TODO
+`supabase/upgrade-47-to-56.sql` en una sola consulta. No ejecutar semillas ni el
+bundle inicial de 01–04. El incremental se detiene si 48+ ya está instalado:
+si hay un estado parcial, revisar las migraciones pendientes en lugar de repetirlo.
+Después de confirmar, volver a abrir los formularios antes de reintentar.
+
+Casos de regresión: una Vaca/Hembra sin caravana ni lote/potrero con 180kg;
+venta de 28 animales con 5500kg a 5520 ARS/kg = 30.360.000 ARS, sin contraparte
+ni pago inmediato. La segunda crea una obligación por cobrar y no un cobro.
+
+Si la base está en 44–47 y sólo se actualizó Vercel, se puede utilizar
+`supabase/upgrade-stock-operations.sql` como actualización única: reinstala las
+funciones históricas 45–47 y aplica 48–56 en la misma transacción. No acepta bases
+con cambios 48+ parciales o ya completos. El diagnóstico debe mostrar
+`base_44_instalada=true` y los módulos nuevos aún ausentes. No cambia visuales ni
+fusiona animales; conserva la regla de históricos activos/vendidos.
+
+Las operaciones efectivas de hoy usan su hora de registro en Argentina. Así una
+venta, aplicación, cobro o pago no se retrofecha a las 12:00 antes de un alta o
+movimiento hecho durante la tarde. Las fechas históricas conservan la convención
+anterior y un vencimiento abarca el día completo; no se reescriben fechas guardadas.

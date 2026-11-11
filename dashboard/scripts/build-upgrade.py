@@ -86,3 +86,33 @@ for p in files:
  parts.append('\n-- '+p.name+' / SHA256 '+hashlib.sha256(raw.encode()).hexdigest()+'\n'+body)
 parts.append("\nNOTIFY pgrst, 'reload schema';\nCOMMIT;\n")
 out=root.parent/'upgrade-47-to-56.sql';out.write_text(''.join(parts));print(out,out.stat().st_size)
+
+# Catch-up for deployments that updated Vercel while the database remained at 44–47.
+parts=["""-- GANPRO: base 01–44 completas (también admite 45–47). Sin seeds.
+-- Ejecutar TODO junto en la base que utiliza Vercel. Conserva IDs e historial.
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '180s';
+SELECT pg_advisory_xact_lock(20261109,1);
+DO $preflight$
+BEGIN
+ IF to_regprocedure('public.ganpro_stock_save(jsonb)') IS NULL
+ OR to_regprocedure('public.ganpro_finance_void(jsonb)') IS NULL
+ OR to_regprocedure('public.ganpro_management_snapshot()') IS NULL
+ OR NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='inventario_cierres' AND column_name='receipt_tick') THEN
+  RAISE EXCEPTION 'Se requieren las migraciones 01–44 completas. No se modificó nada.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND ((table_name='animals' AND column_name='visual_pendiente') OR (table_name='movimientos_financieros' AND column_name='modalidad_precio')))
+ OR to_regprocedure('public.ganpro_stock_save_v47(jsonb)') IS NOT NULL
+ OR to_regprocedure('public.ganpro_stock_generic(jsonb)') IS NOT NULL THEN
+  RAISE EXCEPTION 'Ya hay cambios 48+. Revisar migraciones aplicadas antes de continuar. No se modificó nada.';
+ END IF;
+END
+$preflight$;
+"""]
+for p in files:
+ if int(re.search(r'(\d{6})_',p.name).group(1))<45:continue
+ raw=p.read_text();body=re.sub(r'^\s*BEGIN;\s*\n','',raw,count=1);body=re.sub(r'\nCOMMIT;\s*$','\n',body)
+ parts.append('\n-- '+p.name+' / SHA256 '+hashlib.sha256(raw.encode()).hexdigest()+'\n'+body)
+parts.append("\nNOTIFY pgrst, 'reload schema';\nCOMMIT;\n")
+out=root.parent/'upgrade-stock-operations.sql';out.write_text(''.join(parts));print(out,out.stat().st_size)

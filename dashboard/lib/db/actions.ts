@@ -1,4 +1,5 @@
 import 'server-only';
+import {operationTimestamp} from '@/lib/calc/business-date';
 import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -14,6 +15,10 @@ export function fechaMs(v: string): number {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || !Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 10) !== v) throw new InputError({ fecha: ['Ingresá una fecha válida.'] });
   return ms;
 }
+/** Actual operations today use their registration time; past dates retain the existing convention. */
+export function fechaOperacionMs(v:string):number{return operationTimestamp(v,fechaMs(v));}
+/** A due date covers its full Argentine business day. */
+export function fechaVencimientoMs(v:string):number{return fechaMs(v)+12*60*60*1000-1;}
 export function formToObject(form: FormData): Record<string, string | string[] | undefined> {
   return Object.fromEntries([...new Set(form.keys())].filter(key => !key.startsWith('_')).map(key => {
     const values = form.getAll(key).map(String).filter(v => v.trim() !== '');

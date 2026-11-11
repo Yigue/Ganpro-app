@@ -11,3 +11,11 @@ it('shows a useful reference for pending animals and rejects duplicate electroni
  const a={id:'abcdef123456',id_caravana:'SIN-CARAVANA-abcdef123456',rfid:null};expect(pendingVisual(a)).toBe(true);expect(animalLabel(a)).toContain('Sin caravana');
  const r={rfid:'982000000000001',captured_at:Date.now()};expect(readingList.safeParse([r,r]).success).toBe(false);
 });
+
+it('registers todays operations after animals added this afternoon, preserving historical dates',async()=>{
+ const {operationTimestamp}=await import('./business-date');const noon=Date.parse('2026-11-11T12:00:00-03:00'),afternoon=Date.parse('2026-11-11T16:00:00-03:00');
+ expect(operationTimestamp('2026-11-11',noon,afternoon)).toBe(afternoon);
+ expect(operationTimestamp('2026-11-10',noon-86400000,afternoon)).toBe(noon-86400000);
+ // 01:00 UTC still belongs to the previous Argentine business day.
+ expect(operationTimestamp('2026-11-11',noon,Date.parse('2026-11-12T01:00:00Z'))).toBe(Date.parse('2026-11-12T01:00:00Z'));
+});
