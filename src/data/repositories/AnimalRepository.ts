@@ -1,3 +1,4 @@
+import {selectIdentifiedAnimal} from '@shared/utils/animalIdentity';
 import { Database, Q } from '@nozbe/watermelondb';
 import AnimalModel from '../models/AnimalModel';
 import EventoModel from '../models/EventoModel';
@@ -15,7 +16,7 @@ export class AnimalRepository {
       .get<AnimalModel>('animals')
       .query(Q.where('id_caravana', rfid))
       .fetch();
-    return results[0] ?? null;
+    return selectIdentifiedAnimal(results);
   }
 
   async findById(id: string): Promise<AnimalModel> {

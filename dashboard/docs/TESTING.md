@@ -77,8 +77,8 @@ Internet y el dibujo puede seguir visible aunque falle un proveedor raster.
 
 ## Resultado local de esta entrega
 
-- 44 pruebas unitarias (incluyen errores/API/fechas/CSV, consumos e historial).
-- 27 pruebas PostgreSQL/RLS/sync/circuitos integrados sobre migraciones completas desde una base vacía.
+- 47 pruebas unitarias (incluyen errores/API/fechas/CSV, consumos e historial).
+- 33 pruebas PostgreSQL/RLS/sync/circuitos integrados sobre migraciones completas desde una base vacía.
 - 3 recorridos Playwright aprobados con Chromium local y arnés Auth/Storage descrito arriba.
 - Lint sin advertencias, TypeScript y build de Next aprobados.
 

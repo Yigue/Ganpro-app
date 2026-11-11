@@ -60,7 +60,7 @@ Bancos, Comprobantes y Plan frente a real; los módulos originales enlazan a ell
 
 ## Adopción
 
-Aplicar migraciones aditivas 25–44 después de las anteriores, primero en copia de
+Aplicar migraciones aditivas 25–47 después de las anteriores, primero en copia de
 la base. No se ejecutaron en Supabase/Vercel reales. La 37 crea bucket y políticas
 cuando existe Supabase Storage. No publicar el bucket ni dar permisos anónimos.
 Administradores gestionan cortes y conciliación bancaria; campo administra la

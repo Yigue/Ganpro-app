@@ -1,3 +1,4 @@
+import {selectIdentifiedAnimal} from '@shared/utils/animalIdentity';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Q } from '@nozbe/watermelondb';
@@ -26,6 +27,7 @@ export function AnimalCard({ rfid }: Props) {
 
     async function load() {
       setLoading(true);
+      setAnimal(null);setLote(null);setEnCarencia(false);
       try {
         const results = await database
           .get<AnimalModel>('animals')
@@ -33,7 +35,8 @@ export function AnimalCard({ rfid }: Props) {
           .fetch();
 
         if (!cancelled && results.length > 0) {
-          const a = results[0];
+          const a = selectIdentifiedAnimal(results);
+          if (!a) return;
           setAnimal(a);
 
           if (a.loteId) {

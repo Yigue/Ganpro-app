@@ -2,10 +2,10 @@ name: Dashboard
 on:
   pull_request:
     branches: [v1]
-    paths: ['dashboard/**', '.github/workflows/dashboard.yml']
+    paths: ['dashboard/**', 'src/shared/utils/animalIdentity.ts', '.github/workflows/dashboard.yml']
   push:
-    branches: ['feat/dashboard-integridad-mapa-finanzas']
-    paths: ['dashboard/**', '.github/workflows/dashboard.yml']
+    branches: ['feat/dashboard-integridad-mapa-finanzas', 'fix/caravanas-historicas']
+    paths: ['dashboard/**', 'src/shared/utils/animalIdentity.ts', '.github/workflows/dashboard.yml']
 permissions:
   contents: read
 jobs:

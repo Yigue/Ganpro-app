@@ -51,7 +51,7 @@ parts.append('''\n-- Refrescar el catálogo de PostgREST una vez confirmada la t
 NOTIFY pgrst, 'reload schema';
 COMMIT;
 
--- Ambos deben devolver true después de una ejecución completa.
+-- Los tres deben devolver true después de una ejecución completa.
 SELECT
  to_regprocedure('public.ganpro_ledger_snapshot(text)') IS NOT NULL AS finanzas_instaladas,
  to_regprocedure('public.ganpro_management_snapshot()') IS NOT NULL AS gestion_instalada,

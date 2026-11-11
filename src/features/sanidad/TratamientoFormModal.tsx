@@ -1,3 +1,4 @@
+import {selectIdentifiedAnimal} from '@shared/utils/animalIdentity';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
@@ -64,6 +65,7 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
   }, [visible, database]);
 
   const lookupAnimal = useCallback(async () => {
+    setAnimal(null);
     if (!rfid.trim()) return;
     try {
       const results = await database
@@ -71,7 +73,7 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
         .query(Q.where('id_caravana', rfid.trim()))
         .fetch();
       if (results.length > 0) {
-        setAnimal(results[0]);
+        setAnimal(selectIdentifiedAnimal(results));
       } else {
         Alert.alert('No encontrado', `No hay animal con caravana ${rfid.trim()}`);
         setAnimal(null);

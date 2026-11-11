@@ -1,3 +1,4 @@
+import {selectIdentifiedAnimal} from '@shared/utils/animalIdentity';
 import { useRef, useCallback, useEffect } from 'react';
 import { TextInput, AppState, AppStateStatus, Keyboard } from 'react-native';
 import { Q } from '@nozbe/watermelondb';
@@ -113,7 +114,7 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
             .query(Q.where('id_caravana', rfid))
             .fetch();
 
-          const animal = results[0];
+          const animal = selectIdentifiedAnimal(results);
 
           if (animal) {
             hydrateQueueItem(rfid, {
@@ -144,7 +145,7 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
             .query(Q.where('id_caravana', rfid))
             .fetch();
 
-          const animal = results[0];
+          const animal = selectIdentifiedAnimal(results);
 
           if (animal) {
             setPhase('found');

@@ -172,14 +172,14 @@ END $$;
 REVOKE ALL ON FUNCTION public.ganpro_lock(),public.ganpro_lock_statement(),public.ganpro_audit_row(),public.ganpro_assert_open(bigint) FROM PUBLIC;
 -- User RPC helpers call this with owner privileges; authenticated REST is still protected by RLS.
 
--- 20261109000008_stock_integrity.sql / SHA256 0efb27e1b6d9f824dc0facb50c34ec62ef103f736d4389a710c1fc4d7e33c326
+-- 20261109000008_stock_integrity.sql / SHA256 05230c0c9515f2670f175c9bf235c2e3dc26d2fa40cfadd3cf231d35d6d45e0c
 DO $$ BEGIN
- IF EXISTS(SELECT 1 FROM public.animals GROUP BY upper(trim(id_caravana)) HAVING count(*)>1)
+ IF EXISTS(SELECT 1 FROM public.animals WHERE estado NOT IN('VENDIDO','MUERTO') GROUP BY upper(trim(id_caravana)) HAVING count(*)>1)
  OR EXISTS(SELECT 1 FROM public.animals WHERE nullif(trim(rfid),'') IS NOT NULL GROUP BY trim(rfid) HAVING count(*)>1) THEN
   RAISE EXCEPTION 'Reconcile duplicate visual/RFID identities before migrating; no data was merged';
  END IF;
 END $$;
-CREATE UNIQUE INDEX animals_visual_identity ON public.animals(upper(trim(id_caravana)));
+CREATE UNIQUE INDEX animals_visual_identity ON public.animals(upper(trim(id_caravana))) WHERE estado NOT IN('VENDIDO','MUERTO');
 CREATE UNIQUE INDEX animals_rfid_identity ON public.animals(trim(rfid)) WHERE nullif(trim(rfid),'') IS NOT NULL;
 CREATE FUNCTION public.ganpro_validate_animal() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE expected_sex text; BEGIN
@@ -197,6 +197,7 @@ DECLARE expected_sex text; BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER ganpro_validate_animal BEFORE INSERT OR UPDATE ON public.animals FOR EACH ROW EXECUTE FUNCTION public.ganpro_validate_animal();
+-- Visual identifiers are reserved while in stock; sold/dead history keeps its original number.
 -- NOT VALID preserves pre-existing orphans for explicit reconciliation while protecting all new writes.
 ALTER TABLE public.animals ADD CONSTRAINT animal_lot_ref FOREIGN KEY(lote_id) REFERENCES public.lotes(id) DEFERRABLE INITIALLY DEFERRED NOT VALID;
 ALTER TABLE public.animals ADD CONSTRAINT animal_paddock_ref FOREIGN KEY(potrero_id) REFERENCES public.potreros(id) DEFERRABLE INITIALLY DEFERRED NOT VALID;
@@ -1594,11 +1595,170 @@ DECLARE a public.animals; price numeric; animals jsonb:='[]'; supplies jsonb; he
 END $$;
 REVOKE ALL ON FUNCTION public.ganpro_inventory_close(jsonb) FROM PUBLIC;
 
+-- 20261111000045_historical_visual_tags.sql / SHA256 2ae08968f4f4524f739553395948c080d11c626674767fc4366aa720dafedc20
+DROP INDEX IF EXISTS public.animals_visual_identity;
+CREATE UNIQUE INDEX animals_visual_identity ON public.animals(upper(trim(id_caravana))) WHERE estado NOT IN('VENDIDO','MUERTO');
+CREATE OR REPLACE FUNCTION public.ganpro_stock_movement(d jsonb) RETURNS jsonb LANGUAGE plpgsql SET search_path=public AS $$
+DECLARE kind text:=d->>'tipo'; ts bigint:=(d->>'fecha')::bigint; tag text; tags text[];
+ a public.animals; ids text[]:='{}'; cat text; sex text; amount jsonb; plan public.escenario_lineas; BEGIN
+ PERFORM public.ganpro_assert_open(ts);
+ IF kind IS NULL OR kind NOT IN('VENTA','COMPRA','MUERTE','NACIMIENTO','TRASLADO') THEN RAISE EXCEPTION 'GANPRO_INVALID_INPUT'; END IF;
+ SELECT array_agg(upper(trim(value))) INTO tags FROM jsonb_array_elements_text(d->'caravanas');
+ IF coalesce(cardinality(tags),0)=0 OR cardinality(tags)>1000 OR EXISTS(SELECT 1 FROM unnest(tags) x GROUP BY x HAVING count(*)>1) THEN RAISE EXCEPTION 'GANPRO_INVALID_INPUT'; END IF;
+ IF d->>'lote_destino_id' IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.lotes WHERE id=d->>'lote_destino_id')
+ OR d->>'potrero_destino_id' IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.potreros WHERE id=d->>'potrero_destino_id') THEN RAISE EXCEPTION 'GANPRO_INVALID_REFERENCE'; END IF;
+ IF d->>'kg' IS NOT NULL AND (d->>'kg' !~ '^\d{1,9}(\.\d{1,4})?$' OR (d->>'kg')::numeric<=0 OR (d->>'kg')::numeric>9999*cardinality(tags)) THEN RAISE EXCEPTION 'GANPRO_INVALID_INPUT'; END IF;
+ IF kind IN('VENTA','COMPRA') THEN PERFORM public.ganpro_money(d->>'monto'); END IF;
+ IF kind='VENTA' AND (d->>'kg' IS NULL OR (d->>'kg')::numeric<=0) THEN RAISE EXCEPTION 'GANPRO_INVALID_INPUT'; END IF;
+ IF d->>'escenario_linea_id' IS NOT NULL THEN
+  SELECT * INTO plan FROM public.escenario_lineas WHERE id=d->>'escenario_linea_id';
+  IF NOT FOUND OR plan.movimiento_id IS NOT NULL OR plan.tipo<>kind OR plan.cabezas<>cardinality(tags) THEN RAISE EXCEPTION 'GANPRO_CONFLICT'; END IF;
+ END IF;
+ FOREACH tag IN ARRAY tags LOOP
+  IF kind IN('COMPRA','NACIMIENTO') THEN
+   sex=coalesce(d->>'sexo','H'); cat=coalesce(d->>'categoria',CASE WHEN sex='M' THEN 'Ternero' ELSE 'Ternera' END);
+   IF kind='NACIMIENTO' AND cat NOT IN('Ternero','Ternera') THEN RAISE EXCEPTION 'GANPRO_SEX_CATEGORY'; END IF;
+   INSERT INTO public.animals(id_caravana,sexo,categoria,estado,fecha_nacimiento,peso_actual,lote_id,potrero_id)
+   VALUES(tag,sex,cat,'ACTIVO',CASE WHEN kind='NACIMIENTO' THEN ts END,
+   (d->>'kg')::float8/cardinality(tags),d->>'lote_destino_id',d->>'potrero_destino_id') RETURNING * INTO a;
+   INSERT INTO public.eventos(animal_id,tipo,timestamp,notas,dte_numero) VALUES(a.id,kind,ts,d->>'notas',d->>'dte_numero');
+   IF a.peso_actual IS NOT NULL THEN INSERT INTO public.eventos(animal_id,tipo,valor,timestamp) VALUES(a.id,'PESAJE',a.peso_actual,ts); END IF;
+  ELSE
+   SELECT * INTO a FROM public.animals WHERE upper(trim(id_caravana))=tag AND estado='ACTIVO';
+   IF NOT FOUND THEN
+    IF EXISTS(SELECT 1 FROM public.animals WHERE upper(trim(id_caravana))=tag) THEN RAISE EXCEPTION 'GANPRO_INACTIVE_ANIMAL'; END IF;
+    RAISE EXCEPTION 'GANPRO_NOT_FOUND';
+   END IF;
+   IF a.estado<>'ACTIVO' THEN RAISE EXCEPTION 'GANPRO_INACTIVE_ANIMAL'; END IF;
+   IF a.fecha_nacimiento>ts OR EXISTS(SELECT 1 FROM public.eventos WHERE animal_id=a.id AND timestamp>ts) OR EXISTS(SELECT 1 FROM public.animal_movements WHERE animal_id=a.id AND fecha>ts) THEN RAISE EXCEPTION 'GANPRO_DATE_ORDER'; END IF;
+   IF kind='TRASLADO' THEN
+    IF d->>'lote_destino_id' IS NULL AND d->>'potrero_destino_id' IS NULL THEN RAISE EXCEPTION 'GANPRO_INVALID_REFERENCE'; END IF;
+    INSERT INTO public.animal_movements(animal_id,potrero_origen_id,potrero_destino_id,lote_origen_id,lote_destino_id,fecha)
+    VALUES(a.id,a.potrero_id,coalesce(d->>'potrero_destino_id',a.potrero_id),a.lote_id,coalesce(d->>'lote_destino_id',a.lote_id),ts);
+    UPDATE public.animals SET potrero_id=coalesce(d->>'potrero_destino_id',potrero_id),lote_id=coalesce(d->>'lote_destino_id',lote_id) WHERE id=a.id;
+   ELSE
+    IF kind='VENTA' AND public.ganpro_animal_withdrawal(a.id,ts) THEN RAISE EXCEPTION 'GANPRO_WITHDRAWAL'; END IF;
+    UPDATE public.animals SET estado=CASE WHEN kind='VENTA' THEN 'VENDIDO' ELSE 'MUERTO' END WHERE id=a.id;
+    INSERT INTO public.eventos(animal_id,tipo,timestamp,notas,dte_numero) VALUES(a.id,kind,ts,d->>'notas',d->>'dte_numero');
+   END IF;
+  END IF;
+  ids=array_append(ids,a.id);
+ END LOOP;
+ IF plan.id IS NOT NULL AND EXISTS(SELECT 1 FROM public.animals WHERE id=ANY(ids) AND categoria<>plan.categoria) THEN RAISE EXCEPTION 'GANPRO_CONFLICT'; END IF;
+ IF kind IN('VENTA','COMPRA') THEN
+  amount=public.ganpro_finance_document(d||jsonb_build_object('tipo',CASE WHEN kind='VENTA' THEN 'INGRESO' ELSE 'GASTO' END,'categoria',kind,
+   'descripcion',coalesce(d->>'notas',kind||' '||cardinality(tags)||' cabezas'),'cabezas',cardinality(tags),'animal_ids',to_jsonb(ids),
+   'categoria_animal',(SELECT CASE WHEN count(DISTINCT categoria)=1 THEN min(categoria) END FROM public.animals WHERE id=ANY(ids)),
+   'lote_id',(SELECT CASE WHEN count(DISTINCT lote_id)=1 THEN min(lote_id) END FROM public.animals WHERE id=ANY(ids))));
+  IF kind='VENTA' THEN UPDATE public.animals SET venta_movimiento_id=amount->>'id' WHERE id=ANY(ids);
+  ELSE UPDATE public.animals SET compra_movimiento_id=amount->>'id' WHERE id=ANY(ids); END IF;
+  IF plan.id IS NOT NULL THEN UPDATE public.escenario_lineas SET movimiento_id=amount->>'id' WHERE id=plan.id; END IF;
+ END IF;
+ RETURN jsonb_build_object('message',kind||': '||cardinality(tags)||' animales registrados','id',amount->>'id');
+END $$;
+REVOKE ALL ON FUNCTION public.ganpro_stock_movement(jsonb) FROM PUBLIC;
+
+-- 20261111000046_unambiguous_tag_lookups.sql / SHA256 89cea030a7279dce80478e836f4cf23e75a71fb3536e00eea039377215d2e043
+CREATE OR REPLACE FUNCTION public.ganpro_stock_import(d jsonb) RETURNS jsonb LANGUAGE plpgsql SET search_path=public AS $$
+DECLARE item jsonb; a public.animals; aid text; bid text; nuevos int:=0; pesadas int:=0; ts bigint; BEGIN
+ IF jsonb_typeof(d->'filas')<>'array' OR jsonb_array_length(d->'filas')>2000 THEN RAISE EXCEPTION 'GANPRO_INVALID_INPUT'; END IF;
+ IF EXISTS(SELECT 1 FROM jsonb_array_elements(d->'filas') x WHERE nullif(x->>'caravana','') IS NOT NULL GROUP BY upper(trim(x->>'caravana')) HAVING count(*)>1)
+ OR EXISTS(SELECT 1 FROM jsonb_array_elements(d->'filas') x WHERE nullif(x->>'rfid','') IS NOT NULL GROUP BY trim(x->>'rfid') HAVING count(*)>1) THEN RAISE EXCEPTION 'GANPRO_DUPLICATE_TAG'; END IF;
+ FOR item IN SELECT value FROM jsonb_array_elements(d->'filas') LOOP
+  aid=NULL; bid=NULL;
+  SELECT id INTO aid FROM public.animals WHERE trim(rfid)=nullif(trim(item->>'rfid'),'');
+  SELECT id INTO bid FROM public.animals WHERE upper(trim(id_caravana))=upper(trim(item->>'caravana')) AND estado NOT IN('VENDIDO','MUERTO');
+  IF aid IS NOT NULL AND bid IS NOT NULL AND aid<>bid THEN RAISE EXCEPTION 'GANPRO_CONFLICT'; END IF;
+  aid=coalesce(aid,bid); ts=coalesce((item->>'fecha')::bigint,public.ganpro_now_ms());
+  IF ts>public.ganpro_now_ms()+86400000 THEN RAISE EXCEPTION 'GANPRO_INVALID_INPUT'; END IF;
+  IF aid IS NULL THEN
+   IF EXISTS(SELECT 1 FROM public.animals WHERE upper(trim(id_caravana))=upper(trim(item->>'caravana'))) THEN RAISE EXCEPTION 'GANPRO_REUSED_TAG_REVIEW'; END IF;
+   aid=gen_random_uuid()::text;
+   INSERT INTO public.animals(id,id_caravana,rfid,sexo,categoria,raza,peso_actual,lote_id,potrero_id)
+   VALUES(aid,coalesce(nullif(item->>'caravana',''),'RFID-'||(item->>'rfid')),nullif(item->>'rfid',''),
+    coalesce(item->>'sexo',d->>'sexo'),coalesce(item->>'categoria',d->>'categoria'),item->>'raza',(item->>'peso')::float8,d->>'lote_id',d->>'potrero_id');
+   nuevos=nuevos+1;
+  ELSE
+   SELECT * INTO a FROM public.animals WHERE id=aid;
+   IF nullif(item->>'rfid','') IS NOT NULL AND a.rfid IS NOT NULL AND trim(a.rfid)<>trim(item->>'rfid') THEN RAISE EXCEPTION 'GANPRO_CONFLICT'; END IF;
+   IF a.estado<>'ACTIVO' THEN RAISE EXCEPTION 'GANPRO_INACTIVE_ANIMAL'; END IF;
+   IF EXISTS(SELECT 1 FROM public.eventos WHERE animal_id=aid AND tipo='PESAJE' AND timestamp>ts) THEN RAISE EXCEPTION 'GANPRO_DATE_ORDER'; END IF;
+   IF item->>'peso' IS NOT NULL THEN UPDATE public.animals SET peso_actual=(item->>'peso')::float8 WHERE id=aid; END IF;
+  END IF;
+  IF item->>'peso' IS NOT NULL THEN
+   INSERT INTO public.eventos(animal_id,tipo,valor,timestamp) VALUES(aid,'PESAJE',(item->>'peso')::float8,ts); pesadas=pesadas+1;
+  END IF;
+ END LOOP;
+ RETURN jsonb_build_object('message',nuevos||' animales nuevos, '||pesadas||' pesadas registradas');
+END $$;
+REVOKE ALL ON FUNCTION public.ganpro_stock_import(jsonb) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION public.ganpro_repro_stage(d jsonb) RETURNS jsonb LANGUAGE plpgsql SET search_path=public AS $$
+DECLARE cycle public.repro_ciclos; mother public.animals; calf public.animals; ts bigint:=(d->>'fecha')::bigint; weight numeric:=(d->>'peso')::numeric; BEGIN
+ PERFORM public.ganpro_assert_open(ts);
+ SELECT * INTO cycle FROM public.repro_ciclos WHERE id=d->>'id';
+ IF NOT FOUND THEN RAISE EXCEPTION 'GANPRO_NOT_FOUND'; END IF;
+ IF ts<coalesce(cycle.fecha_destete,cycle.fecha_parto,cycle.fecha_tacto,cycle.fecha_servicio) THEN RAISE EXCEPTION 'GANPRO_DATE_ORDER'; END IF;
+ SELECT * INTO mother FROM public.animals WHERE id=cycle.madre_id;
+ IF d->>'etapa'='TACTO' THEN
+  IF cycle.estado<>'SERVIDA' OR d->>'resultado' NOT IN('PRENADA','VACIA') THEN RAISE EXCEPTION 'GANPRO_CONFLICT'; END IF;
+  UPDATE public.repro_ciclos SET estado=d->>'resultado',fecha_tacto=ts WHERE id=cycle.id;
+  INSERT INTO public.eventos(animal_id,tipo,timestamp,notas) VALUES(mother.id,'TACTO',ts,CASE WHEN d->>'resultado'='PRENADA' THEN 'tacto:prenada' ELSE 'tacto:vacia' END);
+ ELSIF d->>'etapa'='PARTO' THEN
+  IF cycle.estado<>'PRENADA' OR mother.estado<>'ACTIVO' OR weight IS NULL OR weight<=0 OR d->>'sexo' NOT IN('M','H') THEN RAISE EXCEPTION 'GANPRO_CONFLICT'; END IF;
+  SELECT lote_id,potrero_id INTO mother.lote_id,mother.potrero_id FROM public.ganpro_animals_at(ts) WHERE id=mother.id;
+  PERFORM public.ganpro_stock_movement(jsonb_build_object('tipo','NACIMIENTO','fecha',ts,'caravanas',jsonb_build_array(d->>'caravana'),'sexo',d->>'sexo','categoria',CASE WHEN d->>'sexo'='M' THEN 'Ternero' ELSE 'Ternera' END,'kg',weight,'lote_destino_id',mother.lote_id,'potrero_destino_id',mother.potrero_id));
+  SELECT * INTO calf FROM public.animals WHERE id_caravana=upper(trim(d->>'caravana')) AND estado='ACTIVO';
+  UPDATE public.animals SET madre_id=mother.id,padre_id=cycle.padre_id WHERE id=calf.id;
+  UPDATE public.repro_ciclos SET estado='PARIDA',fecha_parto=ts,ternero_id=calf.id WHERE id=cycle.id;
+  INSERT INTO public.eventos(animal_id,tipo,timestamp,notas) VALUES(mother.id,'PARTO',ts,'Cría: '||calf.id_caravana);
+ ELSIF d->>'etapa'='PERDIDA' THEN
+  IF cycle.estado NOT IN('SERVIDA','PRENADA','PARIDA') OR (cycle.ternero_id IS NOT NULL AND EXISTS(SELECT 1 FROM public.animals WHERE id=cycle.ternero_id AND estado='ACTIVO')) THEN RAISE EXCEPTION 'GANPRO_CONFLICT'; END IF;
+  UPDATE public.repro_ciclos SET estado='PERDIDA' WHERE id=cycle.id;
+  INSERT INTO public.eventos(animal_id,tipo,timestamp,notas) VALUES(mother.id,'PERDIDA_REPRODUCTIVA',ts,'Cierre de ciclo por pérdida');
+ ELSIF d->>'etapa'='DESTETE' THEN
+  IF cycle.estado<>'PARIDA' OR weight IS NULL OR weight<=0 OR weight>9999 THEN RAISE EXCEPTION 'GANPRO_CONFLICT'; END IF;
+  SELECT * INTO calf FROM public.animals WHERE id=cycle.ternero_id AND estado='ACTIVO';
+  IF NOT FOUND THEN RAISE EXCEPTION 'GANPRO_INACTIVE_ANIMAL'; END IF;
+  IF EXISTS(SELECT 1 FROM public.eventos WHERE animal_id=calf.id AND timestamp>ts) THEN RAISE EXCEPTION 'GANPRO_DATE_ORDER'; END IF;
+  INSERT INTO public.eventos(animal_id,tipo,timestamp,valor,notas) VALUES(calf.id,'DESTETE',ts,weight,'Madre: '||mother.id_caravana),(calf.id,'PESAJE',ts,weight,'Pesada de destete');
+  UPDATE public.animals SET peso_actual=weight WHERE id=calf.id;
+  UPDATE public.repro_ciclos SET estado='DESTETADA',fecha_destete=ts,peso_destete=weight WHERE id=cycle.id;
+ ELSE RAISE EXCEPTION 'GANPRO_INVALID_INPUT'; END IF;
+ RETURN jsonb_build_object('message','Etapa, genealogía y stock actualizados juntos');
+END $$;
+REVOKE ALL ON FUNCTION public.ganpro_repro_stage(jsonb) FROM PUBLIC;
+
+-- 20261111000047_reactivation_identity_guard.sql / SHA256 afc87ee5a7438ec22a610aae191ea530d708263455917dabee6dbd3de1785b29
+CREATE OR REPLACE FUNCTION public.ganpro_finance_void(d jsonb) RETURNS jsonb LANGUAGE plpgsql SET search_path=public AS $$
+DECLARE doc public.movimientos_financieros; a public.animals; ident text; ts bigint:=(d->>'fecha')::bigint; BEGIN
+ PERFORM public.ganpro_assert_open(ts);
+ SELECT * INTO doc FROM public.movimientos_financieros WHERE id=d->>'id' AND ledger_version=1 AND anulado_en IS NULL;
+ IF NOT FOUND THEN RAISE EXCEPTION 'GANPRO_NOT_FOUND'; END IF;
+ PERFORM public.ganpro_assert_open(coalesce(doc.adopcion_fecha,doc.fecha));
+ IF doc.categoria IN('VENTA','COMPRA') AND coalesce(cardinality(doc.animal_ids),0)=0 THEN RAISE EXCEPTION 'GANPRO_REVERSAL_REQUIRED'; END IF;
+ IF ts<coalesce(doc.adopcion_fecha,doc.fecha) OR EXISTS(SELECT 1 FROM public.asientos_caja WHERE movimiento_id=doc.id AND fecha>ts) THEN RAISE EXCEPTION 'GANPRO_DATE_ORDER'; END IF;
+ IF public.ganpro_paid(doc.id)<>0 OR nullif(trim(d->>'motivo'),'') IS NULL THEN RAISE EXCEPTION 'GANPRO_REVERSAL_REQUIRED'; END IF;
+ FOREACH ident IN ARRAY coalesce(doc.animal_ids,'{}') LOOP
+  SELECT * INTO a FROM public.animals WHERE id=ident;
+  IF NOT FOUND OR (doc.categoria='VENTA' AND (a.estado<>'VENDIDO' OR a.venta_movimiento_id IS DISTINCT FROM doc.id)) OR (doc.categoria='COMPRA' AND (a.estado<>'ACTIVO' OR a.compra_movimiento_id IS DISTINCT FROM doc.id)) THEN RAISE EXCEPTION 'GANPRO_REVERSAL_REQUIRED'; END IF;
+  IF doc.categoria='VENTA' AND EXISTS(SELECT 1 FROM public.animals other WHERE other.id<>a.id AND upper(trim(other.id_caravana))=upper(trim(a.id_caravana)) AND other.estado NOT IN('VENDIDO','MUERTO')) THEN RAISE EXCEPTION 'GANPRO_TAG_REUSE_CONFLICT'; END IF;
+  IF doc.categoria='COMPRA' THEN
+   -- Retain identity and history: an annulled purchase is an exit, not a DELETE.
+   UPDATE public.animals SET estado='DESCARTE',compra_movimiento_id=NULL WHERE id=a.id;
+  ELSE UPDATE public.animals SET estado='ACTIVO',venta_movimiento_id=NULL WHERE id=a.id; END IF;
+  INSERT INTO public.eventos(animal_id,tipo,timestamp,valor,notas) VALUES(a.id,'ANULACION',ts,CASE WHEN doc.categoria='VENTA' THEN 1 ELSE -1 END,'Reversión de comprobante '||doc.id||': '||(d->>'motivo'));
+ END LOOP;
+ UPDATE public.movimientos_financieros SET anulado_en=ts WHERE id=doc.id;
+ UPDATE public.escenario_lineas SET movimiento_id=NULL WHERE movimiento_id=doc.id;
+ RETURN jsonb_build_object('message','Comprobante anulado con historial');
+END $$;
+REVOKE ALL ON FUNCTION public.ganpro_finance_void(jsonb) FROM PUBLIC;
+
 -- Refrescar el catálogo de PostgREST una vez confirmada la transacción.
 NOTIFY pgrst, 'reload schema';
 COMMIT;
 
--- Ambos deben devolver true después de una ejecución completa.
+-- Los tres deben devolver true después de una ejecución completa.
 SELECT
  to_regprocedure('public.ganpro_ledger_snapshot(text)') IS NOT NULL AS finanzas_instaladas,
  to_regprocedure('public.ganpro_management_snapshot()') IS NOT NULL AS gestion_instalada,
