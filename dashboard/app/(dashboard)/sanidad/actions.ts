@@ -15,6 +15,7 @@ export const registrarAplicacion = crearAccion(
     operation_id: z.string().min(1, 'elegí el producto'),
     fecha: z.string().min(1),
     dosis: z.coerce.number().positive().optional(),
+    insumo_id:z.string().optional(),partida_id:z.string().optional(),
     producto_lote: z.string().trim().optional(),
     acta_numero: z.string().trim().optional(),
     responsable: z.string().trim().optional(),

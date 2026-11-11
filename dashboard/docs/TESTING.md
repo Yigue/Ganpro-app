@@ -24,7 +24,7 @@ npm run test:db
 El migrador rechaza bases ya inicializadas; no hace DROP ni reset. El fixture de
 las pruebas SÍ vacía tablas de esa base aislada entre casos. Ambos rechazan hosts
 que no sean localhost/127.0.0.1 y nombres sin sufijo `_tests`.
-`tests/db/bootstrap.sql` simula únicamente roles, auth.users y auth.uid para que
+`tests/db/bootstrap.sql` simula roles, auth.users/auth.uid y metadatos de Storage para que
 las migraciones y RLS se prueben sobre PostgreSQL real. No es una migración de producción.
 
 Cobertura: doble venta concurrente, idempotencia, rollback por cuenta inválida,
@@ -49,10 +49,10 @@ rol `authenticator`, public schema, anon role y el secreto LOCAL definido en
 node tests/e2e/local-services.mjs
 ```
 
-Ese proceso escucha `127.0.0.1:55442`: proxy REST real y **emulador Auth de pruebas**.
+Ese proceso escucha `127.0.0.1:55442`: proxy REST real y **emuladores Auth y Storage de pruebas**.
 Solo admite usuarios `admin/advisor/field@test.invalid`, clave `local-test-only`.
-No usarlo ni publicarlo como autenticación real. Auth Supabase/GoTrue, email de
-confirmación y recuperación no se validan con este arnés.
+No usarlo ni publicarlo como autenticación real. Auth Supabase/GoTrue y el servicio Storage productivo, email de
+confirmación y recuperación no se validan con este arnés. Las políticas de Storage sí se prueban con RLS real.
 
 En otra terminal, con la misma configuración durante build y start:
 
@@ -77,9 +77,11 @@ Internet y el dibujo puede seguir visible aunque falle un proveedor raster.
 
 ## Resultado local de esta entrega
 
-- 40 pruebas unitarias (31 originales + 9 de errores/API/fechas/CSV e historial).
-- 15 pruebas PostgreSQL/RLS/sync sobre migraciones completas desde una base vacía.
-- 2 recorridos Playwright aprobados con Chromium local y arnés Auth descrito arriba.
+- 44 pruebas unitarias (incluyen errores/API/fechas/CSV, consumos e historial).
+- 27 pruebas PostgreSQL/RLS/sync/circuitos integrados sobre migraciones completas desde una base vacía.
+- 3 recorridos Playwright aprobados con Chromium local y arnés Auth/Storage descrito arriba.
 - Lint sin advertencias, TypeScript y build de Next aprobados.
 
 Las pruebas no aplicaron migraciones ni datos a Supabase/Vercel reales.
+
+La ampliación integra compras, consumos y entrega atómica; retiro después de traslados; genealogía y destete; rotaciones y descanso; cortes físicos y resultados; conciliación bancaria; comprobantes privados y rollback de planes. El navegador agrega compra/consumo/archivo y verifica el ancho de celular. Ver INTEGRATED_WORKFLOWS.md.

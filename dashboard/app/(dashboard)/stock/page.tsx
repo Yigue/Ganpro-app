@@ -20,7 +20,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
     getLotes(),
     getPotreros(),
     getEventos(),
-    selectAll('operation_logs'),
+    selectAll('operation_logs',{columns:'*,aplicacion_animales(animal_id)'}),
     getEstablecimiento(),
     getSessionPerfil(),
   ]);

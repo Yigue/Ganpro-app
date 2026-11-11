@@ -4,7 +4,7 @@ Este PR no aplica cambios a Supabase ni publica Vercel. Antes de habilitarlo:
 
 1. Respaldar y ensayar una copia de la base actual, incluyendo tablas móviles.
 2. Aplicar las migraciones del dashboard en orden. Las 01–05 ya existentes no se
-   reejecutan en una base que las tiene registradas. Las nuevas son 06–24.
+   reejecutan en una base que las tiene registradas. Las nuevas son 06–44.
 3. Si hay caravanas/RFID duplicados, la migración 08 se detiene: resolverlos con
    el responsable del campo, conservando trazabilidad; no fusiona datos sola.
    Los FK NOT VALID preservan huérfanos anteriores para conciliación explícita;
@@ -32,7 +32,7 @@ Este PR no aplica cambios a Supabase ni publica Vercel. Antes de habilitarlo:
   o peso de categoría, no se presenta un total completo. El histórico de cabezas
   usa altas/bajas registradas y categoría actual; no reconstruye categorías pasadas.
 - Registros móviles v3 anteriores siguen fuera del libro nuevo hasta conciliación.
-  La app móvil no incorpora en este PR los formularios de cuentas/asientos.
+  La app móvil no incorpora en este PR los formularios de cuentas/asientos ni los nuevos insumos con partidas. Ver INTEGRATED_WORKFLOWS.md antes de habilitar circuitos gestionados.
 - Mapas necesitan WebGL e Internet; proveedores externos pueden fallar. Capas
   calles/CARTO-OSM, satélite/Esri y relieve/OpenTopoMap conservan atribuciones.
   Geometría simple sin agujeros ni cruce de antimeridiano; área esférica aproximada.
@@ -42,3 +42,5 @@ Este PR no aplica cambios a Supabase ni publica Vercel. Antes de habilitarlo:
 
 No revertir migraciones eliminando tablas con movimientos reales. Una reversión
 requiere respaldo, conciliación y un plan específico de preservación de datos.
+
+Ver [Circuitos integrados](INTEGRATED_WORKFLOWS.md) para adopción de insumos, partidas, cortes y Storage privado.

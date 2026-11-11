@@ -1,13 +1,17 @@
 'use client';
+import {businessToday} from '@/lib/calc/business-date';
 
+
+import {MedicineFields} from '@/components/gestion/medicine-fields';
+import type {ManagementData} from '@/lib/management/schema';
 import { useState } from 'react';
-import { CalendarPlus, Plus, Syringe } from 'lucide-react';
-import { crearProducto, programarOperacion, registrarAplicacion } from '@/app/(dashboard)/sanidad/actions';
+import { CalendarPlus, Syringe } from 'lucide-react';
+import { programarOperacion, registrarAplicacion } from '@/app/(dashboard)/sanidad/actions';
 import { FormDialog } from '@/components/ui/form-dialog';
 import { Field, Input, Select } from '@/components/ui/input';
 import type { Lote, OperationCatalog } from '@/lib/db/types';
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => businessToday();
 
 export interface ProgramadaOpcion {
   id: string;
@@ -41,7 +45,7 @@ function LoteSelect({ lotes, required }: { lotes: Lote[]; required?: boolean }) 
   );
 }
 
-export function AplicacionForm({ catalogo, lotes, programadas }: { catalogo: OperationCatalog[]; lotes: Lote[]; programadas: ProgramadaOpcion[] }) {
+export function AplicacionForm({ catalogo, lotes, programadas, management }: { catalogo: OperationCatalog[]; lotes: Lote[]; programadas: ProgramadaOpcion[];management:ManagementData }) {
   const [destino, setDestino] = useState<'lote' | 'animal'>('lote');
   return (
     <FormDialog
@@ -79,6 +83,7 @@ export function AplicacionForm({ catalogo, lotes, programadas }: { catalogo: Ope
         <Field label="Dosis (ml o unidades)">
           <Input name="dosis" type="number" step="0.1" min="0" />
         </Field>
+        <MedicineFields data={management}/>
         <Field label="Lote/serie del producto">
           <Input name="producto_lote" />
         </Field>
@@ -132,39 +137,4 @@ export function ProgramarForm({ catalogo, lotes }: { catalogo: OperationCatalog[
   );
 }
 
-export function ProductoForm() {
-  return (
-    <FormDialog
-      title="Nuevo producto sanitario"
-      trigger={
-        <>
-          <Plus className="h-4 w-4" /> Producto
-        </>
-      }
-      triggerVariant="outline"
-      action={crearProducto}
-    >
-      <Field label="Nombre">
-        <Input name="nombre" required />
-      </Field>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Tipo">
-          <Select name="tipo">
-            <option value="VACUNA">Vacuna</option>
-            <option value="TRATAMIENTO">Tratamiento</option>
-            <option value="IATF">IATF</option>
-          </Select>
-        </Field>
-        <Field label="Días de retiro">
-          <Input name="dias_carencia" type="number" min="0" />
-        </Field>
-        <Field label="Costo por dosis (ARS)">
-          <Input name="costo_unitario" type="number" min="0" />
-        </Field>
-      </div>
-      <Field label="Notas">
-        <Input name="notas" />
-      </Field>
-    </FormDialog>
-  );
-}
+export {ProductoForm} from './producto-form';

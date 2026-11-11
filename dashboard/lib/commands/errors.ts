@@ -6,6 +6,19 @@ export class DataError extends Error {
   constructor(public readonly providerCode: string) { super('DEPENDENCY_FAILURE'); }
 }
 const messages: Record<string, string> = {
+  INSUFFICIENT_STOCK: 'No hay existencias suficientes. No se guardó ningún descuento parcial.',
+  EXPIRED_BATCH: 'La partida está vencida o falta informar su vencimiento.',
+  MANAGED_STOCK: 'Ese stock se gestiona desde Insumos. Registrá una compra o consumo.',
+  UNMANAGED_SUPPLY: 'Incorporá el insumo y su saldo inicial en Gestión antes de consumirlo.',
+  GRAZING_CONFLICT: 'El lote o potrero ya tiene una ocupación o planificación que se superpone.',
+  REST_PERIOD: 'El potrero todavía debe completar su período de descanso.',
+  FORAGE_CAPACITY: 'El lote supera la capacidad o el forraje disponible para esos días.',
+  CURRENT_SNAPSHOT: 'El corte físico debe corresponder a hoy. No se reconstruyen inventarios antiguos con datos actuales.',
+  MISSING_WEIGHT: 'Faltan pesos en animales activos. Completalos antes del corte.',
+  STATEMENT_BALANCE: 'El saldo inicial más los movimientos no coincide con el saldo final del extracto.',
+  DUPLICATE_BANK_REF: 'El extracto contiene referencias ya importadas para esa cuenta. Revisá el archivo para no duplicarlas.',
+  BANK_MISMATCH: 'La cuenta o el importe no coincide con el asiento seleccionado.',
+  STORAGE_UNAVAILABLE: 'No pudimos acceder al almacenamiento de comprobantes. Reintentá más tarde.',
   LAST_ADMIN: 'Debe quedar al menos un administrador. Asigná otro antes de cambiar este rol.',
   FORBIDDEN: 'No tenés permiso para realizar esta operación.',
   UNAUTHORIZED: 'Tu sesión venció. Volvé a ingresar.',

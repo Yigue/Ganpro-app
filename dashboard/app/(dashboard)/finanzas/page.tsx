@@ -18,6 +18,7 @@ export default async function FinancePage({searchParams}:{searchParams:Promise<{
  const [data,lotes,profile]=await Promise.all([getLedger(parsed.data),getLotes(),getSessionPerfil()]);
  const editable=canEdit(profile?.rol);
  return <>
+      <Link className="text-sm text-primary underline" href="/gestion?vista=bancos">Conciliación bancaria y comprobantes</Link>
  <PageHeader title="Finanzas: caja y obligaciones" description="Comprobantes, saldos, cobros y pagos reales. El saldo de caja no es la utilidad." actions={<Link className="text-sm text-primary underline" href="/finanzas/analisis">Análisis económico y proyección</Link>}/>
  <form className="flex flex-wrap items-end gap-3"><label className="text-sm">Período<input name="mes" type="month" defaultValue={parsed.data} className="ml-2 rounded border bg-card p-2"/></label><button className="rounded border px-3 py-2 text-sm">Aplicar</button><a className="text-sm text-primary underline" href={`/api/export/finanzas?mes=${parsed.data}`}>Exportar finanzas CSV</a></form>
  <p className="text-sm text-muted-foreground">Saldos y pendientes al cierre del mes (o última operación disponible); cobros/pagos dentro del mes. Las existencias del campo son actuales.</p>

@@ -21,6 +21,7 @@ App GanPro (WatermelonDB, offline)  ──sync──►  Dashboard Next.js (Verc
 | `/costos` | Directos y estructura, costo por lote, por kg y por ternero, simulador de cría |
 | `/finanzas` | Cuentas ARS, caja, obligaciones, pagos parciales, vencimientos, reversión, cierre y CSV |
 | `/finanzas/analisis` | Análisis económico ARS/USD y proyección conservados; margen parcial e inventario pendiente |
+| `/gestion` | Insumos, reproducción individual, pastoreo, cortes físicos, bancos, comprobantes y plan frente a real |
 | `/mapa` | Dibujar/editar potreros, hectáreas y perímetro, tipos, ocupación, ficha y capas calles/satélite/relieve |
 | `/config` | Establecimiento, potreros, lotes, usuarios y roles, coeficientes EV, precios, estado del sync |
 | `/proyeccion` | Escenarios: negocio de invernada/recría, precios históricos, ganancia de peso, plan de compras y ventas, crecimiento del rodeo de cría |
@@ -95,3 +96,5 @@ Las políticas RLS de `20261101000004_rls.sql` aplican estos permisos en la base
 - [Revisión técnica y administrativa](docs/IMPLEMENTATION_PLAN.md)
 - [Despliegue y conciliación](docs/DEPLOYMENT.md)
 - [Pruebas locales y límites del arnés](docs/TESTING.md)
+
+- [Circuitos integrados y adopción](docs/INTEGRATED_WORKFLOWS.md)

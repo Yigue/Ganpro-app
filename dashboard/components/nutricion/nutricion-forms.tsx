@@ -1,12 +1,14 @@
 'use client';
+import {businessToday} from '@/lib/calc/business-date';
+
 
 import { Package, Plus, Truck } from 'lucide-react';
 import { crearRacion, guardarSuplemento, registrarEntrega } from '@/app/(dashboard)/nutricion/actions';
 import { FormDialog } from '@/components/ui/form-dialog';
 import { Field, Input, Select } from '@/components/ui/input';
-import type { Potrero, Racion, Suplemento } from '@/lib/db/types';
+import type { Lote, Potrero, Racion, Suplemento } from '@/lib/db/types';
 
-export function EntregaForm({ potreros, raciones }: { potreros: Potrero[]; raciones: Racion[] }) {
+export function EntregaForm({ potreros, raciones, lotes }: { potreros: Potrero[]; raciones: Racion[]; lotes:Lote[] }) {
   return (
     <FormDialog
       title="Registrar entrega de alimento"
@@ -27,6 +29,7 @@ export function EntregaForm({ potreros, raciones }: { potreros: Potrero[]; racio
             ))}
           </Select>
         </Field>
+        <Field label="Lote ganadero"><Select name="lote_id" required>{lotes.map(l=><option key={l.id} value={l.id}>{l.nombre}</option>)}</Select></Field>
         <Field label="Ración">
           <Select name="racion_id" required>
             {raciones.map((r) => (
@@ -40,12 +43,10 @@ export function EntregaForm({ potreros, raciones }: { potreros: Potrero[]; racio
           <Input name="cantidad_kg" type="number" min="0" step="1" required />
         </Field>
         <Field label="Fecha">
-          <Input name="fecha" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required />
+          <Input name="fecha" type="date" defaultValue={businessToday()} required />
         </Field>
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="descontar_stock" value="1" defaultChecked /> Descontar del stock de insumos según la fórmula
-      </label>
+      <p className="text-xs">Se descuentan todos los ingredientes y se conserva el costo. Incorporá primero sus saldos en Gestión → Insumos.</p>
     </FormDialog>
   );
 }

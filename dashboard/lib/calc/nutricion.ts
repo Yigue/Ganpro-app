@@ -68,7 +68,7 @@ export function entregasPorPotrero(
     const prev = out.get(l.potrero_id) ?? { potreroId: l.potrero_id, kg: 0, kgMS: 0, costo: 0 };
     prev.kg += l.cantidad_kg;
     prev.kgMS += l.cantidad_kg * ((comp?.msPct ?? 0) / 100);
-    prev.costo = prev.costo == null || comp?.costoKg == null ? null : prev.costo + l.cantidad_kg * comp.costoKg;
+    prev.costo = prev.costo == null || l.costo_total == null ? null : prev.costo + l.costo_total;
     out.set(l.potrero_id, prev);
   }
   return [...out.values()];

@@ -28,7 +28,7 @@ describe('atomic Ganpro stock and finance',()=>{
  });
  it('blocks a sale during withdrawal with no partial write',async()=>{
   await entry(['A']);await pool.query(`INSERT INTO operations_catalog(id,nombre,tipo) VALUES('drug','Test','TRATAMIENTO')`);
-  await pool.query(`INSERT INTO operation_logs(animal_id,operation_id,fecha_aplicacion,fecha_fin_carencia) SELECT id,'drug',$1::bigint-1,$1::bigint+86400000 FROM animals`,[DATE]);
+  await pool.query(`INSERT INTO operation_logs(animal_id,operation_id,fecha_aplicacion,fecha_fin_carencia) SELECT id,'drug',$1::bigint,$1::bigint+86400000 FROM animals`,[DATE]);
   await expect(command('stock.movement',{tipo:'VENTA',fecha:DATE,caravanas:['A'],kg:300,monto:'100',contraparte:'C'})).rejects.toThrow('GANPRO_WITHDRAWAL');
   expect((await pool.query(`SELECT estado FROM animals`)).rows[0].estado).toBe('ACTIVO');
  });

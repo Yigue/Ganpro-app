@@ -2,6 +2,8 @@
 import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
+import {runOperation} from '@/lib/commands/rpc';
+import {operationMessage} from '@/lib/commands/message';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
 
 const RUTAS = ['/nutricion', '/costos', '/'];
@@ -9,14 +11,10 @@ const RUTAS = ['/nutricion', '/costos', '/'];
 export const guardarFormula = crearAccion(
   z.object({ racion_id: z.string().min(1), formula: z.string().min(2) }),
   async (d, supabase) => {
-    const items = z
-      .array(z.object({ suplemento_id: z.string().min(1), porcentaje: z.number().positive().max(100) }))
-      .parse(JSON.parse(d.formula));
-    const total = items.reduce((a, i) => a + i.porcentaje, 0);
-    if (Math.abs(total - 100) > 0.5) throw new InputError({_form:[`Los porcentajes suman ${total.toFixed(1)} %, tienen que sumar 100 %`]});
-    check(await supabase.from('racion_ingredientes').delete().eq('racion_id', d.racion_id));
-    check(await supabase.from('racion_ingredientes').insert(items.map((i) => ({ ...i, racion_id: d.racion_id }))));
-    return 'Fórmula guardada';
+    let raw:unknown;try{raw=JSON.parse(d.formula);}catch{throw new InputError({formula:['Revisá la fórmula.']});}
+    const result=z.array(z.object({suplemento_id:z.string().min(1),porcentaje:z.number().positive().max(100)})).safeParse(raw);
+    if(!result.success)throw new InputError({formula:['Revisá los ingredientes y porcentajes.']});
+    return operationMessage(await runOperation(supabase,'nutrition.formula',{racion_id:d.racion_id,items:result.data}));
   },
   { name: 'nutricion.guardarFormula', revalidate: RUTAS },
 );
@@ -60,31 +58,13 @@ export const guardarSuplemento = crearAccion(
 export const registrarEntrega = crearAccion(
   z.object({
     potrero_id: z.string().min(1),
+    lote_id:z.string().min(1),
     racion_id: z.string().min(1),
     cantidad_kg: z.coerce.number().positive(),
     fecha: z.string().min(1),
     descontar_stock: z.string().optional(),
     notas: z.string().trim().optional(),
   }),
-  async (d, supabase) => {
-    check(
-      await supabase.from('potrero_feeding_logs').insert({
-        potrero_id: d.potrero_id,
-        racion_id: d.racion_id,
-        cantidad_kg: d.cantidad_kg,
-        fecha: fechaMs(d.fecha),
-        notas: d.notas ?? null,
-      }),
-    );
-    if (d.descontar_stock) {
-      const { data: ings } = await supabase.from('racion_ingredientes').select('suplemento_id, porcentaje').eq('racion_id', d.racion_id);
-      for (const ing of ings ?? []) {
-        const { data: s } = await supabase.from('suplementos').select('stock_kg').eq('id', ing.suplemento_id).single();
-        const nuevo = Math.max(0, (s?.stock_kg ?? 0) - (d.cantidad_kg * ing.porcentaje) / 100);
-        check(await supabase.from('suplementos').update({ stock_kg: nuevo }).eq('id', ing.suplemento_id));
-      }
-    }
-    return 'Entrega registrada';
-  },
+  async(d,supabase)=>operationMessage(await runOperation(supabase,'nutrition.deliver',{...d,fecha:fechaMs(d.fecha)})),
   { name: 'nutricion.registrarEntrega', revalidate: RUTAS },
 );

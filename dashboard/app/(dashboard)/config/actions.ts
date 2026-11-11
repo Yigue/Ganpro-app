@@ -2,6 +2,8 @@
 import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
+import {runOperation} from '@/lib/commands/rpc';
+import {operationMessage} from '@/lib/commands/message';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
 
 const num = z.coerce.number().min(0).optional();
@@ -81,26 +83,12 @@ export const guardarCategorias = crearAccion(
     const categorias = Object.keys(d)
       .filter((k) => k.startsWith('ev__'))
       .map((k) => k.slice(4));
-    for (const categoria of categorias) {
-      const v = (campo: string) => {
-        const raw = d[`${campo}__${categoria}`];
-        return typeof raw === 'string' && raw !== '' ? raw : null;
-      };
-      const ev = Number(v('ev'));
-      if (!Number.isFinite(ev) || ev <= 0) throw new InputError({_form:[`EV inválido para ${categoria}`]});
-      check(
-        await supabase
-          .from('categorias_config')
-          .update({
-            ev,
-            recategoriza_a: v('recat'),
-            edad_recategorizacion_meses: v('edad') ? Number(v('edad')) : null,
-            consumo_sal_g_dia: v('sal') ? Number(v('sal')) : null,
-          })
-          .eq('categoria', categoria),
-      );
-    }
-    return 'Categorías guardadas';
+    const changes=categorias.map(categoria=>{
+      const value=(field:string)=>{const raw=d[`${field}__${categoria}`];return typeof raw==='string'&&raw!==''?raw:null;};
+      const ev=Number(value('ev'));if(!Number.isFinite(ev)||ev<=0)throw new InputError({_form:[`EV inválido para ${categoria}`]});
+      return {categoria,ev,recategoriza_a:value('recat'),edad_recategorizacion_meses:value('edad')?Number(value('edad')):null,consumo_sal_g_dia:value('sal')?Number(value('sal')):null};
+    });
+    return operationMessage(await runOperation(supabase,'config.categories',changes));
   },
   { name: 'config.guardarCategorias', roles: ['admin'], revalidate: ['/config', '/', '/stock', '/nutricion'] },
 );

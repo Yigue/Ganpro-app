@@ -3,9 +3,9 @@ import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
 import {DomainError} from '@/lib/commands/errors';
-import {databaseError} from '@/lib/commands/errors';
+import {runOperation} from '@/lib/commands/rpc';
+import {operationMessage} from '@/lib/commands/message';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
-import type { MovimientoFinanciero } from '@/lib/db/types';
 
 const RUTAS = ['/proyeccion', '/proyeccion/negocio', '/proyeccion/peso', '/proyeccion/plan', '/proyeccion/cria', '/proyeccion/precios'];
 
@@ -37,38 +37,10 @@ export const guardarEscenario = crearAccion(
     resultado: json,
     lineas: json.optional(),
   }),
-  async (d, supabase) => {
-    const fila = { tipo: d.tipo, nombre: d.nombre, lote_id: d.lote_id ?? null, supuestos: d.supuestos, resultado: d.resultado };
-    let id = d.id;
-    if (id) {
-      check(await supabase.from('escenarios').update(fila).eq('id', id));
-    } else {
-      const { data, error } = await supabase.from('escenarios').insert(fila).select('id').single();
-      if (error) throw databaseError(error);
-      id = data.id as string;
-    }
-    if (d.lineas !== undefined) {
-      const lineas = z.array(lineaSchema).parse(d.lineas);
-      // Las líneas ya convertidas en reales se conservan.
-      check(await supabase.from('escenario_lineas').delete().eq('escenario_id', id).is('movimiento_id', null));
-      if (lineas.length) {
-        check(
-          await supabase.from('escenario_lineas').insert(
-            lineas.map((l) => ({
-              escenario_id: id,
-              mes: l.mes,
-              tipo: l.tipo,
-              categoria: l.categoria,
-              cabezas: l.cabezas,
-              kg: l.kg,
-              precio_kg: l.precioKg,
-              monto: l.cabezas * l.kg * l.precioKg,
-            })),
-          ),
-        );
-      }
-    }
-    return `Escenario "${d.nombre}" guardado`;
+  async(d,supabase)=>{
+    const lines=d.lineas===undefined?undefined:z.array(lineaSchema).safeParse(d.lineas);
+    if(lines&&!lines.success)throw new InputError({lineas:['Revisá las líneas del plan.']});
+    return operationMessage(await runOperation(supabase,'scenario.save',{...d,lineas:lines?.success?lines.data:undefined}));
   },
   { name: 'proyeccion.guardarEscenario', revalidate: RUTAS },
 );
@@ -88,39 +60,7 @@ export const eliminarEscenario = crearAccion(
  */
 export const cerrarConReal = crearAccion(
   z.object({ id: z.string().min(1), lote_id: z.string().min(1, 'elegí el lote'), desde: z.string().min(1), hasta: z.string().min(1) }),
-  async (d, supabase) => {
-    const { data, error } = await supabase
-      .from('movimientos_financieros')
-      .select('*')
-      .eq('lote_id', d.lote_id)
-      .is('anulado_en',null)
-      .gte('fecha', fechaMs(d.desde))
-      .lte('fecha', fechaMs(d.hasta));
-    if (error) throw databaseError(error);
-    const movs = (data ?? []) as MovimientoFinanciero[];
-    const ventas = movs.filter((m) => m.tipo === 'INGRESO');
-    const compras = movs.filter((m) => m.tipo === 'GASTO' && m.categoria === 'COMPRA');
-    const directos = movs.filter((m) => m.tipo === 'GASTO' && m.categoria !== 'COMPRA');
-    const suma = (l: MovimientoFinanciero[], k: 'monto' | 'kg' | 'cabezas') => l.reduce((a, m) => a + ((m[k] as number | null) ?? 0), 0);
-    const ingreso = suma(ventas, 'monto');
-    const compra = suma(compras, 'monto');
-    const costos = suma(directos, 'monto');
-    const kgVendidos = suma(ventas, 'kg');
-    const real = {
-      desde: fechaMs(d.desde),
-      hasta: fechaMs(d.hasta),
-      ingreso,
-      compra,
-      costosDirectos: costos,
-      margenBruto: ingreso - compra - costos,
-      cabezasVendidas: suma(ventas, 'cabezas'),
-      kgVendidos,
-      precioVentaKg: kgVendidos ? ingreso / kgVendidos : null,
-      movimientos: movs.length,
-    };
-    check(await supabase.from('escenarios').update({ resultado_real: real, estado: 'CERRADO', lote_id: d.lote_id }).eq('id', d.id));
-    return movs.length ? `Cerrado con ${movs.length} movimientos reales` : 'Cerrado, pero el lote no tiene movimientos en esas fechas';
-  },
+  async(d,supabase)=>operationMessage(await runOperation(supabase,'scenario.close',{...d,desde:fechaMs(d.desde),hasta:fechaMs(d.hasta)})),
   { name: 'proyeccion.cerrarConReal', revalidate: RUTAS },
 );
 

@@ -20,10 +20,10 @@ export function fmtPct(v: number | null | undefined, decimals = 1): string {
 
 export function fmtDate(ms: number | null | undefined): string {
   if (ms == null) return '—';
-  return new Date(ms).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return new Date(ms).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric',timeZone:'America/Argentina/Buenos_Aires' });
 }
 
 export function fmtDateShort(ms: number | null | undefined): string {
   if (ms == null) return '—';
-  return new Date(ms).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+  return new Date(ms).toLocaleDateString('es-AR', { day: '2-digit', month: 'short',timeZone:'America/Argentina/Buenos_Aires' });
 }

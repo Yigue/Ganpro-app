@@ -1,3 +1,4 @@
+import {businessToday} from '@/lib/calc/business-date';
 import { Upload } from 'lucide-react';
 import { cargarActaSigsa } from '@/app/(dashboard)/movimientos/actions';
 import { Badge } from '@/components/ui/badge';
@@ -44,7 +45,7 @@ export function ConciliacionSection({
           >
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Fecha">
-                <Input name="fecha" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
+                <Input name="fecha" type="date" required defaultValue={businessToday()} />
               </Field>
               <Field label="N° de acta">
                 <Input name="acta_numero" />

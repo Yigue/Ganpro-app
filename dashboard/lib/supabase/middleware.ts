@@ -1,3 +1,4 @@
+import {boundedFetch} from '@/lib/commands/fetch';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/env';
@@ -14,6 +15,7 @@ export async function updateSession(request: NextRequest) {
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    global:{fetch:boundedFetch},
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (list) => {

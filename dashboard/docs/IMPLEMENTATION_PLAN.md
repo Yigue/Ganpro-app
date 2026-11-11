@@ -58,9 +58,10 @@ bancos y comprobantes reales, definir reglas fiscales, probar la operatoria del
 celular en el campo y acordar el cierre periódico. No se puede certificar la
 exactitud de los datos reales leyendo el código ni usando fixtures locales.
 
-Reproducción, nutrición y proyecciones mantienen funciones originales. Conviene
-hacer una siguiente revisión de sus escrituras múltiples (p. ej. entrega de
-ración y descuento de insumos), genealogía, trazabilidad de tratamientos por lote
-histórico y alertas de calidad de datos. Este cambio no declara esos circuitos
-completamente auditados. Las prioridades de stock, finanzas e Inicio quedan
-concretadas en esta entrega; límites y pruebas en DEPLOYMENT.md y TESTING.md.
+La ampliación posterior implementa los nueve circuitos de conexión revisados: retiro
+por destinatario, insumos/compras/consumos, costos conservados, inventarios,
+reproducción individual, rotaciones, conciliación bancaria, comprobantes y planes.
+También convierte fórmulas, entregas, categorías y escenarios en transacciones.
+Ver INTEGRATED_WORKFLOWS.md para alcance, reglas de adopción y compatibilidad móvil.
+La gestión fiscal, devoluciones comerciales y nuevas pantallas offline requieren
+circuitos específicos; no se presentan como ya implementados.
