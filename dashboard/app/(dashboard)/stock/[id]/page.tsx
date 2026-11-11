@@ -1,3 +1,4 @@
+import {animalLabel} from '@/lib/stock/identity';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -80,7 +81,7 @@ export default async function AnimalPage({ params }: { params: Promise<{ id: str
         <ArrowLeft className="h-4 w-4" /> Stock
       </Link>
       <PageHeader
-        title={`Caravana ${animal.id_caravana}`}
+        title={animalLabel(animal)}
         description={[animal.categoria, animal.raza, animal.sexo === 'H' ? 'Hembra' : 'Macho', animal.rfid && `RFID ${animal.rfid}`].filter(Boolean).join(' · ')}
         actions={
           <>

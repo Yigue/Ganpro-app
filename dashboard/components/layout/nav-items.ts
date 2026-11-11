@@ -33,3 +33,11 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/proyeccion', label: 'Proyección', icon: LineChart },
   { href: '/config', label: 'Configuración', icon: Settings },
 ];
+
+export const NAV_GROUPS=[
+ {label:'General',items:NAV_ITEMS.slice(0,2)},
+ {label:'Campo y existencias',items:NAV_ITEMS.slice(2,5)},
+ {label:'Producción y sanidad',items:NAV_ITEMS.slice(5,8)},
+ {label:'Economía y planificación',items:NAV_ITEMS.slice(8,11)},
+ {label:'Administración',items:NAV_ITEMS.slice(11)},
+];

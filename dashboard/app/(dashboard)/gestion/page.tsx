@@ -1,3 +1,6 @@
+import {QuickOperations} from '@/components/gestion/quick-operations';
+import {getCategoriasConfig} from '@/lib/db/client';
+import {ManagementOverview} from '@/components/gestion/overview';
 import Link from 'next/link';
 import {PageHeader} from '@/components/ui/section';
 import {Supplies} from '@/components/gestion/supplies';
@@ -16,10 +19,12 @@ import {getSessionPerfil,canEdit} from '@/lib/db/auth';
 export const metadata={title:'Gestión integrada'};
 export default async function Page({searchParams}:{searchParams:Promise<{vista?:string}>}){
  const [params,data,animals,lotes,potreros,suplementos,catalogo,servicios,ledger,perfil,lineas,escenarios,reales]=await Promise.all([searchParams,getManagement(),getAnimals(),getLotes(),getPotreros(),getSuplementos(),getCatalogo(),selectAll('servicios'),getLedger(businessToday().slice(0,7)),getSessionPerfil(),selectAll('escenario_lineas'),selectAll('escenarios'),selectAll('movimientos_financieros',{filter:q=>q.is('anulado_en',null)})]);
+ const categorias=await getCategoriasConfig();
  const p:ManagementProps={data,animals,lotes,potreros,suplementos,catalogo,servicios,ledger,lineas,escenarios,reales,editable:canEdit(perfil?.rol),admin:perfil?.rol==='admin'};
- const tabs=[['insumos','Insumos'],['reproduccion','Reproducción'],['pastoreo','Pastoreo'],['inventarios','Inventarios'],['bancos','Bancos'],['documentos','Comprobantes'],['planes','Plan vs. real']];
- const active=tabs.some(([key])=>key===params.vista)?params.vista:'insumos';
+ const tabs=[['resumen','Inicio de gestión'],['insumos','Insumos'],['reproduccion','Reproducción'],['pastoreo','Pastoreo'],['inventarios','Inventarios'],['bancos','Bancos'],['documentos','Comprobantes'],['planes','Plan vs. real']];
+ const active=tabs.some(([key])=>key===params.vista)?params.vista:'resumen';
  return <><PageHeader title="Gestión integrada" description="Conexiones entre el campo, las existencias y la administración."/><nav aria-label="Módulos de gestión" className="flex flex-wrap gap-2">{tabs.map(([key,label])=><Link key={key} href={`/gestion?vista=${key}`} aria-current={active===key?'page':undefined} className={`rounded border px-3 py-2 text-sm ${active===key?'bg-primary text-primary-foreground':''}`}>{label}</Link>)}</nav>
+ {active==='resumen'&&<><QuickOperations p={p} categorias={categorias}/><ManagementOverview/></>}
  {active==='insumos'&&<Supplies p={p}/>}{active==='reproduccion'&&<Reproduction p={p}/>}{active==='pastoreo'&&<Grazing p={p}/>}{active==='inventarios'&&<Closings p={p}/>}{active==='bancos'&&<Banking p={p}/>}{active==='documentos'&&<Documents p={p}/>}{active==='planes'&&<Projections p={p}/>}
  </>;
 }

@@ -74,3 +74,7 @@ Para PostgreSQL, navegador y limitaciones del arnés ver `TESTING.md`.
 Para aplicar migraciones y conciliar datos anteriores ver `DEPLOYMENT.md`.
 
 Los comandos `supply.*`, `nutrition.*`, `repro.*`, `grazing.*`, `inventory.close`, `bank.*`, `scenario.*` y `document.attach` siguen el mismo dispatcher y recibo. Ver INTEGRATED_WORKFLOWS.md para reglas, compatibilidad móvil y límites del upload.
+
+Los comandos `stock.generic`, `stock.readings` y `health.schedule-status` siguen
+el mismo contrato transaccional. Ver [STOCK_AND_OPERATIONS.md](STOCK_AND_OPERATIONS.md)
+para identidad pendiente, lectura HID, cotización y aplicación de tareas.

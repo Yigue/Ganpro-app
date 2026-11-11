@@ -18,9 +18,9 @@ export interface ProgramadaOpcion {
   label: string;
 }
 
-function ProductoSelect({ catalogo }: { catalogo: OperationCatalog[] }) {
+function ProductoSelect({ catalogo,defaultValue,id }: { catalogo: OperationCatalog[];defaultValue?:string;id?:string }) {
   return (
-    <Select name="operation_id" required>
+    <Select id={id} name="operation_id" required defaultValue={defaultValue}>
       <option value="">Elegí…</option>
       {catalogo.map((c) => (
         <option key={c.id} value={c.id}>
@@ -32,9 +32,9 @@ function ProductoSelect({ catalogo }: { catalogo: OperationCatalog[] }) {
   );
 }
 
-function LoteSelect({ lotes, required }: { lotes: Lote[]; required?: boolean }) {
+function LoteSelect({ lotes, required,defaultValue,id }: { lotes: Lote[]; required?: boolean;defaultValue?:string;id?:string }) {
   return (
-    <Select name="lote_id" required={required}>
+    <Select id={id} name="lote_id" required={required} defaultValue={defaultValue}>
       <option value="">{required ? 'Elegí…' : 'Todo el rodeo'}</option>
       {lotes.map((l) => (
         <option key={l.id} value={l.id}>
@@ -45,37 +45,38 @@ function LoteSelect({ lotes, required }: { lotes: Lote[]; required?: boolean }) 
   );
 }
 
-export function AplicacionForm({ catalogo, lotes, programadas, management }: { catalogo: OperationCatalog[]; lotes: Lote[]; programadas: ProgramadaOpcion[];management:ManagementData }) {
-  const [destino, setDestino] = useState<'lote' | 'animal'>('lote');
+export function AplicacionForm({ catalogo, lotes, programadas, management,preset }: { catalogo: OperationCatalog[]; lotes: Lote[]; programadas: ProgramadaOpcion[];management:ManagementData;preset?:{id:string;operationId:string;loteId:string|null} }) {
+  const [destino, setDestino] = useState<'lote' | 'animal' | 'rodeo'>(preset?(preset.loteId?'lote':'rodeo'):'lote');
   return (
     <FormDialog
-      title="Registrar aplicación"
+      title={preset?'Aplicar tarea programada':'Registrar aplicación'}
       description="El fin del período de retiro se calcula con los días de carencia del producto."
       trigger={
         <>
-          <Syringe className="h-4 w-4" /> Registrar aplicación
+          <Syringe className="h-4 w-4" /> {preset?'Aplicar':'Registrar aplicación'}
         </>
       }
       action={registrarAplicacion}
     >
+      {preset&&<input type="hidden" name="scheduled_id" value={preset.id}/>}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Aplicado a">
-          <Select name="destino" value={destino} onChange={(e) => setDestino(e.target.value as 'lote' | 'animal')}>
+          <Select name="destino" value={destino} onChange={(e) => setDestino(e.target.value as 'lote' | 'animal' | 'rodeo')}>
             <option value="lote">Un lote completo</option>
-            <option value="animal">Un animal</option>
+            <option value="animal">Un animal</option><option value="rodeo">Todo el rodeo activo</option>
           </Select>
         </Field>
         {destino === 'lote' ? (
           <Field label="Lote">
-            <LoteSelect lotes={lotes} required />
+            <LoteSelect lotes={lotes} required defaultValue={preset?.loteId??undefined}/>
           </Field>
-        ) : (
+        ) : destino==='animal' ? (
           <Field label="Caravana">
             <Input name="caravana" required />
           </Field>
-        )}
+        ) : <p className="text-xs">Se registrarán los destinatarios de todo el rodeo activo.</p>}
         <Field label="Producto" className="sm:col-span-2">
-          <ProductoSelect catalogo={catalogo} />
+          <ProductoSelect catalogo={catalogo} defaultValue={preset?.operationId}/>
         </Field>
         <Field label="Fecha">
           <Input name="fecha" type="date" defaultValue={hoy()} required />
@@ -93,7 +94,7 @@ export function AplicacionForm({ catalogo, lotes, programadas, management }: { c
         <Field label="Responsable">
           <Input name="responsable" />
         </Field>
-        {programadas.length > 0 && (
+        {!preset&&programadas.length > 0 && (
           <Field label="Completa la programada">
             <Select name="scheduled_id">
               <option value="">Ninguna</option>

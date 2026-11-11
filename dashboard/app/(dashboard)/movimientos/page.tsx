@@ -1,3 +1,5 @@
+import {TradeHistory} from '@/components/movimientos/trade-history';
+import {animalLabel} from '@/lib/stock/identity';
 import {getLedger} from '@/lib/db/ledger';
 import {businessToday} from '@/lib/calc/business-date';
 import {selectOne} from '@/lib/db/client';
@@ -47,7 +49,7 @@ export default async function MovimientosPage({searchParams}:{searchParams:Promi
   const lotesById = byId(lotes);
   const potrerosById = byId(potreros);
   const nombre = (m: Map<string, { nombre: string }>, k: string | null) => (k ? (m.get(k)?.nombre ?? '?') : '—');
-  const caravana = (id: string) => animalsById.get(id)?.id_caravana ?? id;
+  const caravana = (id:string) => {const a=animalsById.get(id);return a?animalLabel(a):id;};
 
   const filas: FilaHistorial[] = [
     ...movimientos.map((m) => ({
@@ -79,7 +81,7 @@ export default async function MovimientosPage({searchParams}:{searchParams:Promi
       <PageHeader
         title="Movimientos y trazabilidad"
         description={`RENSPA ${est.renspa ?? '—'} · ventas, compras, muertes, nacimientos y traslados`}
-        actions={editable && <MovimientoForm lotes={lotes} potreros={potreros} categorias={config} cuentas={libro.cuentas} linea={linea}/>}
+        actions={editable && <MovimientoForm animals={animals} lotes={lotes} potreros={potreros} categorias={config} cuentas={libro.cuentas} linea={linea}/>}
       />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Ventas del ejercicio" value={enEjercicio.filter((e) => e.tipo === 'VENTA').length} hint={`Cabezas · ejercicio ${ejercicio.label}`} />
@@ -101,6 +103,7 @@ export default async function MovimientosPage({searchParams}:{searchParams:Promi
           <HistorialTable filas={filas} />
         </Section>
       </div>
+      <TradeHistory movements={movsFin.filter(m=>['VENTA','COMPRA'].includes(m.categoria))}/>
       <DteSection movs={movsFin.filter((m) => m.dte_numero)} puedeEditar={editable} />
     </>
   );

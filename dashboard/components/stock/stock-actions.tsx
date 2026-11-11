@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import {GenericForm} from './generic-form';
 import { FileUp, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { crearAnimal, importarCsvRFID } from '@/app/(dashboard)/stock/actions';
@@ -39,6 +41,8 @@ function CsvField() {
 export function StockActions({ categorias, lotes, potreros }: Props) {
   return (
     <>
+      <Link href="/stock/manga" className="rounded-md border px-3 py-2 text-sm">Modo manga / lectura</Link>
+      <GenericForm categorias={categorias} lotes={lotes} potreros={potreros}/>
       <FormDialog
         title="Importar lectura RFID"
         description="Si el RFID ya existe se registra la pesada; si no, se da de alta con los valores por defecto de abajo."

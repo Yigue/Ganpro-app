@@ -6,6 +6,8 @@ export class DataError extends Error {
   constructor(public readonly providerCode: string) { super('DEPENDENCY_FAILURE'); }
 }
 const messages: Record<string, string> = {
+  SCHEDULE_APPLICATION: 'Registrá la aplicación para completar la tarea sanitaria y calcular el retiro.',
+  VISUAL_REQUIRED: 'El animal ya tiene caravana visual. Ingresá una identificación válida para cambiarla.',
   INSUFFICIENT_STOCK: 'No hay existencias suficientes. No se guardó ningún descuento parcial.',
   EXPIRED_BATCH: 'La partida está vencida o falta informar su vencimiento.',
   MANAGED_STOCK: 'Ese stock se gestiona desde Insumos. Registrá una compra o consumo.',

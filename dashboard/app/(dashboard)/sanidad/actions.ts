@@ -9,7 +9,7 @@ const RUTAS = ['/sanidad', '/stock', '/'];
 
 export const registrarAplicacion = crearAccion(
   z.object({
-    destino: z.enum(['lote', 'animal']),
+    destino: z.enum(['lote', 'animal','rodeo']),
     lote_id: z.string().optional(),
     caravana: z.string().trim().optional(),
     operation_id: z.string().min(1, 'elegí el producto'),
@@ -44,9 +44,7 @@ export const programarOperacion = crearAccion(
 
 export const cambiarEstadoProgramada = crearAccion(
   z.object({ id: z.string().min(1), estado: z.enum(['PENDIENTE', 'COMPLETADO', 'CANCELADO']) }),
-  async (d, supabase) => {
-    check(await supabase.from('scheduled_operations').update({ estado: d.estado }).eq('id', d.id));
-  },
+  async(d,supabase)=>operationMessage(await runOperation(supabase,'health.schedule-status',d)),
   { name: 'sanidad.cambiarEstadoProgramada', revalidate: RUTAS },
 );
 

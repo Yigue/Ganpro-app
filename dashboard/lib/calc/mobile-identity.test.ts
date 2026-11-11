@@ -11,3 +11,9 @@ it('refuses an ambiguous active or entirely historical visual identity',()=>{
 it('preserves a unique historical result and distinguishes no match',()=>{
  const sold={estado:'VENDIDO'};expect(selectIdentifiedAnimal([sold])).toBe(sold);expect(selectIdentifiedAnimal([])).toBeNull();
 });
+it('prioritizes an electronic match over another visual animal and supports older records',async()=>{
+ const {resolveAnimalIdentity}=await import('../../../src/shared/utils/animalIdentity');
+ const exact={estado:'VENDIDO'},other={estado:'ACTIVO'};
+ expect(await resolveAnimalIdentity(async()=>[exact],async()=>[other])).toBe(exact);
+ expect(await resolveAnimalIdentity(async()=>[],async()=>[other])).toBe(other);
+});

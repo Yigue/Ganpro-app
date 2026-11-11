@@ -3,7 +3,7 @@ import re,hashlib
 root=Path(__file__).resolve().parents[1]/'supabase'/'migrations'
 files=sorted(root.glob('*.sql'))
 preflight='''-- GANPRO-APP / dashboard — actualizar una base existente (originales 01–04).
--- Generado desde las migraciones originales del PR #3, sin seed ni datos demo.
+-- Generado desde las migraciones del dashboard, sin seed ni datos demo.
 -- Antes: respaldo y prueba sobre una copia. Ejecutar TODO junto en SQL Editor.
 -- Una sola transacción: cualquier error revierte los cambios de este script.
 -- Si hay migraciones parcialmente aplicadas, se detiene sin adivinar ni borrar.
@@ -55,6 +55,34 @@ COMMIT;
 SELECT
  to_regprocedure('public.ganpro_ledger_snapshot(text)') IS NOT NULL AS finanzas_instaladas,
  to_regprocedure('public.ganpro_management_snapshot()') IS NOT NULL AS gestion_instalada,
- EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='inventario_cierres' AND column_name='receipt_tick') AS ultima_migracion_instalada;
+ to_regprocedure('public.ganpro_schedule_status(jsonb)') IS NOT NULL AS ultima_migracion_instalada;
 ''')
 out=root.parent/'upgrade-existing.sql';out.write_text(''.join(parts));print(out, out.stat().st_size)
+
+# Incremental bundle for the reviewed historical-identity release (01–47).
+parts=["""-- GANPRO: base con migraciones 01–47 completas. Sin seeds ni datos demo.
+-- Ejecutar TODO junto. No usar en una base con actualizaciones parciales.
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '180s';
+SELECT pg_advisory_xact_lock(20261109,1);
+DO $preflight$
+BEGIN
+ IF to_regprocedure('public.ganpro_stock_save(jsonb)') IS NULL
+ OR to_regprocedure('public.ganpro_finance_void(jsonb)') IS NULL
+ OR position('GANPRO_TAG_REUSE_CONFLICT' IN pg_get_functiondef(to_regprocedure('public.ganpro_finance_void(jsonb)')))=0
+ OR to_regclass('public.inventario_cierres') IS NULL THEN
+  RAISE EXCEPTION 'Se requieren las migraciones 01–47 completas. No se modificó nada.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='animals' AND column_name='visual_pendiente') THEN
+  RAISE EXCEPTION 'Stock ya contiene cambios 48+. Revisar migraciones aplicadas; no se modificó nada.';
+ END IF;
+END
+$preflight$;
+"""]
+for p in files:
+ if int(re.search(r'(\d{6})_',p.name).group(1))<48:continue
+ raw=p.read_text();body=re.sub(r'^\s*BEGIN;\s*\n','',raw,count=1);body=re.sub(r'\nCOMMIT;\s*$','\n',body)
+ parts.append('\n-- '+p.name+' / SHA256 '+hashlib.sha256(raw.encode()).hexdigest()+'\n'+body)
+parts.append("\nNOTIFY pgrst, 'reload schema';\nCOMMIT;\n")
+out=root.parent/'upgrade-47-to-56.sql';out.write_text(''.join(parts));print(out,out.stat().st_size)

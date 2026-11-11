@@ -23,4 +23,4 @@ export function SanidadView0({data}:{data:PageData}){const {catalogo,lotes,logs,
         <StatCard label="Aplicaciones" value={logs.filter((l) => l.fecha_aplicacion >= ejercicio.inicio).length} hint={`Ejercicio ${ejercicio.label}`} />
         <StatCard label="Costo sanitario" value={fmtARS(costoEjercicio)} hint={`${logs.filter(l=>l.fecha_aplicacion>=ejercicio.inicio&&l.costo_total==null).length} aplicaciones sin costo conservado · suma de costos conocidos`} />
       </div>
-<CalendarioSection meses={meses} items={items} puedeEditar={editable} /></>;}
+<CalendarioSection context={{catalogo,lotes,management}} meses={meses} items={items} puedeEditar={editable} /></>;}

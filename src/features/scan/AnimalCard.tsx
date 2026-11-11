@@ -1,7 +1,7 @@
-import {selectIdentifiedAnimal} from '@shared/utils/animalIdentity';
+import {displayAnimalIdentity} from '@shared/utils/animalIdentity';
+import {AnimalRepository} from '@data/repositories/AnimalRepository';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { Q } from '@nozbe/watermelondb';
 import { useDatabase } from '@shared/hooks/useDatabase';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { colors, spacing, typography } from '@theme/index';
@@ -29,13 +29,10 @@ export function AnimalCard({ rfid }: Props) {
       setLoading(true);
       setAnimal(null);setLote(null);setEnCarencia(false);
       try {
-        const results = await database
-          .get<AnimalModel>('animals')
-          .query(Q.where('id_caravana', rfid))
-          .fetch();
+        const found = await new AnimalRepository(database).findByRfid(rfid);
 
-        if (!cancelled && results.length > 0) {
-          const a = selectIdentifiedAnimal(results);
+        if (!cancelled && found) {
+          const a = found;
           if (!a) return;
           setAnimal(a);
 
@@ -82,7 +79,7 @@ export function AnimalCard({ rfid }: Props) {
       )}
 
       <View style={styles.header}>
-        <Text style={styles.rfid}>{animal.idCaravana}</Text>
+        <Text style={styles.rfid}>{displayAnimalIdentity(animal)}</Text>
         <StatusBadge
           label={animal.categoria}
           categoria={animal.categoria as CategoriaType}

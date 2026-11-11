@@ -1,65 +1,18 @@
 'use client';
-
-import { useAccion } from '@/components/ui/form-dialog';
-import { Check, X } from 'lucide-react';
-import { cambiarEstadoProgramada } from '@/app/(dashboard)/sanidad/actions';
-import { Section } from '@/components/ui/section';
-import { mesLabel } from '@/lib/calc/fechas';
-import { fmtDateShort } from '@/lib/calc/format';
-import { cn } from '@/lib/utils';
-
-export interface ItemCalendario {
-  id: string;
-  fecha: number;
-  nombre: string;
-  lote: string;
-  estado: 'PENDIENTE' | 'COMPLETADO' | 'CANCELADO' | 'APLICADO';
-  vencida: boolean;
-}
-
-function Acciones({ id }: { id: string }) {
-  const [, action, pending] = useAccion(cambiarEstadoProgramada);
-  return (
-    <form action={action} className="flex gap-1">
-      <input type="hidden" name="id" value={id} />
-      <button name="estado" value="COMPLETADO" disabled={pending} className="rounded p-0.5 text-success hover:bg-success/10" title="Marcar hecha">
-        <Check className="h-3.5 w-3.5" />
-      </button>
-      <button name="estado" value="CANCELADO" disabled={pending} className="rounded p-0.5 text-muted-foreground hover:bg-muted" title="Cancelar">
-        <X className="h-3.5 w-3.5" />
-      </button>
-    </form>
-  );
-}
-
-export function CalendarioSection({ meses, items, puedeEditar }: { meses: string[]; items: Record<string, ItemCalendario[]>; puedeEditar: boolean }) {
-  return (
-    <Section title="Calendario sanitario" description="Programado y aplicado, mes a mes">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-        {meses.map((m) => (
-          <div key={m} className="flex min-h-28 flex-col gap-1.5 rounded-md border bg-muted/30 p-2">
-            <p className="text-xs font-semibold uppercase text-muted-foreground">{mesLabel(m)}</p>
-            {(items[m] ?? []).map((it) => (
-              <div
-                key={it.id}
-                className={cn(
-                  'flex items-start justify-between gap-1 rounded border-l-2 bg-card px-2 py-1 text-xs',
-                  it.estado === 'APLICADO' || it.estado === 'COMPLETADO' ? 'border-success' : it.vencida ? 'border-danger' : 'border-warning',
-                  it.estado === 'CANCELADO' && 'opacity-50 line-through',
-                )}
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{it.nombre}</p>
-                  <p className="truncate text-muted-foreground">
-                    {fmtDateShort(it.fecha)} · {it.lote}
-                  </p>
-                </div>
-                {puedeEditar && it.estado === 'PENDIENTE' && <Acciones id={it.id} />}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </Section>
-  );
+import {useState} from 'react';
+import {Section} from '@/components/ui/section';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {businessToday} from '@/lib/calc/business-date';
+import {calendarDays,calendarMove,eventDay,type CalendarView} from '@/lib/calc/calendar';
+import {CalendarEvent,type ItemCalendario,type CalendarContext} from './calendar-event';
+export type {ItemCalendario} from './calendar-event';
+export function CalendarioSection({items,puedeEditar,context}:{meses:string[];items:Record<string,ItemCalendario[]>;puedeEditar:boolean;context:CalendarContext}){
+ const [day,setDay]=useState(businessToday()),[view,setView]=useState<CalendarView>('mes');const days=calendarDays(day,view),events=Object.values(items).flat();
+ return <Section title="Calendario sanitario" description="Programá, registrá la aplicación o cancelá una tarea. El retiro comienza en la fecha real de aplicación.">
+ <div className="mb-4 flex flex-wrap items-center gap-2">{(['mes','semana','dia'] as const).map(v=><Button key={v} variant={view===v?'default':'outline'} onClick={()=>setView(v)} aria-pressed={view===v}>{v==='dia'?'Día':v==='mes'?'Mes':'Semana'}</Button>)}<Button variant="outline" aria-label="Período anterior" onClick={()=>setDay(calendarMove(day,view,-1))}>←</Button><Input aria-label="Fecha del calendario" type="date" value={day} onChange={e=>{if(e.target.value)setDay(e.target.value);}} className="w-40"/><Button variant="outline" aria-label="Período siguiente" onClick={()=>setDay(calendarMove(day,view,1))}>→</Button><Button variant="ghost" onClick={()=>setDay(businessToday())}>Hoy</Button></div>
+ <div className="overflow-x-auto"><div className={view==='dia'?'space-y-3':'grid min-w-[630px] grid-cols-7 gap-1'}>
+ {view!=='dia'&&['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=><p key={d} className="text-center text-xs font-medium">{d}</p>)}
+ {days.map(d=><div key={d} className={`min-h-28 space-y-2 rounded border p-2 ${d.slice(0,7)!==day.slice(0,7)&&view==='mes'?'bg-muted/50':''}`}><p className="text-sm font-medium">{view==='mes'?Number(d.slice(-2)):d.split('-').reverse().join('/')}</p>{events.filter(it=>eventDay(it.fecha)===d).map(it=><CalendarEvent key={`${it.estado}-${it.id}`} item={it} editable={puedeEditar} context={context}/>)}{view==='dia'&&!events.some(it=>eventDay(it.fecha)===d)&&<p className="text-sm text-muted-foreground">Sin tareas en esta fecha.</p>}</div>)}
+ </div></div></Section>;
 }

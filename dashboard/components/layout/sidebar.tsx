@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { LogOut, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { NAV_ITEMS } from './nav-items';
+import { NAV_GROUPS } from './nav-items';
 
 interface Props {
   establecimiento: string;
@@ -20,7 +20,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <nav className="flex flex-col gap-0.5">
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+      {NAV_GROUPS.map(group=><section key={group.label} className="mb-3 border-b pb-3 last:border-0"><h2 className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</h2>{group.items.map(({ href, label, icon: Icon }) => {
         const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
         return (
           <Link
@@ -36,7 +36,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             {label}
           </Link>
         );
-      })}
+      })}</section>)}
     </nav>
   );
 }

@@ -1,3 +1,4 @@
+import {pendingVisual} from '@/lib/stock/identity';
 import { Field, Input, Select } from '@/components/ui/input';
 import type { Animal, CategoriaConfig, Lote, Potrero } from '@/lib/db/types';
 
@@ -20,9 +21,9 @@ export function AnimalFormFields({
     <div className="grid gap-3 sm:grid-cols-2">
       {animal && <input type="hidden" name="id" value={animal.id} />}
       <Field label="Caravana visual">
-        <Input name="id_caravana" required defaultValue={animal?.id_caravana} />
+        <Input name="id_caravana" placeholder="Sin caravana todavía" defaultValue={animal&&!pendingVisual(animal)?animal.id_caravana:''} />
       </Field>
-      <Field label="RFID">
+      <Field label="RFID electrónico (opcional)">
         <Input name="rfid" defaultValue={animal?.rfid ?? ''} inputMode="numeric" />
       </Field>
       <Field label="Sexo">
