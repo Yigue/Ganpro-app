@@ -19,6 +19,7 @@ export function AnimalEdit(props: { animal: Animal; categorias: CategoriaConfig[
       triggerVariant="outline"
       action={editarAnimal}
     >
+      <input type="hidden" name="expected_version" value={props.animal.server_updated_at??0}/>
       <AnimalFormFields {...props} conEstado />
     </FormDialog>
   );

@@ -19,7 +19,10 @@ App GanPro (WatermelonDB, offline)  ──sync──►  Dashboard Next.js (Verc
 | `/reproduccion` | Servicio, tacto (general, por lote, categoría y toro), IATF, revisación de toros, CC y destete |
 | `/nutricion` | Carga por potrero, formulador de sal mineral, cadena forrajera, entregas e insumos |
 | `/costos` | Directos y estructura, costo por lote, por kg y por ternero, simulador de cría |
-| `/finanzas` | Ingresos y gastos en ARS/USD, margen bruto julio-junio, flujo proyectado, cobros, valuación |
+| `/finanzas` | Cuentas ARS, caja, obligaciones, pagos parciales, vencimientos, reversión, cierre y CSV |
+| `/finanzas/analisis` | Análisis económico ARS/USD y proyección conservados; margen parcial e inventario pendiente |
+| `/gestion` | Insumos, reproducción individual, pastoreo, cortes físicos, bancos, comprobantes y plan frente a real |
+| `/mapa` | Dibujar/editar potreros, hectáreas y perímetro, tipos, ocupación, ficha y capas calles/satélite/relieve |
 | `/config` | Establecimiento, potreros, lotes, usuarios y roles, coeficientes EV, precios, estado del sync |
 | `/proyeccion` | Escenarios: negocio de invernada/recría, precios históricos, ganancia de peso, plan de compras y ventas, crecimiento del rodeo de cría |
 
@@ -65,7 +68,7 @@ Cinco herramientas en `/proyeccion`, cada una guarda escenarios en `escenarios` 
 - **Negocio** (`/negocio`): hasta 4 modelos lado a lado con gastos comerciales, desbaste y mortandad; margen bruto y neto, renta del ciclo y anualizada, costo por kg y **precio de venta de equilibrio**; tabla de sensibilidad precio × ganancia diaria. Un escenario guardado se puede cerrar contra los movimientos reales del lote.
 - **Precios** (`/precios`): series en pesos y dólares, relación ternero/novillo, insumo-producto con el maíz de Nutrición, estacionalidad de 5 años y carga histórica por CSV.
 - **Peso** (`/peso`): proyección desde la última pesada con la ganancia histórica (o elegida) y curva estacional opcional; fecha a la que llega cada animal al objetivo.
-- **Compras y ventas** (`/plan`): 12 a 24 meses con flujo de caja, stock por categoría y alerta de carga; cada línea guardada se registra como real en Finanzas con su DTE.
+- **Compras y ventas** (`/plan`): 12 a 24 meses con flujo de caja, stock por categoría y alerta de carga; cada línea se registra en Movimientos con sus caravanas para afectar stock y finanzas juntos.
 - **Rodeo de cría** (`/cria`): modelo año por año con retención, refugo, demora de entore y tope de hectáreas; comparación entre escenarios guardados.
 
 Las fórmulas están en `lib/calc/proyeccion.ts` y sus tests verifican las reglas del análisis de RTC (margen neto = margen bruto − costo de la tierra; renta anualizada = renta × 365 / días). Los cuatro modelos de partida son de ejemplo: para que reproduzcan exactamente las columnas de RTC hay que cargar sus números.
@@ -86,3 +89,12 @@ Las políticas RLS de `20261101000004_rls.sql` aplican estos permisos en la base
 - Importar el PDF del acta SIGSA: por ahora se cargan las cabezas por categoría a mano.
 - Genealogía en la ficha del animal: la base no tiene madre/padre todavía.
 - La diferencia de inventario del margen bruto se completa al cerrar el ejercicio.
+
+## Guías de esta implementación
+
+- [Comandos, eventos y errores](docs/COMMANDS_AND_ERRORS.md)
+- [Revisión técnica y administrativa](docs/IMPLEMENTATION_PLAN.md)
+- [Despliegue y conciliación](docs/DEPLOYMENT.md)
+- [Pruebas locales y límites del arnés](docs/TESTING.md)
+
+- [Circuitos integrados y adopción](docs/INTEGRATED_WORKFLOWS.md)

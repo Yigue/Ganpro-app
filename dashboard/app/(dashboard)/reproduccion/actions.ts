@@ -1,11 +1,12 @@
 'use server';
+import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
 
 const RUTAS = ['/reproduccion', '/'];
 
-const caravanas = (s: string) => s.split(/[\s,;]+/).map((c) => c.trim()).filter(Boolean);
+const caravanas = (s: string) => s.split(/[\s,;]+/).map((c) => c.trim().toUpperCase()).filter(Boolean);
 
 export const crearServicio = crearAccion(
   z.object({
@@ -18,20 +19,21 @@ export const crearServicio = crearAccion(
     notas: z.string().trim().optional(),
   }),
   async (d, supabase) => {
+    if(d.fecha_salida&&fechaMs(d.fecha_salida)<fechaMs(d.fecha_entrada))throw new InputError({fecha_salida:['La salida debe ser posterior a la entrada.']});
     const lista = caravanas(d.toros);
-    const { data } = await supabase.from('animals').select('id, id_caravana').in('id_caravana', lista);
+    const data=check(await supabase.from('animals').select('id, id_caravana').in('id_caravana',lista).eq('sexo','M').eq('categoria','Toro').eq('estado','ACTIVO'));
     const faltan = lista.filter((c) => !(data ?? []).some((a) => a.id_caravana === c));
-    if (faltan.length) throw new Error(`No existen los toros: ${faltan.join(', ')}`);
+    if (faltan.length) throw new InputError({_form:[`No existen los toros: ${faltan.join(', ')}`]});
     let vientres = d.vientres;
     if (!vientres) {
-      const { count } = await supabase
+      const countResult = await supabase
         .from('animals')
         .select('id', { count: 'exact', head: true })
         .eq('lote_id', d.lote_id)
         .eq('estado', 'ACTIVO')
         .eq('sexo', 'H')
         .in('categoria', ['Vaca', 'Vaquillona']);
-      vientres = count ?? undefined;
+      check(countResult);vientres = countResult.count ?? undefined;
     }
     check(
       await supabase.from('servicios').insert({
@@ -46,7 +48,7 @@ export const crearServicio = crearAccion(
     );
     return 'Servicio registrado';
   },
-  { revalidate: RUTAS },
+  { name: 'reproduccion.crearServicio', revalidate: RUTAS },
 );
 
 export const registrarRevisacion = crearAccion(
@@ -59,8 +61,8 @@ export const registrarRevisacion = crearAccion(
     notas: z.string().trim().optional(),
   }),
   async (d, supabase) => {
-    const { data } = await supabase.from('animals').select('id').eq('id_caravana', d.caravana).maybeSingle();
-    if (!data) throw new Error(`No existe la caravana ${d.caravana}`);
+    const data=check(await supabase.from('animals').select('id').eq('id_caravana',d.caravana).maybeSingle());
+    if (!data) throw new InputError({_form:[`No existe la caravana ${d.caravana}`]});
     check(
       await supabase.from('revisacion_toros').insert({
         animal_id: data.id,
@@ -73,7 +75,7 @@ export const registrarRevisacion = crearAccion(
     );
     return 'Revisación registrada';
   },
-  { revalidate: RUTAS },
+  { name: 'reproduccion.registrarRevisacion', revalidate: RUTAS },
 );
 
 export const completarEtapa = crearAccion(
@@ -81,5 +83,5 @@ export const completarEtapa = crearAccion(
   async (d, supabase) => {
     check(await supabase.from('etapas_protocolo').update({ completada: true, fecha_completada: Date.now() }).eq('id', d.id));
   },
-  { revalidate: RUTAS },
+  { name: 'reproduccion.completarEtapa', revalidate: RUTAS },
 );

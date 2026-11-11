@@ -1,4 +1,6 @@
 'use client';
+import {businessToday} from '@/lib/calc/business-date';
+
 
 import { CheckCircle2 } from 'lucide-react';
 import { cerrarConReal } from '@/app/(dashboard)/proyeccion/actions';
@@ -36,7 +38,7 @@ export function CierreReal({ id, lotes, loteId, desde }: { id: string; lotes: Lo
           <Input name="desde" type="date" defaultValue={desde} required />
         </Field>
         <Field label="Hasta">
-          <Input name="hasta" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required />
+          <Input name="hasta" type="date" defaultValue={businessToday()} required />
         </Field>
       </div>
     </FormDialog>

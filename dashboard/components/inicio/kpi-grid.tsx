@@ -11,7 +11,7 @@ export interface KpisInicio {
   tactadas: number;
   margenBruto: number;
   ejercicio: string;
-  valorRodeo: number;
+  valorRodeo: number | null;
   valorRodeoUSD: number | null;
 }
 
@@ -34,16 +34,16 @@ export function KpiGrid({ k }: { k: KpisInicio }) {
         icon={<HeartHandshake />}
       />
       <StatCard
-        label="Margen bruto"
+        label="Margen parcial"
         value={fmtCompact(k.margenBruto)}
-        hint={`Ejercicio ${k.ejercicio} · ${fmtARS(k.margenBruto)}`}
+        hint={`Ejercicio ${k.ejercicio} · sin ajuste de inventario`}
         tone={k.margenBruto >= 0 ? 'success' : 'danger'}
         icon={<TrendingUp />}
       />
       <StatCard
         label="Valor del rodeo"
         value={fmtCompact(k.valorRodeo)}
-        hint={`${fmtARS(k.valorRodeo)} · ${fmtUSD(k.valorRodeoUSD)}`}
+        hint={k.valorRodeo == null ? 'Faltan pesos o precios por categoría' : `Estimado · ${fmtARS(k.valorRodeo)} · ${fmtUSD(k.valorRodeoUSD)}`}
         icon={<CircleDollarSign />}
       />
     </div>

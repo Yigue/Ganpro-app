@@ -7,10 +7,8 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
   return (
     <Card className="mx-auto mt-12 max-w-lg p-6">
       <h2 className="text-lg font-semibold">No se pudieron cargar los datos</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Si es la primera vez, revisá que las migraciones de <code>supabase/migrations</code> estén aplicadas.
-      </p>
+      <p className="mt-2 text-sm text-muted-foreground">Ocurrió un problema al cargar la información. Probá nuevamente en unos momentos.</p>
+      {error.digest && <p className="mt-2 text-xs text-muted-foreground">Referencia: {error.digest}</p>}
       <Button className="mt-4" onClick={reset}>
         Reintentar
       </Button>

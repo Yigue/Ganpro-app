@@ -1,45 +1,18 @@
 'use server';
-
-import { z } from 'zod';
-import { check, crearAccion, fechaMs } from '@/lib/db/actions';
-
-const RUTAS = ['/finanzas', '/costos', '/'];
-
-export const crearMovimientoFinanciero = crearAccion(
-  z.object({
-    tipo: z.enum(['GASTO', 'INGRESO']),
-    categoria: z.string().min(1),
-    monto: z.coerce.number().positive(),
-    fecha: z.string().min(1),
-    lote_id: z.string().optional(),
-    descripcion: z.string().trim().optional(),
-    comprobante: z.string().trim().optional(),
-    fecha_cobro: z.string().optional(),
-  }),
-  async (d, supabase) => {
-    const cobro = d.tipo === 'INGRESO' && d.fecha_cobro ? fechaMs(d.fecha_cobro) : null;
-    check(
-      await supabase.from('movimientos_financieros').insert({
-        tipo: d.tipo,
-        categoria: d.categoria,
-        monto: d.monto,
-        fecha: fechaMs(d.fecha),
-        lote_id: d.lote_id ?? null,
-        descripcion: d.descripcion ?? null,
-        comprobante: d.comprobante ?? null,
-        fecha_cobro: cobro,
-        cobrado: d.tipo === 'INGRESO' ? (cobro == null || cobro <= Date.now()) : null,
-      }),
-    );
-    return d.tipo === 'GASTO' ? 'Gasto cargado' : 'Ingreso cargado';
-  },
-  { revalidate: RUTAS },
-);
-
-export const marcarCobrado = crearAccion(
-  z.object({ id: z.string().min(1) }),
-  async (d, supabase) => {
-    check(await supabase.from('movimientos_financieros').update({ cobrado: true }).eq('id', d.id));
-  },
-  { revalidate: RUTAS },
-);
+import {z} from 'zod';
+import {crearAccion,fechaMs} from '@/lib/db/actions';
+import {runOperation} from '@/lib/commands/rpc';
+import {operationMessage} from '@/lib/commands/message';
+import {amountSchema,documentSchema,daySchema,textSchema} from '@/lib/commands/finance-input';
+import {DomainError} from '@/lib/commands/errors';
+const RUTAS=['/finanzas','/finanzas/analisis','/costos','/'];
+export const crearMovimientoFinanciero=crearAccion(documentSchema,async(d,c)=>operationMessage(await runOperation(c,'finance.document',{...d,fecha:fechaMs(d.fecha),vencimiento:fechaMs(d.vencimiento)})),{name:'finance.document',revalidate:RUTAS});
+export const abrirCuenta=crearAccion(z.object({nombre:textSchema,saldo_inicial:z.string().regex(/^-?\d{1,12}(\.\d{1,2})?$/),fecha:daySchema}),async(d,c)=>operationMessage(await runOperation(c,'finance.account',{...d,fecha:fechaMs(d.fecha)})),{name:'finance.account',revalidate:RUTAS});
+export const registrarPago=crearAccion(z.object({movimiento_id:textSchema,cuenta_id:textSchema,monto:amountSchema,fecha:daySchema}),async(d,c)=>operationMessage(await runOperation(c,'finance.settle',{...d,fecha:fechaMs(d.fecha)})),{name:'finance.settle',revalidate:RUTAS});
+export const transferirCaja=crearAccion(z.object({origen_id:textSchema,destino_id:textSchema,monto:amountSchema,fecha:daySchema}),async(d,c)=>operationMessage(await runOperation(c,'finance.transfer',{...d,fecha:fechaMs(d.fecha)})),{name:'finance.transfer',revalidate:RUTAS});
+export const revertirPago=crearAccion(z.object({id:textSchema,motivo:textSchema,fecha:daySchema}),async(d,c)=>operationMessage(await runOperation(c,'finance.reverse',{...d,fecha:fechaMs(d.fecha)})),{name:'finance.reverse',revalidate:RUTAS});
+export const anularComprobante=crearAccion(z.object({id:textSchema,motivo:textSchema,fecha:daySchema}),async(d,c)=>operationMessage(await runOperation(c,'finance.void',{...d,fecha:fechaMs(d.fecha)})),{name:'finance.void',revalidate:[...RUTAS,'/stock','/movimientos','/mapa']});
+export const cerrarPeriodo=crearAccion(z.object({fecha:daySchema}),async(d,c)=>operationMessage(await runOperation(c,'finance.close',{fecha:fechaMs(d.fecha)})),{name:'finance.close',revalidate:RUTAS});
+/** A boolean is not a bank/cash posting; old tabs receive an actionable safe failure. */
+export const marcarCobrado=crearAccion(z.object({id:textSchema}),async()=>{throw new DomainError('INVALID_REFERENCE');},{name:'finance.legacy-settle',revalidate:RUTAS});
+export const conciliarAnterior=crearAccion(z.object({id:textSchema,contraparte:textSchema,fecha:daySchema,vencimiento:daySchema,conciliado:z.string().regex(/^\d{1,12}(\.\d{1,2})?$/)}),async(d,c)=>operationMessage(await runOperation(c,'finance.adopt',{...d,fecha:fechaMs(d.fecha),vencimiento:fechaMs(d.vencimiento)})),{name:'finance.adopt',revalidate:RUTAS});

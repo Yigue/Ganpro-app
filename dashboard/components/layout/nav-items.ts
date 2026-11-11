@@ -5,6 +5,7 @@ import {
   HeartHandshake,
   LayoutDashboard,
   LineChart,
+  MapPin,
   Settings,
   Syringe,
   Wallet,
@@ -20,6 +21,8 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Inicio', icon: LayoutDashboard },
+  { href: '/gestion', label: 'Gestión integrada', icon: ArrowLeftRight },
+  { href: '/mapa', label: 'Mapa de potreros', icon: MapPin },
   { href: '/stock', label: 'Stock', icon: Beef },
   { href: '/movimientos', label: 'Movimientos y SIGSA', icon: ArrowLeftRight },
   { href: '/sanidad', label: 'Sanidad', icon: Syringe },

@@ -13,9 +13,9 @@ export interface Carencia {
  */
 export function animalesEnCarencia(animals: Animal[], logs: OperationLog[], ahora: number): Carencia[] {
   const out = new Map<string, Carencia>();
-  const vigentes = logs.filter((l) => l.fecha_fin_carencia != null && l.fecha_fin_carencia > ahora);
+  const vigentes = logs.filter((l) => l.fecha_aplicacion<=ahora && l.fecha_fin_carencia != null && l.fecha_fin_carencia > ahora);
   for (const log of vigentes) {
-    const alcanzados = log.animal_id
+    const alcanzados = log.receptores_fijados ? animals.filter(a=>log.aplicacion_animales?.some(r=>r.animal_id===a.id)) : log.animal_id
       ? animals.filter((a) => a.id === log.animal_id)
       : animals.filter((a) => log.lote_id && a.lote_id === log.lote_id);
     for (const a of alcanzados) {

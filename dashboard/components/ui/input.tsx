@@ -1,3 +1,5 @@
+'use client';
+import {cloneElement,isValidElement,useId} from 'react';
 import { cn } from '@/lib/utils';
 
 const fieldClass =
@@ -20,10 +22,11 @@ export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLab
 }
 
 export function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  const id=useId();
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <Label>{label}</Label>
-      {children}
+      <Label htmlFor={id}>{label}</Label>
+      {isValidElement<{id?:string}>(children)?cloneElement(children,{id}):children}
     </div>
   );
 }

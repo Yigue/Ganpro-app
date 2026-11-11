@@ -154,7 +154,7 @@ describe('finanzas', () => {
     const ps = [precio(10, 1000), precio(20, 1200)];
     expect(dolarEn(ps, 15)).toBe(1000);
     expect(dolarEn(ps, 25)).toBe(1200);
-    expect(dolarEn(ps, 5)).toBe(1000);
+    expect(dolarEn(ps, 5)).toBeNull();
   });
   it('margen bruto separa estructura', () => {
     const m = margenBruto([

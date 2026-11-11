@@ -1,4 +1,6 @@
 'use client';
+import {businessToday} from '@/lib/calc/business-date';
+
 
 import { Check, ClipboardCheck, Plus } from 'lucide-react';
 import { completarEtapa, crearServicio, registrarRevisacion } from '@/app/(dashboard)/reproduccion/actions';
@@ -6,7 +8,7 @@ import { FormDialog, useAccion } from '@/components/ui/form-dialog';
 import { Field, Input, Select } from '@/components/ui/input';
 import type { Lote } from '@/lib/db/types';
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => businessToday();
 
 export function ServicioForm({ lotes, temporada }: { lotes: Lote[]; temporada: string }) {
   return (

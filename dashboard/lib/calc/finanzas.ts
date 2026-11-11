@@ -35,11 +35,11 @@ export function precioVigente(precios: PrecioMercado[]): PrecioMercado | null {
   return [...precios].sort((a, b) => b.fecha - a.fecha)[0];
 }
 
-/** Dólar del día más cercano anterior a la fecha; si no hay, el más viejo disponible. */
+/** Dólar del día más cercano anterior a la fecha; sin cotización previa devuelve null. */
 export function dolarEn(precios: PrecioMercado[], fecha: number, tipo: 'dolar_oficial' | 'dolar_mep' = 'dolar_oficial'): number | null {
   const con = precios.filter((p) => p[tipo] != null).sort((a, b) => a.fecha - b.fecha);
   if (!con.length) return null;
-  let valor = con[0][tipo];
+  let valor: number | null = null;
   for (const p of con) {
     if (p.fecha <= fecha) valor = p[tipo];
     else break;
@@ -81,7 +81,7 @@ export interface ValuacionCategoria {
   cabezas: number;
   pesoPromedio: number | null;
   precioKg: number | null;
-  valor: number;
+  valor: number | null;
 }
 
 /** Valor del rodeo: Σ cabezas × peso promedio × precio por kg de la categoría. */
@@ -96,7 +96,7 @@ export function valuacionRodeo(animals: Animal[], config: CategoriaConfig[], pre
       const pesoPromedio = pesos.length ? pesos.reduce((a, b) => a + b, 0) / pesos.length : null;
       const col = cfg.get(categoria)?.precio_columna;
       const precioKg = precio && col ? ((precio[col] as number | null) ?? null) : null;
-      const valor = pesoPromedio != null && precioKg != null ? lista.length * pesoPromedio * precioKg : 0;
+      const valor = pesoPromedio != null && precioKg != null ? lista.length * pesoPromedio * precioKg : null;
       return { categoria, cabezas: lista.length, pesoPromedio, precioKg, valor };
     })
     .sort((a, b) => (cfg.get(a.categoria)?.orden ?? 99) - (cfg.get(b.categoria)?.orden ?? 99));

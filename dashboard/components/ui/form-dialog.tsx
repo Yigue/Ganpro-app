@@ -3,25 +3,30 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
+import type {ActionState} from '@/lib/commands/result';
+import {ActionMessage} from './action-state';
+export type {ActionState} from '@/lib/commands/result';
+export {ActionMessage} from './action-state';
 import { Button, type ButtonProps } from './button';
-
-export interface ActionState {
-  ok?: boolean;
-  error?: string;
-  message?: string;
-}
 
 type Accion = (prev: ActionState, formData: FormData) => Promise<ActionState>;
 
 /** useActionState + refresco de la pantalla cuando la acción termina bien. */
-export function useAccion(action: Accion) {
+export function useAccion(action: Accion,localError=false) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(action, {});
+  const commandKey=useRef<string|null>(null);
+  const [state, formAction, pending] = useActionState(async(prev:ActionState,form:FormData)=>{
+    commandKey.current??=crypto.randomUUID();
+    form.set('_commandKey',commandKey.current);
+    try {const result=await action(prev,form);if(result.ok)commandKey.current=null;return result;}
+    catch {return {error:'No pudimos completar la operación. Intentá nuevamente más tarde.'};}
+  }, {});
   const last = useRef(state);
   useEffect(() => {
     if (state !== last.current && state.ok) router.refresh();
+    if(state !== last.current && state.error && !localError)window.dispatchEvent(new CustomEvent('ganpro:action-error',{detail:state}));
     last.current = state;
-  }, [state, router]);
+  }, [state, router,localError]);
   return [state, formAction, pending] as const;
 }
 
@@ -49,7 +54,7 @@ export function FormDialog({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useAccion(action);
+  const [state, formAction, pending] = useAccion(action,true);
   const lastState = useRef(state);
 
   useEffect(() => {
@@ -77,7 +82,7 @@ export function FormDialog({
             </div>
             <form action={formAction} className="flex flex-col gap-4">
               {children}
-              {state.error && <p className="text-sm text-danger">{state.error}</p>}
+              <ActionMessage state={state}/>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
@@ -92,10 +97,4 @@ export function FormDialog({
       )}
     </>
   );
-}
-
-export function ActionMessage({ state }: { state: ActionState }) {
-  if (state.error) return <p className="text-sm text-danger">{state.error}</p>;
-  if (state.message) return <p className="text-sm text-success">{state.message}</p>;
-  return null;
 }

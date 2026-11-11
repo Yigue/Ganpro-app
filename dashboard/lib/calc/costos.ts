@@ -28,7 +28,7 @@ export function costosPorLote(params: {
   desde: number;
   hasta: number;
 }): CostoLote[] {
-  const { lotes, animals, movs, logs, catalogo, desde, hasta } = params;
+  const { lotes, animals, movs, logs, desde, hasta } = params;
   const dias = Math.max(1, (hasta - desde) / DAY_MS);
   return lotes.map((lote) => {
     const cabezas = animals.filter((a) => a.estado === 'ACTIVO' && a.lote_id === lote.id).length;
@@ -39,7 +39,7 @@ export function costosPorLote(params: {
     if (!sanidad) {
       sanidad = logs
         .filter((l) => l.lote_id === lote.id && l.fecha_aplicacion >= desde && l.fecha_aplicacion <= hasta)
-        .reduce((a, l) => a + (catalogo.get(l.operation_id)?.costo_unitario ?? 0) * (l.dosis ?? 1) * cabezas, 0);
+        .reduce((a, l) => a + (l.costo_total ?? 0), 0);
     }
     const nutricion = suma('NUTRICION');
     const alquilerCargado = suma('ALQUILER');
