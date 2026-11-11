@@ -1,3 +1,4 @@
+import {CategoryFields} from './category-fields';
 import {pendingVisual} from '@/lib/stock/identity';
 import { Field, Input, Select } from '@/components/ui/input';
 import type { Animal, CategoriaConfig, Lote, Potrero } from '@/lib/db/types';
@@ -26,20 +27,7 @@ export function AnimalFormFields({
       <Field label="RFID electrónico (opcional)">
         <Input name="rfid" defaultValue={animal?.rfid ?? ''} inputMode="numeric" />
       </Field>
-      <Field label="Sexo">
-        <Select name="sexo" defaultValue={animal?.sexo ?? 'H'}>
-          <option value="H">Hembra</option>
-          <option value="M">Macho</option>
-        </Select>
-      </Field>
-      <Field label="Categoría">
-        <Select name="categoria" defaultValue={animal?.categoria ?? 'Vaca'}>
-          {categorias.map((c) => (
-            <option key={c.categoria}>{c.categoria}</option>
-          ))}
-          {animal && !categorias.some((c) => c.categoria === animal.categoria) && <option>{animal.categoria}</option>}
-        </Select>
-      </Field>
+      <CategoryFields categorias={categorias} initialCategory={animal?.categoria} initialSex={animal?.sexo} preserveInitial={Boolean(animal)}/>
       <Field label="Raza">
         <Input name="raza" defaultValue={animal?.raza ?? ''} />
       </Field>

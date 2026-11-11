@@ -5,6 +5,7 @@ import {useAccion,ActionMessage} from '@/components/ui/form-dialog';
 import {Button} from '@/components/ui/button';
 import {MapCanvas} from './map-canvas';
 import {MapFields} from './map-fields';
+import {PaddockClimate} from './paddock-climate';
 import {PaddockInfo} from './paddock-info';
 import {closePolygon,previewHectares,type Point} from '@/lib/maps/geometry';
 import type {MapPaddock,BaseLayer} from '@/lib/maps/types';
@@ -24,6 +25,6 @@ export function MapWorkspace({paddocks,editable,initialSelected=null}:{paddocks:
  {editing&&p&&<><input type="hidden" name="id" value={p.id}/><input type="hidden" name="expected_version" value={p.version}/></>}
  <input type="hidden" name="geometry" value={JSON.stringify(closePolygon(points))}/><MapFields p={editing?p:null}/><ActionMessage state={state}/><Button type="submit" disabled={pending||points.length<3}>{pending?'Guardando…':'Cerrar y guardar polígono'}</Button>
  </form>}{!drawing&&<ActionMessage state={state}/>}</>}
- </div><aside className="space-y-3"><h2 className="font-semibold">Potreros del establecimiento</h2>{paddocks.length===0&&<p className="text-sm">Sin potreros. Dibujá el primero para comenzar.</p>}{paddocks.map(plot=><button key={plot.id} type="button" onClick={()=>{if(!drawing)setSelected(plot.id);}} className={`w-full rounded-lg border p-3 text-left text-sm ${selected===plot.id?'border-primary bg-muted':'bg-card'}`}><strong>{plot.nombre}</strong><span className="block">{plot.hectareas??'—'} ha · {plot.cabezas} cabezas</span><span className="text-xs text-muted-foreground">{plot.invalid?'Geometría a revisar':plot.geometry?'Ubicado en el mapa':'Sin ubicar'}</span></button>)}{p&&<PaddockInfo p={p}/>}</aside>
+ </div><aside className="space-y-3"><h2 className="font-semibold">Potreros del establecimiento</h2>{paddocks.length===0&&<p className="text-sm">Sin potreros. Dibujá el primero para comenzar.</p>}{paddocks.map(plot=><button key={plot.id} type="button" onClick={()=>{if(!drawing)setSelected(plot.id);}} className={`w-full rounded-lg border p-3 text-left text-sm ${selected===plot.id?'border-primary bg-muted':'bg-card'}`}><strong>{plot.nombre}</strong><span className="block">{plot.hectareas??'—'} ha · {plot.cabezas} cabezas</span><span className="text-xs text-muted-foreground">{plot.invalid?'Geometría a revisar':plot.geometry?'Ubicado en el mapa':'Sin ubicar'}</span></button>)}{p&&<><PaddockInfo p={p}/>{p.geometry&&<PaddockClimate key={`${p.id}:${p.version}`} id={p.id}/>}</>}</aside>
  </div>;
 }

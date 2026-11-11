@@ -1,6 +1,7 @@
 import {businessToday} from '../../lib/calc/business-date';
 import {test,expect} from '@playwright/test';
 test('admin navigates real home, cash and map, draws and persists a polygon',async({page})=>{
+ await page.route('**/api/potreros/*/clima',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({fetchedAt:Date.now(),reference:[-58.4,-32.4],recent:{days:7,from:'2026-11-01',to:'2026-11-07',rain:5,et0:25,balance:-20,min:8,max:25,wind:10},forecast:{days:7,from:'2026-11-08',to:'2026-11-14',rain:20,et0:25,balance:-5,min:7,max:28,wind:15},recommendations:['Revisar disponibilidad de forraje antes de aumentar la carga.']})}));
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill('admin@test.invalid');await page.getByLabel('Contraseña',{exact:true}).fill('local-test-only');await page.getByRole('button',{name:'Ingresar',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Caja y compromisos'})).toBeVisible();
@@ -11,6 +12,7 @@ test('admin navigates real home, cash and map, draws and persists a polygon',asy
  for(const [x,y]of [[.35,.35],[.55,.35],[.55,.55],[.35,.55]])await page.mouse.click(rect.x+rect.width*x,rect.y+rect.height*y);
  await page.getByLabel('Nombre del potrero',{exact:true}).fill('Navegador Norte');await page.getByLabel('Tipo de potrero',{exact:true}).selectOption('MONTE');await page.getByRole('button',{name:'Cerrar y guardar polígono'}).click();await expect(page.getByRole('button').filter({hasText:'Navegador Norte'})).toBeVisible();
  await page.screenshot({path:'test-results/mapa.png',fullPage:true});await page.reload();await expect(map.locator('canvas')).toBeVisible();await page.waitForTimeout(2000);const saved=await map.boundingBox();if(!saved)throw new Error('Map not found');await page.mouse.click(saved.x+saved.width/2,saved.y+saved.height/2);await expect(page.getByRole('button',{name:'Cerrar ficha',exact:true})).toBeVisible();
+ await expect(page.getByText('Clima y revisión del potrero',{exact:true})).toBeVisible();
  for(const name of ['Calles','Relieve','Satélite']){await page.getByRole('button',{name,exact:true}).click();await page.getByRole('button',{name:'Cerrar ficha',exact:true}).click();await page.waitForTimeout(700);await page.mouse.click(saved.x+saved.width/2,saved.y+saved.height/2);await expect(page.getByRole('button',{name:'Cerrar ficha',exact:true})).toBeVisible();}
  const csv=await page.request.get(`/api/export/finanzas?mes=${businessToday().slice(0,7)}`);expect(csv.status()).toBe(200);expect(await csv.text()).toContain('Caja navegador');expect(errors).toEqual([]);
 });

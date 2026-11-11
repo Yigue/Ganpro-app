@@ -6,6 +6,9 @@ export class DataError extends Error {
   constructor(public readonly providerCode: string) { super('DEPENDENCY_FAILURE'); }
 }
 const messages: Record<string, string> = {
+  CATEGORY_SELECTION: 'Hay animales seleccionados fuera de la categoría elegida. Revisá la selección.',
+  TRADE_TERMS: 'Revisá el desbaste, el plazo y el vencimiento pactados. Deben corresponder entre sí.',
+  DUPLICATE_LOT: 'Ya existe un lote con ese nombre. Elegí el existente o cambiá el nombre.',
   SETUP_REQUIRED: 'Esta función necesita completar la actualización del sistema. Contactá al administrador con la referencia.',
   SCHEDULE_APPLICATION: 'Registrá la aplicación para completar la tarea sanitaria y calcular el retiro.',
   VISUAL_REQUIRED: 'El animal ya tiene caravana visual. Ingresá una identificación válida para cambiarla.',

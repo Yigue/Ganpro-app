@@ -14,6 +14,7 @@ export interface MovimientoFinanciero extends Base {
   categoria_animal: string | null;
   renspa_destino: string | null;
   dte_estado: 'EMITIDO' | 'ANULADO' | 'RETORNO' | null;
+  desbaste_pct?:number|string|null;kg_facturados?:number|string|null;plazo_dias?:number|null;metodo_pago?:string|null;condiciones?:string|null;
   modalidad_precio?: 'KG'|'CABEZA'|null;
   precio_unitario?: number|string|null;
   detalle_categorias?: {categoria:string;cabezas:number}[]|null;

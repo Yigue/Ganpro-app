@@ -1,5 +1,6 @@
 'use client';
 
+import {CategoryFields} from '@/components/stock/category-fields';
 import {AnimalPicker} from './animal-picker';
 import type {Animal} from '@/lib/db/types';
 import {CommerceFields,DteFields} from './commerce-fields';
@@ -41,6 +42,7 @@ export function MovimientoForm({ lotes, potreros, categorias,cuentas=[],linea,an
         </>
       }
       action={registrarMovimiento}
+      onSuccess={()=>{setSelected([]);setTags('');setQuantity(linea?.cabezas??1);setManual(false);}}
     >
       {linea&&<input type="hidden" name="escenario_linea_id" value={linea.id}/>}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -60,20 +62,7 @@ export function MovimientoForm({ lotes, potreros, categorias,cuentas=[],linea,an
       {ingresa?<><Field label="Cantidad de animales"><Input name="cantidad" type="number" min="1" max="500" value={quantity} onChange={e=>setQuantity(Number(e.target.value))}/></Field><Field label="Caravanas visuales si ya las tienen (opcional)"><Textarea name="caravanas" value={tags} onChange={e=>setTags(e.target.value)} placeholder="Una por línea. Si se deja vacío, ingresan sin caravana."/></Field></>:<><label className="flex gap-2 text-sm"><input type="checkbox" checked={manual} onChange={e=>setManual(e.target.checked)}/>Ingresar caravanas manualmente</label>{manual?<Field label="Caravanas"><Textarea name="caravanas" value={tags} onChange={e=>setTags(e.target.value)} required/></Field>:<AnimalPicker animals={animals} lotes={lotes} selected={selected} onChange={setSelected}/>}</>}
       {ingresa && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Sexo">
-            <Select name="sexo" defaultValue="H">
-              <option value="H">Hembra</option>
-              <option value="M">Macho</option>
-            </Select>
-          </Field>
-          <Field label="Categoría">
-            <Select name="categoria" defaultValue={tipo === 'NACIMIENTO' ? '' : 'Vaca'}>
-              {tipo === 'NACIMIENTO' && <option value="">Ternero / Ternera según sexo</option>}
-              {categorias.map((c) => (
-                <option key={c.categoria}>{c.categoria}</option>
-              ))}
-            </Select>
-          </Field>
+          <CategoryFields key={tipo} categorias={categorias} initialCategory={tipo==='NACIMIENTO'?'Ternera':'Vaca'} birth={tipo==='NACIMIENTO'}/>
         </div>
       )}
       {(ingresa || tipo === 'TRASLADO') && (

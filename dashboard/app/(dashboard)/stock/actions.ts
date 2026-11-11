@@ -37,3 +37,8 @@ export const confirmarLecturas=crearAccion(intakeDefaults.extend({lecturas:z.str
  const rows=readingList.safeParse(raw);if(!rows.success)throw new InputError({lecturas:['Revisá RFID, pesos y lecturas repetidas.']});
  return operationMessage(await runOperation(c,'stock.readings',{...d,lecturas:rows.data}));
 },{name:'stock.readings',revalidate:RUTAS});
+
+export const crearAlta=crearAccion(z.discriminatedUnion('modo',[
+ animalSchema.extend({modo:z.literal('IDENTIFICADO'),id_caravana:z.string().trim().min(1,'Ingresá la caravana visual')}),
+ intakeDefaults.extend({modo:z.literal('GENERICO'),cantidad:z.coerce.number().int().min(1).max(500),peso_actual:z.coerce.number().finite().positive().max(9999).optional()}),
+]),async(d,c)=>{const {modo,...data}=d;const body=modo==='IDENTIFICADO'?{...data,fecha_nacimiento:'fecha_nacimiento' in data&&data.fecha_nacimiento?fechaMs(data.fecha_nacimiento):null}:data;return operationMessage(await runOperation(c,modo==='GENERICO'?'stock.generic':'stock.save',body));},{name:'stock.intake',revalidate:[...RUTAS,'/gestion','/movimientos','/reproduccion']});

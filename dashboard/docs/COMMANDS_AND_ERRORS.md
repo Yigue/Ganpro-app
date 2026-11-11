@@ -78,3 +78,10 @@ Los comandos `supply.*`, `nutrition.*`, `repro.*`, `grazing.*`, `inventory.close
 Los comandos `stock.generic`, `stock.readings` y `health.schedule-status` siguen
 el mismo contrato transaccional. Ver [STOCK_AND_OPERATIONS.md](STOCK_AND_OPERATIONS.md)
 para identidad pendiente, lectura HID, cotización y aplicación de tareas.
+
+`stock.lot-save` usa el mismo recibo y auditoría. Antes de escribir stock se
+comprueban columnas y `ganpro_stock_capabilities()`, incluyendo el dispatcher,
+para detectar instalaciones parciales. Las consultas de clima son de sólo lectura,
+con errores seguros y referencia en logs, y no producen comandos de inventario.
+Ver [STOCK_FIELD_WORKFLOWS.md](STOCK_FIELD_WORKFLOWS.md) para flujos, condiciones
+comerciales, calendario anual, recomendaciones climáticas y migraciones 57–60.

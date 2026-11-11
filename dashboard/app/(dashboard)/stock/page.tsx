@@ -75,7 +75,8 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         description={`${vivos.length} cabezas activas · ${animals.length} registros en total`}
         actions={editable && <StockActions categorias={config} lotes={lotes} potreros={potreros} />}
       />
-      <p className="text-sm text-muted-foreground"><Link href="/mapa" className="underline">Ver potreros en el mapa</Link> · {vivos.filter(a => !a.potrero_id).length} animales activos sin potrero. {potrero && <Link href="/stock" className="underline">Quitar filtro: {potrerosById.get(potrero)?.nombre ?? potrero}</Link>}</p>
+      <p className="text-sm text-muted-foreground"><Link href="/mapa" className="underline">Ver potreros en el mapa</Link> · <Link href="/movimientos" className="underline">Historial completo de stock</Link> · {vivos.filter(a => !a.potrero_id).length} animales activos sin potrero. {potrero && <Link href="/stock" className="underline">Quitar filtro: {potrerosById.get(potrero)?.nombre ?? potrero}</Link>}</p>
+      <p className="text-xs text-muted-foreground">Lote = grupo de animales (ej.: recría, vacas preñadas). Potrero = superficie física del mapa. Cambiar de potrero no crea un lote nuevo.</p>
       <Section title="Rodeo" description="Tocá la caravana para ver la ficha del animal" flush>
         <StockTable filas={filas} soloPesadaAtrasada={alerta === 'pesada'} />
       </Section>

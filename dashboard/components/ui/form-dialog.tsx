@@ -42,7 +42,7 @@ export function FormDialog({
   action,
   children,
   submitLabel = 'Guardar',
-  disabled,
+  disabled,onSuccess,
 }: {
   title: string;
   description?: string;
@@ -51,16 +51,16 @@ export function FormDialog({
   action: Accion;
   children: React.ReactNode;
   submitLabel?: string;
-  disabled?: boolean;
+  disabled?: boolean;onSuccess?:()=>void;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useAccion(action,true);
   const lastState = useRef(state);
 
   useEffect(() => {
-    if (state !== lastState.current && state.ok) setOpen(false);
+    if (state !== lastState.current && state.ok) {setOpen(false);onSuccess?.();}
     lastState.current = state;
-  }, [state]);
+  }, [state,onSuccess]);
 
   return (
     <>
@@ -70,7 +70,7 @@ export function FormDialog({
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-lg border bg-card p-5 shadow-xl sm:rounded-lg">
+          <div role="dialog" aria-modal="true" aria-label={title} className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-lg border bg-card p-5 shadow-xl sm:rounded-lg">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-base font-semibold">{title}</h2>

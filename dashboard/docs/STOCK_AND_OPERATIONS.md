@@ -1,5 +1,7 @@
 # Stock y operaciones del establecimiento
 
+La ampliación actual (57–60) se documenta en [STOCK_FIELD_WORKFLOWS.md](STOCK_FIELD_WORKFLOWS.md).
+
 ## Identidad y altas
 
 La tabla de stock usa TanStack para ordenar, paginar y elegir columnas. La
@@ -56,7 +58,7 @@ escrituras siguen recibo, auditoría, bloqueo y errores seguros de
 Gestión integrada abre con carga rápida y accesos por operación. El menú agrupa
 campo, producción, economía y administración; Finanzas destaca Registrar operación.
 
-El calendario permite mes, semana y día con fecha de negocio argentina. Aplicar
+El calendario abre con los doce meses del año y permite mes, semana y día con fecha de negocio argentina. Aplicar
 una tarea abre el formulario ya asociado al producto/destino y recién completa la
 programación al registrar la aplicación real, sus destinatarios y retiro. Cancelar
 no crea una aplicación. Una programación completada no se vuelve a aplicar.
@@ -101,7 +103,7 @@ ni pago inmediato. La segunda crea una obligación por cobrar y no un cobro.
 
 Si la base está en 44–47 y sólo se actualizó Vercel, se puede utilizar
 `supabase/upgrade-stock-operations.sql` como actualización única: reinstala las
-funciones históricas 45–47 y aplica 48–56 en la misma transacción. No acepta bases
+funciones históricas 45–47 y aplica 48–60 en la misma transacción. No acepta bases
 con cambios 48+ parciales o ya completos. El diagnóstico debe mostrar
 `base_44_instalada=true` y los módulos nuevos aún ausentes. No cambia visuales ni
 fusiona animales; conserva la regla de históricos activos/vendidos.

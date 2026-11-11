@@ -19,3 +19,5 @@ it('registers todays operations after animals added this afternoon, preserving h
  // 01:00 UTC still belongs to the previous Argentine business day.
  expect(operationTimestamp('2026-11-11',noon,Date.parse('2026-11-12T01:00:00Z'))).toBe(Date.parse('2026-11-12T01:00:00Z'));
 });
+
+it('keeps the annual overview compact and navigates full years',()=>{expect(calendarDays('2026-11-11','ano')).toEqual([]);expect(calendarMove('2026-11-11','ano',1)).toBe('2027-01-01');});

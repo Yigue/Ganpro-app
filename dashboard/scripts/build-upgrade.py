@@ -2,6 +2,13 @@ from pathlib import Path
 import re,hashlib
 root=Path(__file__).resolve().parents[1]/'supabase'/'migrations'
 files=sorted(root.glob('*.sql'))
+def section(p):
+ raw=p.read_text();body=re.sub(r'^\s*BEGIN;\s*\n','',raw,count=1);body=re.sub(r'\nCOMMIT;\s*$','\n',body)
+ if re.search(r'^\s*(BEGIN|COMMIT);\s*$',body,re.M):raise ValueError('Unexpected transaction boundary '+p.name)
+ return '\n-- '+p.name+' / SHA256 '+hashlib.sha256(raw.encode()).hexdigest()+'\n'+body
+
+def number(p):return int(re.search(r'(\d{6})_',p.name).group(1))
+
 preflight='''-- GANPRO-APP / dashboard — actualizar una base existente (originales 01–04).
 -- Generado desde las migraciones del dashboard, sin seed ni datos demo.
 -- Antes: respaldo y prueba sobre una copia. Ejecutar TODO junto en SQL Editor.
@@ -41,12 +48,7 @@ END
 $ganpro_optional_05$;
 '''
 parts=[preflight,optional]
-for p in files:
- number=int(re.search(r'(\d{6})_',p.name).group(1))
- if number<6:continue
- raw=p.read_text();body=re.sub(r'^\s*BEGIN;\s*\n','',raw,count=1);body=re.sub(r'\nCOMMIT;\s*$','\n',body)
- if re.search(r'^\s*(BEGIN|COMMIT);\s*$',body,re.M):raise ValueError('Unexpected transaction boundary '+p.name)
- parts.append('\n-- '+p.name+' / SHA256 '+hashlib.sha256(raw.encode()).hexdigest()+'\n'+body)
+parts.extend(section(p) for p in files if number(p)>=6)
 parts.append('''\n-- Refrescar el catálogo de PostgREST una vez confirmada la transacción.
 NOTIFY pgrst, 'reload schema';
 COMMIT;
@@ -55,7 +57,7 @@ COMMIT;
 SELECT
  to_regprocedure('public.ganpro_ledger_snapshot(text)') IS NOT NULL AS finanzas_instaladas,
  to_regprocedure('public.ganpro_management_snapshot()') IS NOT NULL AS gestion_instalada,
- to_regprocedure('public.ganpro_schedule_status(jsonb)') IS NOT NULL AS ultima_migracion_instalada;
+ to_regprocedure('public.ganpro_stock_capabilities()') IS NOT NULL AS ultima_migracion_instalada;
 ''')
 out=root.parent/'upgrade-existing.sql';out.write_text(''.join(parts));print(out, out.stat().st_size)
 
@@ -80,10 +82,7 @@ BEGIN
 END
 $preflight$;
 """]
-for p in files:
- if int(re.search(r'(\d{6})_',p.name).group(1))<48:continue
- raw=p.read_text();body=re.sub(r'^\s*BEGIN;\s*\n','',raw,count=1);body=re.sub(r'\nCOMMIT;\s*$','\n',body)
- parts.append('\n-- '+p.name+' / SHA256 '+hashlib.sha256(raw.encode()).hexdigest()+'\n'+body)
+parts.extend(section(p) for p in files if 48<=number(p)<=56)
 parts.append("\nNOTIFY pgrst, 'reload schema';\nCOMMIT;\n")
 out=root.parent/'upgrade-47-to-56.sql';out.write_text(''.join(parts));print(out,out.stat().st_size)
 
@@ -110,9 +109,23 @@ BEGIN
 END
 $preflight$;
 """]
-for p in files:
- if int(re.search(r'(\d{6})_',p.name).group(1))<45:continue
- raw=p.read_text();body=re.sub(r'^\s*BEGIN;\s*\n','',raw,count=1);body=re.sub(r'\nCOMMIT;\s*$','\n',body)
- parts.append('\n-- '+p.name+' / SHA256 '+hashlib.sha256(raw.encode()).hexdigest()+'\n'+body)
+parts.extend(section(p) for p in files if number(p)>=45)
 parts.append("\nNOTIFY pgrst, 'reload schema';\nCOMMIT;\n")
 out=root.parent/'upgrade-stock-operations.sql';out.write_text(''.join(parts));print(out,out.stat().st_size)
+
+# Incremental upgrade for the previous stock release (01–56).
+parts=["""-- GANPRO: base con migraciones 01–56 completas. Ejecutar TODO junto.
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '180s';
+SELECT pg_advisory_xact_lock(20261109,1);
+DO $preflight$
+BEGIN
+ IF to_regprocedure('public.ganpro_schedule_status(jsonb)') IS NULL OR to_regprocedure('public.ganpro_stock_movement_v50(jsonb)') IS NULL OR to_regprocedure('public.ganpro_stock_save_v47(jsonb)') IS NULL THEN RAISE EXCEPTION 'Se requieren las migraciones 01–56 completas. No se modificó nada.'; END IF;
+ IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='movimientos_financieros' AND column_name='desbaste_pct') OR to_regprocedure('public.ganpro_stock_capabilities()') IS NOT NULL THEN RAISE EXCEPTION 'Ya hay cambios 57+. Revisar migraciones aplicadas antes de continuar.'; END IF;
+END
+$preflight$;
+"""]
+parts.extend(section(p) for p in files if number(p)>=57)
+parts.append("\nNOTIFY pgrst, 'reload schema';\nCOMMIT;\n")
+out=root.parent/'upgrade-56-to-60.sql';out.write_text(''.join(parts));print(out,out.stat().st_size)
