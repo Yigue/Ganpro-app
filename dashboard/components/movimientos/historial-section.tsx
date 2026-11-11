@@ -33,12 +33,12 @@ export function HistorialTable({ filas }: { filas: FilaHistorial[] }) {
       <div className="px-5">
         <Select value={tipo} onChange={(e) => setTipo(e.target.value)} className="sm:w-56" aria-label="Tipo">
           <option value="">Todos los tipos</option>
-          {Object.keys(TONE).map((t) => (
+          {[...new Set(filas.map(f=>f.tipo))].sort().map((t) => (
             <option key={t}>{t}</option>
           ))}
         </Select>
       </div>
-      <DataTable data={data} columns={columns} pageSize={15} empty="Sin movimientos" />
+      <DataTable data={data} columns={columns} pageSize={15} initialSorting={[{id:'fecha',desc:true}]} empty="Sin movimientos" />
     </div>
   );
 }

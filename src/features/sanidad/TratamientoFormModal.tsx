@@ -1,3 +1,4 @@
+import {AnimalRepository} from '@data/repositories/AnimalRepository';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
@@ -9,7 +10,6 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { Q } from '@nozbe/watermelondb';
 import { useDatabase } from '@shared/hooks/useDatabase';
 import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
 import { Button } from '@shared/components/Button';
@@ -64,14 +64,12 @@ export function TratamientoFormModal({ visible, onClose }: Props) {
   }, [visible, database]);
 
   const lookupAnimal = useCallback(async () => {
+    setAnimal(null);
     if (!rfid.trim()) return;
     try {
-      const results = await database
-        .get<AnimalModel>('animals')
-        .query(Q.where('id_caravana', rfid.trim()))
-        .fetch();
-      if (results.length > 0) {
-        setAnimal(results[0]);
+      const found = await new AnimalRepository(database).findByRfid(rfid.trim());
+      if (found) {
+        setAnimal(found);
       } else {
         Alert.alert('No encontrado', `No hay animal con caravana ${rfid.trim()}`);
         setAnimal(null);

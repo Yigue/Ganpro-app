@@ -1,6 +1,6 @@
+import {AnimalRepository} from '@data/repositories/AnimalRepository';
 import { useRef, useCallback, useEffect } from 'react';
 import { TextInput, AppState, AppStateStatus, Keyboard } from 'react-native';
-import { Q } from '@nozbe/watermelondb';
 import { useScanStore } from '@store/scanStore';
 import { useDatabase } from '@shared/hooks/useDatabase';
 import { useHapticFeedback } from '@shared/hooks/useHapticFeedback';
@@ -108,12 +108,9 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
         enqueueLoading(rfid);
 
         try {
-          const results = await database
-            .get<AnimalModel>('animals')
-            .query(Q.where('id_caravana', rfid))
-            .fetch();
+          const found = await new AnimalRepository(database).findByRfid(rfid);
 
-          const animal = results[0];
+          const animal = found;
 
           if (animal) {
             hydrateQueueItem(rfid, {
@@ -139,12 +136,9 @@ export function useRFIDScanner(): UseRFIDScannerReturn {
         setPhase('scanning');
 
         try {
-          const results = await database
-            .get<AnimalModel>('animals')
-            .query(Q.where('id_caravana', rfid))
-            .fetch();
+          const found = await new AnimalRepository(database).findByRfid(rfid);
 
-          const animal = results[0];
+          const animal = found;
 
           if (animal) {
             setPhase('found');

@@ -1,13 +1,16 @@
 'use client';
-import {Field,Input,Select} from '@/components/ui/input';
+import {useState} from 'react';
+import {Field,Input,Select,Textarea} from '@/components/ui/input';
 import type {LedgerSnapshot} from '@/lib/db/ledger-types';
-import {businessToday} from '@/lib/calc/business-date';
-export function CommerceFields({sale,cuentas,monto,kg}:{sale:boolean;cuentas:LedgerSnapshot['cuentas'];monto?:number|null;kg?:number|null}){return <div className="grid gap-3 sm:grid-cols-2">
- <Field label="Kg totales"><Input name="kg" type="number" min="0.01" step="0.01" required={sale} defaultValue={kg??undefined}/></Field>
- <Field label="Monto total (ARS)"><Input name="monto" type="number" min="0.01" step="0.01" required defaultValue={monto??undefined}/></Field>
- <Field label="Cliente / proveedor"><Input name="contraparte" required/></Field>
- <Field label="Vencimiento"><Input name="vencimiento" type="date" defaultValue={businessToday()} required/></Field>
- <Field label="Cobrado / pagado ahora (opcional)"><Input name="pagado" type="number" min="0.01" step="0.01"/></Field>
- <Field label="Cuenta del cobro / pago"><Select name="cuenta_id"><option value="">Sin pago inmediato</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</Select></Field>
- </div>;}
-export function DteFields({sale}:{sale:boolean}){return <div className="grid gap-3 sm:grid-cols-2"><Field label="N° de DTE"><Input name="dte_numero" placeholder="07-2026-000000"/></Field>{sale&&<Field label="RENSPA destino"><Input name="renspa_destino"/></Field>}</div>;}
+import {fmtARS,fmtNum} from '@/lib/calc/format';
+import {tradePreview,paymentMethods} from '@/lib/stock/trade';
+export function CommerceFields({cuentas,kg,cabezas=0,price}:{sale:boolean;cuentas:LedgerSnapshot['cuentas'];monto?:number|null;kg?:number|null;cabezas?:number;price?:number|null}){
+ const [mode,setMode]=useState('KG'),[weight,setWeight]=useState(kg?.toString()??''),[unit,setUnit]=useState(price?.toString()??''),[shrink,setShrink]=useState('0');const preview=tradePreview(mode,cabezas,Number(weight),Number(unit),mode==='KG'?Number(shrink):0);
+ return <><div className="grid gap-3 sm:grid-cols-2"><Field label="Forma de cotización"><Select name="modalidad_precio" value={mode} onChange={e=>setMode(e.target.value)}><option value="KG">Por kilo</option><option value="CABEZA">Por cabeza / pieza</option></Select></Field>
+ <Field label={mode==='KG'?'Precio por kg (ARS)':'Precio por cabeza (ARS)'}><Input name="precio_unitario" type="number" min="0.01" step="0.01" required value={unit} onChange={e=>setUnit(e.target.value)}/></Field>
+ <Field label={`Kg totales${mode==='CABEZA'?' (opcional)':''}`}><Input name="kg" type="number" min="0.01" step="0.01" required={mode==='KG'} value={weight} onChange={e=>setWeight(e.target.value)}/></Field><Field label="Cliente / proveedor (opcional)"><Input name="contraparte"/></Field>
+ {mode==='KG'?<Field label="Desbaste (%)"><Input name="desbaste_pct" type="number" min="0" max="20" step="0.01" value={shrink} onChange={e=>setShrink(e.target.value)}/></Field>:<input type="hidden" name="desbaste_pct" value="0"/>}</div>
+ <div className="rounded bg-primary/10 p-3 text-sm"><strong>{cabezas} cabezas · total calculado: {preview.amount>0?fmtARS(preview.amount):'Completá la cotización'}</strong><p>Peso promedio: {preview.average&&Number(weight)>0?`${fmtNum(preview.average,2)} kg por cabeza`:'Sin peso informado'}</p>{mode==='KG'&&<p>Kg a facturar: {fmtNum(preview.billedKg,2)} · desbaste {shrink||0}%</p>}</div>
+ <details><summary className="cursor-pointer text-sm">Condiciones, plazo y pago (opcional)</summary><div className="mt-2 grid gap-3 sm:grid-cols-2"><Field label="Plazo de pago (días)"><Input name="plazo_dias" type="number" min="0" max="365" placeholder="0 = mismo día"/></Field><Field label="Vencimiento pactado (opcional)"><Input name="vencimiento" type="date"/></Field><Field label="Método de pago acordado"><Select name="metodo_pago">{paymentMethods.map(m=><option key={m} value={m}>{m.replaceAll('_',' ')}</option>)}</Select></Field><Field label="Cobrado / pagado ahora (ARS)"><Input name="pagado" type="number" min="0.01" step="0.01"/></Field><Field label="Cuenta del cobro / pago"><Select name="cuenta_id"><option value="">Sin pago inmediato</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</Select></Field><Field label="Condiciones comerciales"><Textarea name="condiciones" maxLength={1000} placeholder="Entrega, flete pactado, condiciones de pesada…"/></Field></div><p className="mt-2 text-xs text-muted-foreground">El plazo y método acordados no registran un cobro. Sólo el importe pagado ahora impacta en la cuenta seleccionada.</p></details></>;
+}
+export function DteFields({sale}:{sale:boolean}){return <details><summary className="cursor-pointer text-sm">Documentación DTE / SIGSA (opcional)</summary><div className="mt-2 grid gap-3 sm:grid-cols-2"><Field label="N° de DTE"><Input name="dte_numero"/></Field>{sale&&<Field label="RENSPA destino"><Input name="renspa_destino"/></Field>}</div></details>;}

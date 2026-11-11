@@ -1,3 +1,5 @@
+import {TradeHistory} from '@/components/movimientos/trade-history';
+import {animalLabel} from '@/lib/stock/identity';
 import {getLedger} from '@/lib/db/ledger';
 import {businessToday} from '@/lib/calc/business-date';
 import {selectOne} from '@/lib/db/client';
@@ -47,7 +49,7 @@ export default async function MovimientosPage({searchParams}:{searchParams:Promi
   const lotesById = byId(lotes);
   const potrerosById = byId(potreros);
   const nombre = (m: Map<string, { nombre: string }>, k: string | null) => (k ? (m.get(k)?.nombre ?? '?') : '—');
-  const caravana = (id: string) => animalsById.get(id)?.id_caravana ?? id;
+  const caravana = (id:string) => {const a=animalsById.get(id);return a?animalLabel(a):id;};
 
   const filas: FilaHistorial[] = [
     ...movimientos.map((m) => ({
@@ -61,11 +63,8 @@ export default async function MovimientosPage({searchParams}:{searchParams:Promi
       dte: null,
     })),
     ...eventos
-      .filter((e) => ['VENTA','MUERTE','COMPRA','NACIMIENTO','ANULACION','RECATEGORIZACION'].includes(e.tipo))
-      .map((e) => ({ fecha: e.timestamp, tipo: e.tipo, animal: caravana(e.animal_id), detalle: e.notas ?? '', dte: e.dte_numero })),
-    ...animals
-      .filter((a) => !eventos.some(e=>e.animal_id===a.id&&e.tipo==='NACIMIENTO') && a.fecha_nacimiento && a.fecha_nacimiento >= ahora - 365 * 86_400_000 && ['Ternero', 'Ternera'].includes(a.categoria))
-      .map((a) => ({ fecha: a.fecha_nacimiento!, tipo: 'NACIMIENTO', animal: a.id_caravana, detalle: a.categoria, dte: null })),
+      .filter((e) => Boolean(e.tipo))
+      .map((e) => ({ fecha: e.timestamp, tipo: e.tipo, animal: caravana(e.animal_id), detalle: [e.notas,e.valor!=null?`${e.valor}${['PESAJE','DESTETE'].includes(e.tipo)?' kg':''}`:null].filter(Boolean).join(' · '), dte: e.dte_numero })),
   ].sort((a, b) => b.fecha - a.fecha);
 
   const acta = ultimaActa(sigsa);
@@ -79,8 +78,9 @@ export default async function MovimientosPage({searchParams}:{searchParams:Promi
       <PageHeader
         title="Movimientos y trazabilidad"
         description={`RENSPA ${est.renspa ?? '—'} · ventas, compras, muertes, nacimientos y traslados`}
-        actions={editable && <MovimientoForm lotes={lotes} potreros={potreros} categorias={config} cuentas={libro.cuentas} linea={linea}/>}
+        actions={editable && <MovimientoForm animals={animals} lotes={lotes} potreros={potreros} categorias={config} cuentas={libro.cuentas} linea={linea}/>}
       />
+      <p className="rounded border bg-card p-3 text-sm">Registrá compras, ventas, muertes, nacimientos y traslados con «Registrar movimiento». Un parto declarado en Reproducción ya incorpora su cría: no vuelvas a cargar el nacimiento. Los traslados cambian la ubicación; las compras y ventas generan además su obligación en Finanzas.</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Ventas del ejercicio" value={enEjercicio.filter((e) => e.tipo === 'VENTA').length} hint={`Cabezas · ejercicio ${ejercicio.label}`} />
         <StatCard label="Muertes del ejercicio" value={enEjercicio.filter((e) => e.tipo === 'MUERTE').length} hint="Cabezas" />
@@ -97,10 +97,11 @@ export default async function MovimientosPage({searchParams}:{searchParams:Promi
             puedeEditar={editable}
           />
         </div>
-        <Section title="Historial" className="lg:col-span-3" flush>
+        <Section title="Historial completo de stock" description="Altas, identificación, pesadas, nacimientos, bajas y traslados. Las operaciones declaradas en otros módulos aparecen acá; no las dupliques." className="lg:col-span-3" flush>
           <HistorialTable filas={filas} />
         </Section>
       </div>
+      <TradeHistory movements={movsFin.filter(m=>['VENTA','COMPRA'].includes(m.categoria))}/>
       <DteSection movs={movsFin.filter((m) => m.dte_numero)} puedeEditar={editable} />
     </>
   );

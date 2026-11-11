@@ -10,8 +10,10 @@ it('tracks a reproductive cycle, a single calf, parents and a weaning weight',as
  await pool.query(`INSERT INTO servicios(id,temporada,lote_id,toros,fecha_entrada,fecha_salida) VALUES('s','2026','l1',$1,$2,$3)`,[[father],serviceDate,DATE]);
  const cycle=await command('repro.cycle',{madre_id:mother,padre_id:father,servicio_id:'s',fecha:serviceDate});
  await command('repro.stage',{id:cycle.id,etapa:'TACTO',resultado:'PRENADA',fecha:DATE-100*86400000});
+ await pool.query(`INSERT INTO animals(id,id_caravana,sexo,categoria,estado) VALUES('previous-calf','CALF','H','Ternera','VENDIDO')`);
  const key=randomUUID(),birth={id:cycle.id,etapa:'PARTO',fecha:DATE-30*86400000,caravana:'CALF',sexo:'H',peso:35};await command('repro.stage',birth,key);await command('repro.stage',birth,key);
- const calf=(await pool.query(`SELECT * FROM animals WHERE id_caravana='CALF'`)).rows[0];expect(calf).toMatchObject({madre_id:mother,padre_id:father,peso_actual:35});
+ const calf=(await pool.query(`SELECT * FROM animals WHERE id_caravana='CALF' AND estado='ACTIVO'`)).rows[0];expect(calf).toMatchObject({madre_id:mother,padre_id:father,peso_actual:35});
+ expect((await pool.query(`SELECT madre_id FROM animals WHERE id='previous-calf'`)).rows[0].madre_id).toBeNull();
  await expect(command('repro.stage',birth)).rejects.toThrow('GANPRO_CONFLICT');
  await command('repro.stage',{id:cycle.id,etapa:'DESTETE',fecha:DATE,peso:120});expect((await pool.query('SELECT estado,peso_destete FROM repro_ciclos')).rows[0]).toEqual({estado:'DESTETADA',peso_destete:'120.00'});
 });

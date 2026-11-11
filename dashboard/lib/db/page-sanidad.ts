@@ -33,11 +33,11 @@ const meses = ultimosMeses(12, fin).map((m) => m.key);
 const items: Record<string, ItemCalendario[]> = {};
 const push = (it: ItemCalendario) => {
     const k = mesKey(it.fecha);
-    if (meses.includes(k)) (items[k] ??= []).push(it);
+    (items[k] ??= []).push(it);
   };
 scheduled.forEach((s) =>
     push({
-      id: s.id,
+      id: s.id,operationId:s.operation_id,loteId:s.lote_id,
       fecha: s.fecha_programada,
       nombre: cat.get(s.operation_id)?.nombre ?? 'Operación',
       lote: loteNombre(s.lote_id),

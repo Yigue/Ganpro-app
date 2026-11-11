@@ -4,7 +4,7 @@ Este PR no aplica cambios a Supabase ni publica Vercel. Antes de habilitarlo:
 
 1. Respaldar y ensayar una copia de la base actual, incluyendo tablas móviles.
 2. Aplicar las migraciones del dashboard en orden. Las 01–05 ya existentes no se
-   reejecutan en una base que las tiene registradas. Las nuevas son 06–44.
+   reejecutan en una base que las tiene registradas. Las nuevas son 06–47.
 3. Si hay caravanas/RFID duplicados, la migración 08 se detiene: resolverlos con
    el responsable del campo, conservando trazabilidad; no fusiona datos sola.
    Los FK NOT VALID preservan huérfanos anteriores para conciliación explícita;

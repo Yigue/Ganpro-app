@@ -1,3 +1,4 @@
+import {resolveAnimalIdentity} from '@shared/utils/animalIdentity';
 import { Database, Q } from '@nozbe/watermelondb';
 import AnimalModel from '../models/AnimalModel';
 import EventoModel from '../models/EventoModel';
@@ -11,11 +12,11 @@ export class AnimalRepository {
   constructor(private database: Database) {}
 
   async findByRfid(rfid: string): Promise<AnimalModel | null> {
-    const results = await this.database
-      .get<AnimalModel>('animals')
-      .query(Q.where('id_caravana', rfid))
-      .fetch();
-    return results[0] ?? null;
+    rfid=rfid.trim().toUpperCase();
+    return resolveAnimalIdentity(
+      ()=>this.database.get<AnimalModel>('animals').query(Q.where('rfid',rfid)).fetch(),
+      ()=>this.database.get<AnimalModel>('animals').query(Q.where('id_caravana',rfid)).fetch(),
+    );
   }
 
   async findById(id: string): Promise<AnimalModel> {
@@ -32,7 +33,8 @@ export class AnimalRepository {
   }): Promise<AnimalModel> {
     return this.database.write(async () => {
       return this.database.get<AnimalModel>('animals').create((animal) => {
-        animal.idCaravana = params.rfid;
+        animal.idCaravana = `SIN-CARAVANA-${animal.id}`;
+        animal.rfid = params.rfid;
         animal.sexo = params.sexo;
         animal.categoria = params.categoria;
         animal.raza = params.raza ?? '';

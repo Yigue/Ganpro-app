@@ -77,11 +77,21 @@ Internet y el dibujo puede seguir visible aunque falle un proveedor raster.
 
 ## Resultado local de esta entrega
 
-- 44 pruebas unitarias (incluyen errores/API/fechas/CSV, consumos e historial).
-- 27 pruebas PostgreSQL/RLS/sync/circuitos integrados sobre migraciones completas desde una base vacía.
-- 3 recorridos Playwright aprobados con Chromium local y arnés Auth/Storage descrito arriba.
+- 64 pruebas unitarias (incluyen errores/API/fechas/CSV, consumos e historial).
+- 47 pruebas PostgreSQL/RLS/sync/circuitos integrados sobre migraciones completas desde una base vacía.
+- 9 recorridos Playwright aprobados con Chromium local y arnés Auth/Storage descrito arriba.
 - Lint sin advertencias, TypeScript y build de Next aprobados.
 
 Las pruebas no aplicaron migraciones ni datos a Supabase/Vercel reales.
 
 La ampliación integra compras, consumos y entrega atómica; retiro después de traslados; genealogía y destete; rotaciones y descanso; cortes físicos y resultados; conciliación bancaria; comprobantes privados y rollback de planes. El navegador agrega compra/consumo/archivo y verifica el ancho de celular. Ver INTEGRATED_WORKFLOWS.md.
+
+La ampliación de campo verifica alta unificada y lote ganadero, selección de genéricos,
+conteos por categoría, desbaste, plazo, método acordado frente a pago real, capacidades
+del dispatcher y calendario anual. Los datos meteorológicos se validan por unidades
+y consistencia de fechas; la UI del mapa utiliza una respuesta climática controlada
+en Playwright para no depender de una red externa en CI. La consulta real de
+Open-Meteo y su API autenticada se comprueban por separado en el entorno local.
+En entornos Node 24 con proxy de salida, iniciar la prueba local con
+`NODE_USE_ENV_PROXY=1`, conservando proxy/CA/NO_PROXY heredados. Esa opción es del
+entorno de pruebas; no es una variable requerida por el producto en Vercel.
