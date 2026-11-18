@@ -13,7 +13,8 @@
     "test:db": "vitest run --config vitest.integration.config.ts",
     "test:db:migrate": "node tests/db/migrate.mjs",
     "test:e2e": "playwright test",
-    "db:upgrade:bundle": "python3 scripts/build-upgrade.py"
+    "db:upgrade:bundle": "python3 scripts/build-upgrade.py",
+    "db:audit": "node scripts/audit-database.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

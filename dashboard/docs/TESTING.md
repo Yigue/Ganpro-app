@@ -95,3 +95,8 @@ Open-Meteo y su API autenticada se comprueban por separado en el entorno local.
 En entornos Node 24 con proxy de salida, iniciar la prueba local con
 `NODE_USE_ENV_PROXY=1`, conservando proxy/CA/NO_PROXY heredados. Esa opción es del
 entorno de pruebas; no es una variable requerida por el producto en Vercel.
+
+## Incremento de integridad y plan de producto (18/11/2026)
+
+78 unitarias, 53 PostgreSQL/RLS y 10 Playwright aprobadas; lint, tipos y build Next aprobados.
+Ver [detalle y límites](producto/12-verificacion.md). No se ejecutaron cambios en Supabase/Vercel productivos ni una compilación nativa completa.

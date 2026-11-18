@@ -9,10 +9,10 @@ export function isControlFlow(error: unknown): boolean {
   return error.digest.startsWith('NEXT_REDIRECT;') || error.digest.startsWith('NEXT_HTTP_ERROR_FALLBACK;');
 }
 export async function executeCommand(options: {
-  name: string; key: string; handle: () => Promise<string | void>; observers?: readonly Observer[];
+  name: string; key: string; operationAt?: number; handle: () => Promise<string | void>; observers?: readonly Observer[];
 }): Promise<ActionState> {
   const requestId = randomUUID(), started = Date.now();
-  return commandContext.run({ command: options.name, requestId, key: options.key }, async () => {
+  return commandContext.run({ command: options.name, requestId, key: options.key, operationAt: options.operationAt }, async () => {
     const event = (type: 'started' | 'succeeded' | 'failed', code?: string) => emit({ type, command: options.name, requestId, durationMs: Date.now() - started, ...(code ? { code } : {}) }, options.observers);
     await event('started');
     try {

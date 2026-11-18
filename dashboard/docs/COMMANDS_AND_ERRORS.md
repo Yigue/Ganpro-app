@@ -10,6 +10,9 @@ WatermelonDB v3. No introducir modelos de organizaciones ni service role en form
    Los roles de escritura son admin/campo; asesor solo lee. El servidor vuelve a validar.
 3. Usar `FormDialog` o `useAccion` para enviar `_commandKey`. La clave permanece
    estable ante una respuesta perdida y se renueva después de éxito confirmado.
+   `useAccion` conserva también `_operationAt` para que las fechas efectivas no
+   cambien al reenviar, incluso después de medianoche. El servidor valida esa
+   marca y la mantiene en el contexto; las validaciones SQL siguen siendo obligatorias.
 4. Para stock/caja usar `runOperation(supabase, 'nombre.operacion', datos)`.
    Agregar el nombre al dispatcher SQL y una función privada con tipos explícitos.
 5. Dentro de la misma transacción validar referencias, estado, carencia, fechas,

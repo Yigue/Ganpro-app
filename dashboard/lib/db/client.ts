@@ -1,6 +1,7 @@
 import {databaseError} from '@/lib/commands/errors';
 import 'server-only';
 import {getManagement} from '@/lib/management/data';
+import {healthExpenses} from '@/lib/management/health-expenses';
 import {consumptionExpenses} from '@/lib/management/economic';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
@@ -48,7 +49,14 @@ export const getAnimals = cache(() => selectAll('animals', { order: 'id_caravana
 export const getCategoriasConfig = cache(() => selectAll('categorias_config', { order: 'orden' }));
 export const getEventos = cache(() => selectAll('eventos', { order: 'timestamp' }));
 export const getPrecios = cache(() => selectAll('precios_mercado', { order: 'fecha', ascending: false }));
-export const getMovimientosFinancieros = cache(async()=>{const [documents,data]=await Promise.all([selectAll('movimientos_financieros',{order:'fecha',ascending:false,filter:q=>q.is('anulado_en',null).eq('es_inventario',false)}),getManagement()]);return [...documents,...consumptionExpenses(data)];});
+export const getMovimientosFinancieros = cache(async()=>{
+ const [documents,data,logs]=await Promise.all([
+  selectAll('movimientos_financieros',{order:'fecha',ascending:false,filter:q=>q.is('anulado_en',null).eq('es_inventario',false)}),
+  getManagement(),selectAll('operation_logs'),
+ ]);
+ const expenses=[...documents,...consumptionExpenses(data)];
+ return [...expenses,...healthExpenses(logs,expenses)];
+});
 export const getCatalogo = cache(() => selectAll('operations_catalog', { order: 'nombre' }));
 export const getSuplementos = cache(() => selectAll('suplementos', { order: 'nombre' }));
 

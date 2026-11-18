@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';
+import {randomUUID} from 'node:crypto';
+import {command,entry,pool,DATE} from '../db/fixtures';
+test.afterAll(()=>pool.end());
+test('animal history displays a fixed withdrawal after moving to another group',async({page})=>{
+ const tag=`RET-${randomUUID().slice(0,8)}`.toUpperCase(),drug=randomUUID(),lot=randomUUID();
+ await entry([tag],{lote_destino_id:'l1'});
+ await pool.query("INSERT INTO operations_catalog(id,nombre,tipo,dias_carencia) VALUES($1,'Retiro verificable','TRATAMIENTO',365)",[drug]);
+ await command('health.apply',{destino:'animal',caravana:tag,operation_id:drug,fecha:DATE,dosis:1});
+ await pool.query("INSERT INTO lotes(id,nombre) VALUES($1,'Destino de retiro')",[lot]);
+ await command('stock.movement',{tipo:'TRASLADO',caravanas:[tag],lote_destino_id:lot,fecha:DATE+1000});
+ const id=(await pool.query('SELECT id FROM animals WHERE id_caravana=$1',[tag])).rows[0].id;
+ await page.goto('/login');await page.getByLabel('Email',{exact:true}).fill('admin@test.invalid');
+ await page.getByLabel('Contraseña',{exact:true}).fill('local-test-only');
+ await page.getByRole('button',{name:'Ingresar',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Caja y compromisos'})).toBeVisible();
+ await page.goto(`/stock/${id}`);
+ await expect(page.getByText(/En carencia hasta.*no vender/)).toBeVisible();
+ await expect(page.getByText('Retiro verificable',{exact:true})).toBeVisible();
+});

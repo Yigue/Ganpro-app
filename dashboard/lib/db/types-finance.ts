@@ -1,5 +1,7 @@
 import type {Base} from './types-animals';
 export interface MovimientoFinanciero extends Base {
+  /** Exact application reference for synthetic supply consumption expenses. */
+  aplicacion_id?: string | null;
   tipo: 'GASTO' | 'INGRESO';
   categoria: string;
   lote_id: string | null;

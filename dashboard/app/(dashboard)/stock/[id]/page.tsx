@@ -1,3 +1,4 @@
+import {getTreatmentHistory} from '@/lib/db/treatments';
 import {animalLabel} from '@/lib/stock/identity';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -11,6 +12,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { fmtDate, fmtDateShort, fmtNum } from '@/lib/calc/format';
 import { gdp } from '@/lib/calc/pesadas';
 import { parseTacto } from '@/lib/calc/reproduccion';
+import { treatmentsForAnimal } from '@/lib/calc/treatment-history';
 import { animalesEnCarencia } from '@/lib/calc/sanidad';
 import { edadMeses } from '@/lib/calc/stock';
 import { canEdit, getSessionPerfil } from '@/lib/db/auth';
@@ -21,11 +23,10 @@ export default async function AnimalPage({ params }: { params: Promise<{ id: str
   const animal = await selectOne('animals', id);
   if (!animal) notFound();
 
-  const [eventos, movimientos, logsAnimal, logsLote, cc, catalogo, lotes, potreros, config, perfil] = await Promise.all([
+  const [eventos, movimientos, logs, cc, catalogo, lotes, potreros, config, perfil] = await Promise.all([
     selectAll('eventos', { filter: (q) => q.eq('animal_id', id), order: 'timestamp' }),
     selectAll('animal_movements', { filter: (q) => q.eq('animal_id', id), order: 'fecha' }),
-    selectAll('operation_logs', { filter: (q) => q.eq('animal_id', id) }),
-    animal.lote_id ? selectAll('operation_logs', { filter: (q) => q.eq('lote_id', animal.lote_id) }) : Promise.resolve([]),
+    getTreatmentHistory(id),
     selectAll('condicion_corporal', { filter: (q) => q.eq('animal_id', id), order: 'fecha' }),
     getCatalogo(),
     getLotes(),
@@ -35,12 +36,13 @@ export default async function AnimalPage({ params }: { params: Promise<{ id: str
   ]);
 
   const ahora = Date.now();
+  const tratamientos = treatmentsForAnimal(animal, logs, movimientos, eventos);
   const cat = byId(catalogo);
   const lotesById = byId(lotes);
   const potrerosById = byId(potreros);
   const pesajes = eventos.filter((e) => e.tipo === 'PESAJE' && e.valor != null).map((e) => ({ timestamp: e.timestamp, valor: e.valor! }));
   const g = gdp(pesajes);
-  const carencia = animalesEnCarencia([animal], [...logsAnimal, ...logsLote], ahora)[0];
+  const carencia = animalesEnCarencia([animal], tratamientos, ahora)[0];
   const edad = edadMeses(animal, ahora);
   const ultimoTacto = [...eventos].reverse().find((e) => e.tipo === 'TACTO');
 
@@ -61,7 +63,7 @@ export default async function AnimalPage({ params }: { params: Promise<{ id: str
             : e.tipo,
       detalle: [e.notas, e.dte_numero && `DTE ${e.dte_numero}`].filter(Boolean).join(' · ') || null,
     })),
-    ...[...logsAnimal, ...logsLote].map((l) => ({
+    ...tratamientos.map((l) => ({
       fecha: l.fecha_aplicacion,
       tipo: 'SANIDAD',
       titulo: cat.get(l.operation_id)?.nombre ?? 'Aplicación',

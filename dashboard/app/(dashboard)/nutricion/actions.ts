@@ -4,7 +4,7 @@ import {InputError} from '@/lib/commands/errors';
 import { z } from 'zod';
 import {runOperation} from '@/lib/commands/rpc';
 import {operationMessage} from '@/lib/commands/message';
-import { check, crearAccion, fechaMs } from '@/lib/db/actions';
+import { check, crearAccion, fechaOperacionMs } from '@/lib/db/actions';
 
 const RUTAS = ['/nutricion', '/costos', '/'];
 
@@ -65,6 +65,6 @@ export const registrarEntrega = crearAccion(
     descontar_stock: z.string().optional(),
     notas: z.string().trim().optional(),
   }),
-  async(d,supabase)=>operationMessage(await runOperation(supabase,'nutrition.deliver',{...d,fecha:fechaMs(d.fecha)})),
+  async(d,supabase)=>operationMessage(await runOperation(supabase,'nutrition.deliver',{...d,fecha:fechaOperacionMs(d.fecha)})),
   { name: 'nutricion.registrarEntrega', revalidate: RUTAS },
 );

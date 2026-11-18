@@ -16,7 +16,8 @@ export interface CostoLote {
 
 /**
  * Costo por lote en el período. Sanidad y nutrición salen de los gastos cargados;
- * si no hay gasto de sanidad cargado, se estima con aplicaciones × costo unitario.
+ * Las aplicaciones se suman salvo que un consumo vinculado ya registre su costo.
+ * No se deduplican hechos distintos por compartir categoría, fecha o importe.
  * El alquiler usa costo_alquiler_ha (ARS/ha/año) prorrateado por días.
  */
 export function costosPorLote(params: {
@@ -35,12 +36,10 @@ export function costosPorLote(params: {
     const delLote = movs.filter((m) => m.tipo === 'GASTO' && m.lote_id === lote.id && m.fecha >= desde && m.fecha <= hasta);
     const suma = (cat: string) => delLote.filter((m) => m.categoria === cat).reduce((a, m) => a + m.monto, 0);
 
-    let sanidad = suma('SANIDAD');
-    if (!sanidad) {
-      sanidad = logs
-        .filter((l) => l.lote_id === lote.id && l.fecha_aplicacion >= desde && l.fecha_aplicacion <= hasta)
-        .reduce((a, l) => a + (l.costo_total ?? 0), 0);
-    }
+    const aplicacionesRegistradas = new Set(movs.filter(m => m.tipo === 'GASTO' && m.aplicacion_id).map(m => m.aplicacion_id));
+    const sanidad = suma('SANIDAD') + logs
+      .filter(l => l.lote_id === lote.id && l.fecha_aplicacion >= desde && l.fecha_aplicacion <= hasta && !aplicacionesRegistradas.has(l.id))
+      .reduce((total, log) => total + (log.costo_total ?? 0), 0);
     const nutricion = suma('NUTRICION');
     const alquilerCargado = suma('ALQUILER');
     const alquiler = alquilerCargado || ((lote.costo_alquiler_ha ?? 0) * (lote.hectareas ?? 0) * dias) / 365;
