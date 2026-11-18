@@ -9,7 +9,8 @@ export interface Carencia {
 
 /**
  * Animales con período de retiro vigente. Una aplicación por lote alcanza a los
- * animales que hoy están en ese lote. Mientras dure, el animal no se puede vender.
+ * destinatarios fijados al aplicarla. Los registros antiguos usan el lote disponible.
+ * Para una ficha histórica usar treatmentsForAnimal antes de evaluar el retiro.
  */
 export function animalesEnCarencia(animals: Animal[], logs: OperationLog[], ahora: number): Carencia[] {
   const out = new Map<string, Carencia>();

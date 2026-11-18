@@ -29,6 +29,7 @@ export interface Lote extends Base {
 export type EstadoAnimal = 'ACTIVO' | 'VENDIDO' | 'MUERTO' | 'DESCARTE';
 
 export interface Animal extends Base {
+  visual_pendiente?:boolean;
   id_caravana: string;
   rfid: string | null;
   sexo: 'M' | 'H';

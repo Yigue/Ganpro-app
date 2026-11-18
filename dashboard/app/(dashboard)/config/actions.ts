@@ -53,21 +53,7 @@ export const guardarPotrero = crearAccion(
   { name: 'config.guardarPotrero', revalidate: ['/config', '/nutricion', '/'] },
 );
 
-export const guardarLote = crearAccion(
-  z.object({
-    id: z.string().optional(),
-    nombre: z.string().trim().min(1),
-    ubicacion: z.string().trim().optional(),
-    hectareas: num,
-    costo_alquiler_ha: num,
-  }),
-  async ({ id, ...d }, supabase) => {
-    const fila = { nombre: d.nombre, ubicacion: d.ubicacion ?? null, hectareas: d.hectareas ?? null, costo_alquiler_ha: d.costo_alquiler_ha ?? null };
-    check(id ? await supabase.from('lotes').update(fila).eq('id', id) : await supabase.from('lotes').insert(fila));
-    return `Lote ${d.nombre} guardado`;
-  },
-  { name: 'config.guardarLote', revalidate: ['/config', '/costos', '/'] },
-);
+export const guardarLote=crearAccion(z.object({id:z.string().optional(),expected_version:z.coerce.number().int().nonnegative().optional(),nombre:z.string().trim().min(1).max(200),descripcion:z.string().trim().max(1000).optional(),ubicacion:z.string().trim().optional(),hectareas:num,costo_alquiler_ha:num}),async(d,c)=>operationMessage(await runOperation(c,'stock.lot-save',d)),{name:'stock.lot-save',revalidate:['/config','/stock','/stock/manga','/movimientos','/gestion','/mapa','/reproduccion','/costos','/']});
 
 export const cambiarRol = crearAccion(
   z.object({ id: z.string().uuid(), rol: z.enum(['admin', 'campo', 'asesor']) }),

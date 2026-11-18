@@ -3,13 +3,13 @@
 import { z } from 'zod';
 import {runOperation} from '@/lib/commands/rpc';
 import {operationMessage} from '@/lib/commands/message';
-import { check, crearAccion, fechaMs } from '@/lib/db/actions';
+import { check, crearAccion, fechaMs, fechaOperacionMs } from '@/lib/db/actions';
 
 const RUTAS = ['/sanidad', '/stock', '/'];
 
 export const registrarAplicacion = crearAccion(
   z.object({
-    destino: z.enum(['lote', 'animal']),
+    destino: z.enum(['lote', 'animal','rodeo']),
     lote_id: z.string().optional(),
     caravana: z.string().trim().optional(),
     operation_id: z.string().min(1, 'elegí el producto'),
@@ -21,7 +21,7 @@ export const registrarAplicacion = crearAccion(
     responsable: z.string().trim().optional(),
     scheduled_id: z.string().optional(),
   }),
-  async (d,supabase)=>operationMessage(await runOperation(supabase,'health.apply',{...d,fecha:fechaMs(d.fecha)})),
+  async (d,supabase)=>operationMessage(await runOperation(supabase,'health.apply',{...d,fecha:fechaOperacionMs(d.fecha)})),
   { name: 'sanidad.registrarAplicacion', revalidate: RUTAS },
 );
 
@@ -44,9 +44,7 @@ export const programarOperacion = crearAccion(
 
 export const cambiarEstadoProgramada = crearAccion(
   z.object({ id: z.string().min(1), estado: z.enum(['PENDIENTE', 'COMPLETADO', 'CANCELADO']) }),
-  async (d, supabase) => {
-    check(await supabase.from('scheduled_operations').update({ estado: d.estado }).eq('id', d.id));
-  },
+  async(d,supabase)=>operationMessage(await runOperation(supabase,'health.schedule-status',d)),
   { name: 'sanidad.cambiarEstadoProgramada', revalidate: RUTAS },
 );
 

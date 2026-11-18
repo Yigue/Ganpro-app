@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { EmptyState } from '@shared/components/EmptyState';
 import { colors, spacing, typography } from '@theme/index';
@@ -9,7 +9,7 @@ interface GdpChartProps {
 }
 
 /**
- * SimpleLineChart — pure presentational dot-plot for GDP weight curve.
+ * SimpleLineChart — pure presentational dot-plot for sampled mean weights.
  * No external chart lib, renders absolute-positioned dots.
  */
 export function SimpleLineChart({ data }: GdpChartProps) {
@@ -18,7 +18,7 @@ export function SimpleLineChart({ data }: GdpChartProps) {
       <EmptyState
         icon="⚖️"
         title="Pocos pesajes"
-        subtitle="Registrá al menos 2 pesajes para ver la curva GDP"
+        subtitle="Registrá pesadas en al menos 2 fechas para ver los pesos medios"
       />
     );
   }
@@ -27,12 +27,14 @@ export function SimpleLineChart({ data }: GdpChartProps) {
   const maxY = Math.max(...data.map((d) => d.y));
   const minY = Math.min(...data.map((d) => d.y));
   const range = maxY - minY || 1;
+  const minX = Math.min(...data.map(d => d.x));
+  const rangeX = Math.max(...data.map(d => d.x)) - minX || 1;
 
   return (
     <View style={styles.container}>
       <View style={[styles.chart, { height: CHART_H }]}>
         {data.map((point, i) => {
-          const xPct = i / (data.length - 1);
+          const xPct = (point.x - minX) / rangeX;
           const yPct = (point.y - minY) / range;
           return (
             <View

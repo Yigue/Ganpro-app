@@ -61,7 +61,7 @@ export const registrarRevisacion = crearAccion(
     notas: z.string().trim().optional(),
   }),
   async (d, supabase) => {
-    const data=check(await supabase.from('animals').select('id').eq('id_caravana',d.caravana).maybeSingle());
+    const data=check(await supabase.from('animals').select('id').eq('id_caravana',d.caravana.trim().toUpperCase()).eq('estado','ACTIVO').eq('sexo','M').eq('categoria','Toro').maybeSingle());
     if (!data) throw new InputError({_form:[`No existe la caravana ${d.caravana}`]});
     check(
       await supabase.from('revisacion_toros').insert({

@@ -13,6 +13,7 @@ export default class AnimalModel extends Model {
   };
 
   @text('id_caravana') idCaravana!: string;
+  @field('rfid') rfid!: string | null;
   @text('sexo') sexo!: string;           // 'M' | 'H'
   @text('categoria') categoria!: string;
   @text('raza') raza!: string;

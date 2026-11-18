@@ -1,11 +1,11 @@
 BEGIN;
 DO $$ BEGIN
- IF EXISTS(SELECT 1 FROM public.animals GROUP BY upper(trim(id_caravana)) HAVING count(*)>1)
+ IF EXISTS(SELECT 1 FROM public.animals WHERE estado NOT IN('VENDIDO','MUERTO') GROUP BY upper(trim(id_caravana)) HAVING count(*)>1)
  OR EXISTS(SELECT 1 FROM public.animals WHERE nullif(trim(rfid),'') IS NOT NULL GROUP BY trim(rfid) HAVING count(*)>1) THEN
   RAISE EXCEPTION 'Reconcile duplicate visual/RFID identities before migrating; no data was merged';
  END IF;
 END $$;
-CREATE UNIQUE INDEX animals_visual_identity ON public.animals(upper(trim(id_caravana)));
+CREATE UNIQUE INDEX animals_visual_identity ON public.animals(upper(trim(id_caravana))) WHERE estado NOT IN('VENDIDO','MUERTO');
 CREATE UNIQUE INDEX animals_rfid_identity ON public.animals(trim(rfid)) WHERE nullif(trim(rfid),'') IS NOT NULL;
 CREATE FUNCTION public.ganpro_validate_animal() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE expected_sex text; BEGIN
@@ -23,6 +23,7 @@ DECLARE expected_sex text; BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER ganpro_validate_animal BEFORE INSERT OR UPDATE ON public.animals FOR EACH ROW EXECUTE FUNCTION public.ganpro_validate_animal();
+-- Visual identifiers are reserved while in stock; sold/dead history keeps its original number.
 -- NOT VALID preserves pre-existing orphans for explicit reconciliation while protecting all new writes.
 ALTER TABLE public.animals ADD CONSTRAINT animal_lot_ref FOREIGN KEY(lote_id) REFERENCES public.lotes(id) DEFERRABLE INITIALLY DEFERRED NOT VALID;
 ALTER TABLE public.animals ADD CONSTRAINT animal_paddock_ref FOREIGN KEY(potrero_id) REFERENCES public.potreros(id) DEFERRABLE INITIALLY DEFERRED NOT VALID;

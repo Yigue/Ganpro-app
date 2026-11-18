@@ -10,6 +10,9 @@ WatermelonDB v3. No introducir modelos de organizaciones ni service role en form
    Los roles de escritura son admin/campo; asesor solo lee. El servidor vuelve a validar.
 3. Usar `FormDialog` o `useAccion` para enviar `_commandKey`. La clave permanece
    estable ante una respuesta perdida y se renueva después de éxito confirmado.
+   `useAccion` conserva también `_operationAt` para que las fechas efectivas no
+   cambien al reenviar, incluso después de medianoche. El servidor valida esa
+   marca y la mantiene en el contexto; las validaciones SQL siguen siendo obligatorias.
 4. Para stock/caja usar `runOperation(supabase, 'nombre.operacion', datos)`.
    Agregar el nombre al dispatcher SQL y una función privada con tipos explícitos.
 5. Dentro de la misma transacción validar referencias, estado, carencia, fechas,
@@ -74,3 +77,14 @@ Para PostgreSQL, navegador y limitaciones del arnés ver `TESTING.md`.
 Para aplicar migraciones y conciliar datos anteriores ver `DEPLOYMENT.md`.
 
 Los comandos `supply.*`, `nutrition.*`, `repro.*`, `grazing.*`, `inventory.close`, `bank.*`, `scenario.*` y `document.attach` siguen el mismo dispatcher y recibo. Ver INTEGRATED_WORKFLOWS.md para reglas, compatibilidad móvil y límites del upload.
+
+Los comandos `stock.generic`, `stock.readings` y `health.schedule-status` siguen
+el mismo contrato transaccional. Ver [STOCK_AND_OPERATIONS.md](STOCK_AND_OPERATIONS.md)
+para identidad pendiente, lectura HID, cotización y aplicación de tareas.
+
+`stock.lot-save` usa el mismo recibo y auditoría. Antes de escribir stock se
+comprueban columnas y `ganpro_stock_capabilities()`, incluyendo el dispatcher,
+para detectar instalaciones parciales. Las consultas de clima son de sólo lectura,
+con errores seguros y referencia en logs, y no producen comandos de inventario.
+Ver [STOCK_FIELD_WORKFLOWS.md](STOCK_FIELD_WORKFLOWS.md) para flujos, condiciones
+comerciales, calendario anual, recomendaciones climáticas y migraciones 57–60.
