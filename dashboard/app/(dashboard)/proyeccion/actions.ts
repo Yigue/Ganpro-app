@@ -1,11 +1,12 @@
 'use server';
+import {applyBatch} from '@/lib/commands/batch';
 import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
 import {DomainError} from '@/lib/commands/errors';
 import {runOperation} from '@/lib/commands/rpc';
 import {operationMessage} from '@/lib/commands/message';
-import { check, crearAccion, fechaMs } from '@/lib/db/actions';
+import { crearAccion, fechaMs } from '@/lib/db/actions';
 
 const RUTAS = ['/proyeccion', '/proyeccion/negocio', '/proyeccion/peso', '/proyeccion/plan', '/proyeccion/cria', '/proyeccion/precios'];
 
@@ -48,7 +49,7 @@ export const guardarEscenario = crearAccion(
 export const eliminarEscenario = crearAccion(
   z.object({ id: z.string().min(1) }),
   async (d, supabase) => {
-    check(await supabase.from('escenarios').delete().eq('id', d.id));
+    await applyBatch(supabase,[{table:'escenarios',mode:'delete',id:d.id}]);
     return 'Escenario eliminado';
   },
   { name: 'proyeccion.eliminarEscenario', revalidate: RUTAS },
@@ -86,7 +87,8 @@ export const importarPrecios = crearAccion(
     for (const linea of lineas.slice(1)) {
       const cel = linea.split(sep).map((c) => c.trim());
       const m = cel[0].match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-      const fecha = m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12).getTime() : Date.parse(`${cel[0]}T12:00:00`);
+      const day=m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:cel[0];
+      let fecha:number;try{fecha=fechaMs(day);}catch{throw new InputError({csv:[`Fecha inválida en la fila ${filas.length+2}.`]});}
       if (!Number.isFinite(fecha)) continue;
       const fila: Record<string, number | string | null> = { fecha, fuente: d.fuente };
       mapa.forEach((col, j) => {
@@ -98,7 +100,7 @@ export const importarPrecios = crearAccion(
       filas.push(fila);
     }
     if (!filas.length) throw new InputError({_form:['No hay filas con fecha válida']});
-    check(await supabase.from('precios_mercado').insert(filas));
+    await applyBatch(supabase,filas.map(fila=>({table:'precios_mercado',mode:'insert',data:fila})));
     return `${filas.length} fechas de precios cargadas`;
   },
   { name: 'proyeccion.importarPrecios', revalidate: [...RUTAS, '/finanzas', '/config'] },

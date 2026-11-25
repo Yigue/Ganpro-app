@@ -36,13 +36,12 @@ const norm = (s: string) =>
     .replace(/[^a-z_]/g, '');
 
 function parseFecha(v: string): number | null {
-  const m = v.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
-  if (m) {
-    const y = Number(m[3].length === 2 ? `20${m[3]}` : m[3]);
-    return new Date(y, Number(m[2]) - 1, Number(m[1]), 12).getTime();
-  }
-  const t = Date.parse(v);
-  return Number.isNaN(t) ? null : t;
+ const m=v.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+ const day=m?`${m[3].length===2?'20'+m[3]:m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:v;
+ if(/^\d{4}-\d{2}-\d{2}$/.test(day)){
+  const t=Date.parse(`${day}T12:00:00-03:00`);return Number.isFinite(t)&&new Date(t).toISOString().slice(0,10)===day?t:null;
+ }
+ const t=Date.parse(v);return Number.isFinite(t)?t:null;
 }
 
 /**
@@ -76,6 +75,7 @@ export function parseCsvRFID(texto: string): { filas: FilaRFID[]; errores: strin
         f.sexo = s.startsWith('M') ? 'M' : s.startsWith('H') || s.startsWith('F') ? 'H' : null;
       } else if (col === 'fecha') {
         f.fecha = parseFecha(v);
+        if(f.fecha==null)errores.push(`Línea ${i+(tieneHeader?2:1)}: fecha inválida`);
       } else if (col === 'rfid') {
         f.rfid = v.replace(/\s/g, '');
       } else {

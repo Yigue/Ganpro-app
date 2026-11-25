@@ -15,7 +15,7 @@ export function CashForms({data}:{data:LedgerSnapshot}){
  <Field label="Nombre"><Input name="nombre" required/></Field><Field label="Saldo inicial (ARS)"><Input name="saldo_inicial" type="number" step="0.01" defaultValue="0" required/></Field>{date}</FormDialog>
  <FormDialog title="Registrar cobro / pago" trigger="Cobro / pago" triggerVariant="outline" action={registrarPago} disabled={!data.cuentas.length}>
  <Field label="Comprobante pendiente"><Select name="movimiento_id" required><option value="">Elegir…</option>{data.documentos.filter(d=>Number(d.pendiente)>0).map(d=><option value={d.id} key={d.id}>{d.descripcion??d.categoria} · {d.contraparte} · {money(d.pendiente)}</option>)}</Select></Field>
- {accounts('cuenta_id','Cuenta')}{amount}{date}</FormDialog>
+ {accounts('cuenta_id','Cuenta')}<Field label="Método del cobro / pago"><Select name="metodo_pago"><option value="A_CONVENIR">Sin informar</option>{['TRANSFERENCIA','EFECTIVO','CHEQUE','OTRO'].map(m=><option key={m}>{m}</option>)}</Select></Field>{amount}{date}</FormDialog>
  <FormDialog title="Transferir entre cuentas" trigger="Transferencia" triggerVariant="outline" action={transferirCaja} disabled={data.cuentas.length<2}>
  {accounts('origen_id','Cuenta de origen')}{accounts('destino_id','Cuenta de destino')}{amount}{date}</FormDialog>
  </>;

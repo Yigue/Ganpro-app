@@ -1,3 +1,4 @@
+import {businessParts} from '@/lib/calc/fechas';
 import { DAY_MS,mesLabel } from '@/lib/calc/fechas';
 import { cadenaForrajera,cargaPorPotrero,composicionRacion,entregasPorPotrero,suplementosBajoMinimo } from '@/lib/calc/nutricion';
 import { activos,totalEV } from '@/lib/calc/stock';
@@ -36,7 +37,7 @@ const totalKgMS = entregas.reduce((a, e) => a + e.kgMS, 0);
 const totalCosto = entregas.some(e=>e.costo==null)?null:entregas.reduce((a, e) => a + (e.costo ?? 0), 0);
 const bajos = suplementosBajoMinimo(suplementos);
 const sobrecargados = cargas.filter((c) => (c.ocupacionPct ?? 0) > 100);
-const cadena = cadenaForrajera(potreros, ev, new Date(ahora).getFullYear()).map((c) => ({
+const cadena = cadenaForrajera(potreros, ev, businessParts(ahora).year).map((c) => ({
     label: mesLabel(`2000-${String(c.mes + 1).padStart(2, '0')}`).split(' ')[0],
     Oferta: c.oferta / 1000,
     Demanda: c.demanda / 1000,

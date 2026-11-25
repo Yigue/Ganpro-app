@@ -4,9 +4,10 @@ import { crearAccion, fechaMs } from '@/lib/db/actions';
 import { parseCsvRFID } from '@/lib/calc/csv';
 import { runOperation } from '@/lib/commands/rpc';
 import { operationMessage } from '@/lib/commands/message';
+import {intakeDefaults,readingList} from '@/lib/stock/intake';
 import { InputError } from '@/lib/commands/errors';
 const animalSchema = z.object({
- id_caravana:z.string().trim().min(1).max(100),rfid:z.string().trim().max(200).optional(),
+ id_caravana:z.string().trim().max(100).optional(),rfid:z.string().trim().max(200).optional(),
  sexo:z.enum(['M','H']),categoria:z.string().min(1),raza:z.string().trim().optional(),
  fecha_nacimiento:z.string().optional(),peso_actual:z.coerce.number().positive().max(9999).optional(),
  lote_id:z.string().optional(),potrero_id:z.string().optional(),
@@ -29,3 +30,15 @@ export const importarCsvRFID=crearAccion(z.object({csv:z.string().min(1).max(200
  if(!filas.length||errores.length)throw new InputError({csv:['Revisá las filas del CSV; no se importó ningún registro.']});
  return operationMessage(await runOperation(client,'stock.import',{...d,csv:undefined,filas}));
 },{name:'stock.import',revalidate:RUTAS});
+
+export const crearGenericos=crearAccion(intakeDefaults.extend({cantidad:z.coerce.number().int().min(1).max(500),peso_actual:z.coerce.number().finite().positive().max(9999).optional()}),async(d,c)=>operationMessage(await runOperation(c,'stock.generic',d)),{name:'stock.generic',revalidate:RUTAS});
+export const confirmarLecturas=crearAccion(intakeDefaults.extend({lecturas:z.string().min(2)}),async(d,c)=>{
+ let raw:unknown;try{raw=JSON.parse(d.lecturas);}catch{throw new InputError({lecturas:['Revisá las lecturas.']});}
+ const rows=readingList.safeParse(raw);if(!rows.success)throw new InputError({lecturas:['Revisá RFID, pesos y lecturas repetidas.']});
+ return operationMessage(await runOperation(c,'stock.readings',{...d,lecturas:rows.data}));
+},{name:'stock.readings',revalidate:RUTAS});
+
+export const crearAlta=crearAccion(z.discriminatedUnion('modo',[
+ animalSchema.extend({modo:z.literal('IDENTIFICADO'),id_caravana:z.string().trim().min(1,'Ingresá la caravana visual')}),
+ intakeDefaults.extend({modo:z.literal('GENERICO'),cantidad:z.coerce.number().int().min(1).max(500),peso_actual:z.coerce.number().finite().positive().max(9999).optional()}),
+]),async(d,c)=>{const {modo,...data}=d;const body=modo==='IDENTIFICADO'?{...data,fecha_nacimiento:'fecha_nacimiento' in data&&data.fecha_nacimiento?fechaMs(data.fecha_nacimiento):null}:data;return operationMessage(await runOperation(c,modo==='GENERICO'?'stock.generic':'stock.save',body));},{name:'stock.intake',revalidate:[...RUTAS,'/gestion','/movimientos','/reproduccion']});

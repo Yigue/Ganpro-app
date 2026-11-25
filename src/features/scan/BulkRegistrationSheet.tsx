@@ -134,7 +134,8 @@ export function BulkRegistrationSheet({ visible, unknownItems, onClose }: Props)
         return Promise.all(
           rfidsArray.map(rfid =>
             animalsCollection.create(animal => {
-              animal.idCaravana = rfid;
+              animal.idCaravana = `SIN-CARAVANA-${animal.id}`;
+              animal.rfid = rfid;
               animal.sexo = sexo;
               animal.categoria = categoriaSeleccionada;
               animal.raza = '';

@@ -6,6 +6,12 @@ export class DataError extends Error {
   constructor(public readonly providerCode: string) { super('DEPENDENCY_FAILURE'); }
 }
 const messages: Record<string, string> = {
+  CATEGORY_SELECTION: 'Hay animales seleccionados fuera de la categoría elegida. Revisá la selección.',
+  TRADE_TERMS: 'Revisá el desbaste, el plazo y el vencimiento pactados. Deben corresponder entre sí.',
+  DUPLICATE_LOT: 'Ya existe un lote con ese nombre. Elegí el existente o cambiá el nombre.',
+  SETUP_REQUIRED: 'Esta función necesita completar la actualización del sistema. Contactá al administrador con la referencia.',
+  SCHEDULE_APPLICATION: 'Registrá la aplicación para completar la tarea sanitaria y calcular el retiro.',
+  VISUAL_REQUIRED: 'El animal ya tiene caravana visual. Ingresá una identificación válida para cambiarla.',
   INSUFFICIENT_STOCK: 'No hay existencias suficientes. No se guardó ningún descuento parcial.',
   EXPIRED_BATCH: 'La partida está vencida o falta informar su vencimiento.',
   MANAGED_STOCK: 'Ese stock se gestiona desde Insumos. Registrá una compra o consumo.',
@@ -25,7 +31,9 @@ const messages: Record<string, string> = {
   INVALID_GEOMETRY: 'El polígono debe estar cerrado, sin cruces y con al menos 3 puntos distintos.',
   INVALID_INPUT: 'Revisá los datos ingresados.',
   NOT_FOUND: 'No se encontró el registro. Actualizá la pantalla.',
-  DUPLICATE_TAG: 'Esa caravana o RFID ya está registrado.',
+  DUPLICATE_TAG: 'Esa caravana ya está asignada en el stock actual o ese RFID ya está registrado.',
+  REUSED_TAG_REVIEW: 'Esa caravana figura en una baja anterior. Revisá la identidad y registrá el nuevo animal desde Alta individual o Compra; no se creó otro desde el CSV.',
+  TAG_REUSE_CONFLICT: 'No se puede reactivar el animal: su caravana está asignada a otro en stock. Revisá las identidades antes de anular la venta.',
   CONFLICT: 'Los datos cambiaron. Actualizá la pantalla antes de volver a guardar.',
   WITHDRAWAL: 'Hay animales en período de retiro. No se puede registrar la venta.',
   INACTIVE_ANIMAL: 'La operación requiere animales activos y sin bajas anteriores.',

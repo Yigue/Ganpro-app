@@ -4,3 +4,8 @@ export function businessToday(now=new Date()):string{
  const part=(key:string)=>parts.find(p=>p.type===key)?.value??'';
  return `${part('year')}-${part('month')}-${part('day')}`;
 }
+
+/** A same-day registration follows earlier operations instead of backdating to noon. */
+export function operationTimestamp(day:string,noon:number,now=Date.now()):number{
+ return day===businessToday(new Date(now))?now:noon;
+}

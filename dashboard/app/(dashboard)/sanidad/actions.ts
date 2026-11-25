@@ -1,15 +1,16 @@
 'use server';
+import {applyBatch} from '@/lib/commands/batch';
 
 import { z } from 'zod';
 import {runOperation} from '@/lib/commands/rpc';
 import {operationMessage} from '@/lib/commands/message';
-import { check, crearAccion, fechaMs } from '@/lib/db/actions';
+import { crearAccion, fechaMs, fechaOperacionMs } from '@/lib/db/actions';
 
-const RUTAS = ['/sanidad', '/stock', '/'];
+const RUTAS = ['/sanidad', '/stock','/gestion','/costos','/finanzas/analisis', '/'];
 
 export const registrarAplicacion = crearAccion(
   z.object({
-    destino: z.enum(['lote', 'animal']),
+    destino: z.enum(['lote', 'animal','rodeo']),
     lote_id: z.string().optional(),
     caravana: z.string().trim().optional(),
     operation_id: z.string().min(1, 'elegí el producto'),
@@ -21,7 +22,7 @@ export const registrarAplicacion = crearAccion(
     responsable: z.string().trim().optional(),
     scheduled_id: z.string().optional(),
   }),
-  async (d,supabase)=>operationMessage(await runOperation(supabase,'health.apply',{...d,fecha:fechaMs(d.fecha)})),
+  async (d,supabase)=>operationMessage(await runOperation(supabase,'health.apply',{...d,fecha:fechaOperacionMs(d.fecha)})),
   { name: 'sanidad.registrarAplicacion', revalidate: RUTAS },
 );
 
@@ -32,11 +33,7 @@ export const programarOperacion = crearAccion(
     fecha: z.string().min(1),
   }),
   async (d, supabase) => {
-    check(
-      await supabase
-        .from('scheduled_operations')
-        .insert({ operation_id: d.operation_id, lote_id: d.lote_id ?? null, fecha_programada: fechaMs(d.fecha), estado: 'PENDIENTE' }),
-    );
+    await applyBatch(supabase,[{table:'scheduled_operations',mode:'insert',data:{operation_id:d.operation_id,lote_id:d.lote_id??null,fecha_programada:fechaMs(d.fecha),estado:'PENDIENTE'}}]);
     return 'Operación programada';
   },
   { name: 'sanidad.programarOperacion', revalidate: RUTAS },
@@ -44,9 +41,7 @@ export const programarOperacion = crearAccion(
 
 export const cambiarEstadoProgramada = crearAccion(
   z.object({ id: z.string().min(1), estado: z.enum(['PENDIENTE', 'COMPLETADO', 'CANCELADO']) }),
-  async (d, supabase) => {
-    check(await supabase.from('scheduled_operations').update({ estado: d.estado }).eq('id', d.id));
-  },
+  async(d,supabase)=>operationMessage(await runOperation(supabase,'health.schedule-status',d)),
   { name: 'sanidad.cambiarEstadoProgramada', revalidate: RUTAS },
 );
 
@@ -54,19 +49,12 @@ export const crearProducto = crearAccion(
   z.object({
     nombre: z.string().trim().min(1),
     tipo: z.enum(['VACUNA', 'TRATAMIENTO', 'IATF']),
-    dias_carencia: z.coerce.number().min(0).optional(),
+    dias_carencia: z.coerce.number().int().min(0).max(3650).optional(),
     costo_unitario: z.coerce.number().min(0).optional(),
     notas: z.string().trim().optional(),
   }),
   async (d, supabase) => {
-    check(
-      await supabase.from('operations_catalog').insert({
-        ...d,
-        dias_carencia: d.dias_carencia ?? null,
-        costo_unitario: d.costo_unitario ?? null,
-        notas: d.notas ?? null,
-      }),
-    );
+    await applyBatch(supabase,[{table:'operations_catalog',mode:'insert',data:{...d,dias_carencia:d.dias_carencia??null,costo_unitario:d.costo_unitario??null,notas:d.notas??null}}]);
     return `${d.nombre} agregado`;
   },
   { name: 'sanidad.crearProducto', revalidate: ['/sanidad'] },

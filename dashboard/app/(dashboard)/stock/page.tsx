@@ -1,3 +1,4 @@
+import {animalLabel,pendingVisual} from '@/lib/stock/identity';
 import Link from 'next/link';
 import { BarChartView } from '@/components/charts/charts';
 import { RecategorizacionSection } from '@/components/stock/recategorizacion-section';
@@ -12,8 +13,8 @@ import { byId, getAnimals, getCategoriasConfig, getEstablecimiento, getEventos, 
 
 export const metadata = { title: 'Stock' };
 
-export default async function StockPage({ searchParams }: { searchParams: Promise<{ alerta?: string; potrero?: string }> }) {
-  const [{ alerta, potrero }, animals, config, lotes, potreros, eventos, logs, est, perfil] = await Promise.all([
+export default async function StockPage({ searchParams }: { searchParams: Promise<{ alerta?: string; potrero?: string;lote?:string }> }) {
+  const [{ alerta, potrero,lote }, animals, config, lotes, potreros, eventos, logs, est, perfil] = await Promise.all([
     searchParams,
     getAnimals(),
     getCategoriasConfig(),
@@ -32,11 +33,12 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const atrasadas = new Set(pesadasAtrasadas(animals, pesajes, est.dias_alerta_pesada, ahora).map((a) => a.id));
   const carencias = new Map(animalesEnCarencia(animals, logs, ahora).map((c) => [c.animal.id, c.hasta]));
 
-  const filas: FilaStock[] = animals.filter(a => !potrero || a.potrero_id === potrero).map((a) => {
+  const filas: FilaStock[] = animals.filter(a => (!potrero || a.potrero_id === potrero)&&(!lote||a.lote_id===lote)).map((a) => {
     const p = pesajes.get(a.id) ?? [];
     return {
       id: a.id,
-      caravana: a.id_caravana,
+      caravana: animalLabel(a),
+      sinCaravana:pendingVisual(a),
       rfid: a.rfid,
       categoria: a.categoria,
       raza: a.raza,
@@ -73,7 +75,8 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         description={`${vivos.length} cabezas activas · ${animals.length} registros en total`}
         actions={editable && <StockActions categorias={config} lotes={lotes} potreros={potreros} />}
       />
-      <p className="text-sm text-muted-foreground"><Link href="/mapa" className="underline">Ver potreros en el mapa</Link> · {vivos.filter(a => !a.potrero_id).length} animales activos sin potrero. {potrero && <Link href="/stock" className="underline">Quitar filtro: {potrerosById.get(potrero)?.nombre ?? potrero}</Link>}</p>
+      <p className="text-sm text-muted-foreground"><Link href="/mapa" className="underline">Ver potreros en el mapa</Link> · <Link href="/movimientos" className="underline">Historial completo de stock</Link> · {vivos.filter(a => !a.potrero_id).length} animales activos sin potrero. {potrero && <Link href="/stock" className="underline">Quitar filtro: {potrerosById.get(potrero)?.nombre ?? potrero}</Link>}</p>
+      <p className="text-xs text-muted-foreground">Lote = grupo de animales (ej.: recría, vacas preñadas). Potrero = superficie física del mapa. Cambiar de potrero no crea un lote nuevo.</p>
       <Section title="Rodeo" description="Tocá la caravana para ver la ficha del animal" flush>
         <StockTable filas={filas} soloPesadaAtrasada={alerta === 'pesada'} />
       </Section>

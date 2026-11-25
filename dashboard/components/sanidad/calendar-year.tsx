@@ -1,0 +1,5 @@
+'use client';
+import {eventDay} from '@/lib/calc/calendar';
+import type {ItemCalendario} from './calendar-event';
+const names=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+export function CalendarYear({year,events,open}:{year:string;events:ItemCalendario[];open:(month:string)=>void}){return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{names.map((name,i)=>{const month=`${year}-${String(i+1).padStart(2,'0')}`;const here=events.filter(e=>eventDay(e.fecha).startsWith(month)),pending=here.filter(e=>e.estado==='PENDIENTE');return <button key={month} type="button" onClick={()=>open(month+'-01')} className="min-h-28 rounded-lg border bg-card p-3 text-left hover:bg-muted" aria-label={`Ver ${name} de ${year}`}><strong>{name}</strong><p className="mt-1 text-sm">{pending.length} pendientes · {here.length} tareas</p><p className="text-xs text-muted-foreground">{pending.some(e=>e.vencida)?'Hay tareas vencidas':here.length?'Ver calendario del mes':'Sin tareas registradas'}</p></button>;})}</div>;}

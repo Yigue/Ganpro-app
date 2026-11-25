@@ -1,5 +1,5 @@
 import { type ItemCalendario } from '@/components/sanidad/calendario-section';
-import { ejercicioDe,mesKey,ultimosMeses } from '@/lib/calc/fechas';
+import { ejercicioDe,mesKey,ultimosMeses,nextMonthStart } from '@/lib/calc/fechas';
 import { fmtDate } from '@/lib/calc/format';
 import { animalesEnCarencia,proximasOperaciones } from '@/lib/calc/sanidad';
 import { canEdit,getSessionPerfil } from '@/lib/db/auth';
@@ -28,16 +28,16 @@ const proximas = proximasOperaciones(scheduled, ahora, 30);
 const costoEjercicio = logs
     .filter((l) => l.fecha_aplicacion >= ejercicio.inicio)
     .reduce((acc, l) => acc + (l.costo_total ?? 0), 0);
-const fin = new Date(new Date(ahora).getFullYear(), new Date(ahora).getMonth() + 9, 1).getTime();
+const fin = nextMonthStart(ahora,9);
 const meses = ultimosMeses(12, fin).map((m) => m.key);
 const items: Record<string, ItemCalendario[]> = {};
 const push = (it: ItemCalendario) => {
     const k = mesKey(it.fecha);
-    if (meses.includes(k)) (items[k] ??= []).push(it);
+    (items[k] ??= []).push(it);
   };
 scheduled.forEach((s) =>
     push({
-      id: s.id,
+      id: s.id,operationId:s.operation_id,loteId:s.lote_id,
       fecha: s.fecha_programada,
       nombre: cat.get(s.operation_id)?.nombre ?? 'Operación',
       lote: loteNombre(s.lote_id),

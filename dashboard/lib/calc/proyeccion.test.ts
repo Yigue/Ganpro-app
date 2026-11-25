@@ -102,8 +102,8 @@ describe('plan', () => {
 describe('precios', () => {
   it('estacionalidad promedia por mes', () => {
     const e = estacionalidad([
-      { fecha: new Date(2025, 2, 1).getTime(), valor: 100 },
-      { fecha: new Date(2026, 2, 1).getTime(), valor: 200 },
+      { fecha: Date.parse('2025-03-01T12:00:00-03:00'), valor: 100 },
+      { fecha: Date.parse('2026-03-01T12:00:00-03:00'), valor: 200 },
     ]);
     expect(e[2]).toBe(150);
     expect(e[0]).toBeNull();

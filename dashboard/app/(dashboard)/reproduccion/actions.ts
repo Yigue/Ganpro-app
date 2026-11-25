@@ -1,7 +1,11 @@
 'use server';
-import {InputError} from '@/lib/commands/errors';
+import {applyBatch} from '@/lib/commands/batch';
+import {runOperation} from '@/lib/commands/rpc';
+import {operationMessage} from '@/lib/commands/message';
 
 import { z } from 'zod';
+import {commandContext} from '@/lib/commands/context';
+import {InputError} from '@/lib/commands/errors';
 import { check, crearAccion, fechaMs } from '@/lib/db/actions';
 
 const RUTAS = ['/reproduccion', '/'];
@@ -18,36 +22,7 @@ export const crearServicio = crearAccion(
     fecha_salida: z.string().optional(),
     notas: z.string().trim().optional(),
   }),
-  async (d, supabase) => {
-    if(d.fecha_salida&&fechaMs(d.fecha_salida)<fechaMs(d.fecha_entrada))throw new InputError({fecha_salida:['La salida debe ser posterior a la entrada.']});
-    const lista = caravanas(d.toros);
-    const data=check(await supabase.from('animals').select('id, id_caravana').in('id_caravana',lista).eq('sexo','M').eq('categoria','Toro').eq('estado','ACTIVO'));
-    const faltan = lista.filter((c) => !(data ?? []).some((a) => a.id_caravana === c));
-    if (faltan.length) throw new InputError({_form:[`No existen los toros: ${faltan.join(', ')}`]});
-    let vientres = d.vientres;
-    if (!vientres) {
-      const countResult = await supabase
-        .from('animals')
-        .select('id', { count: 'exact', head: true })
-        .eq('lote_id', d.lote_id)
-        .eq('estado', 'ACTIVO')
-        .eq('sexo', 'H')
-        .in('categoria', ['Vaca', 'Vaquillona']);
-      check(countResult);vientres = countResult.count ?? undefined;
-    }
-    check(
-      await supabase.from('servicios').insert({
-        temporada: d.temporada,
-        lote_id: d.lote_id,
-        toros: (data ?? []).map((a) => a.id),
-        vientres: vientres ?? null,
-        fecha_entrada: fechaMs(d.fecha_entrada),
-        fecha_salida: d.fecha_salida ? fechaMs(d.fecha_salida) : null,
-        notas: d.notas ?? null,
-      }),
-    );
-    return 'Servicio registrado';
-  },
+  async(d,supabase)=>operationMessage(await runOperation(supabase,'repro.service',{...d,toros:caravanas(d.toros),fecha_entrada:fechaMs(d.fecha_entrada),fecha_salida:d.fecha_salida?fechaMs(d.fecha_salida):undefined})),
   { name: 'reproduccion.crearServicio', revalidate: RUTAS },
 );
 
@@ -61,18 +36,9 @@ export const registrarRevisacion = crearAccion(
     notas: z.string().trim().optional(),
   }),
   async (d, supabase) => {
-    const data=check(await supabase.from('animals').select('id').eq('id_caravana',d.caravana).maybeSingle());
+    const data=check(await supabase.from('animals').select('id').eq('id_caravana',d.caravana.trim().toUpperCase()).eq('estado','ACTIVO').eq('sexo','M').eq('categoria','Toro').maybeSingle());
     if (!data) throw new InputError({_form:[`No existe la caravana ${d.caravana}`]});
-    check(
-      await supabase.from('revisacion_toros').insert({
-        animal_id: data.id,
-        fecha: fechaMs(d.fecha),
-        apto: d.apto === 'si',
-        sanitaria: d.sanitaria ?? null,
-        circunferencia_escrotal_cm: d.circunferencia_escrotal_cm ?? null,
-        notas: d.notas ?? null,
-      }),
-    );
+    await applyBatch(supabase,[{table:'revisacion_toros',mode:'insert',data:{animal_id:data.id,fecha:fechaMs(d.fecha),apto:d.apto==='si',sanitaria:d.sanitaria??null,circunferencia_escrotal_cm:d.circunferencia_escrotal_cm??null,notas:d.notas??null}}]);
     return 'Revisación registrada';
   },
   { name: 'reproduccion.registrarRevisacion', revalidate: RUTAS },
@@ -81,7 +47,7 @@ export const registrarRevisacion = crearAccion(
 export const completarEtapa = crearAccion(
   z.object({ id: z.string().min(1) }),
   async (d, supabase) => {
-    check(await supabase.from('etapas_protocolo').update({ completada: true, fecha_completada: Date.now() }).eq('id', d.id));
+    await applyBatch(supabase,[{table:'etapas_protocolo',mode:'update',id:d.id,data:{completada:true,fecha_completada:commandContext.getStore()?.operationAt??Date.now()}}]);
   },
   { name: 'reproduccion.completarEtapa', revalidate: RUTAS },
 );

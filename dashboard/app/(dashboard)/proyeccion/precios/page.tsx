@@ -1,3 +1,4 @@
+import {businessParts} from '@/lib/calc/fechas';
 import { BarChartView, LineChartView } from '@/components/charts/charts';
 import { ImportarPrecios } from '@/components/proyeccion/importar-precios';
 import { PageHeader, Section } from '@/components/ui/section';
@@ -34,14 +35,14 @@ export default async function PreciosPage({ searchParams }: { searchParams: Prom
   };
 
   const serie = conDolar.map(({ p, dolar: d }) => ({
-    fecha: fmtDateShort(p.fecha) + ` ${String(new Date(p.fecha).getFullYear()).slice(2)}`,
+    fecha: fmtDateShort(p.fecha) + ` ${String(businessParts(p.fecha).year).slice(2)}`,
     Ternero: valor(p, d, 'ternero_kg'),
     Novillo: valor(p, d, 'novillo_kg'),
     Vaca: valor(p, d, 'vaca_kg'),
   }));
   const relacion = precios
     .filter((p) => p.ternero_kg && p.novillo_kg)
-    .map((p) => ({ fecha: fmtDateShort(p.fecha) + ` ${String(new Date(p.fecha).getFullYear()).slice(2)}`, 'Ternero / novillo': p.ternero_kg! / p.novillo_kg! }));
+    .map((p) => ({ fecha: fmtDateShort(p.fecha) + ` ${String(businessParts(p.fecha).year).slice(2)}`, 'Ternero / novillo': p.ternero_kg! / p.novillo_kg! }));
 
   const hace5 = Date.now() - 5 * 365 * DAY_MS;
   const recientes = conDolar.filter(({ p }) => p.fecha >= hace5);

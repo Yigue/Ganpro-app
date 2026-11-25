@@ -1,3 +1,8 @@
+import {businessToday} from './business-date';
+export const businessParts=(ms:number)=>{const [year,month,day]=businessToday(new Date(ms)).split('-').map(Number);return {year,month,day};};
+/** Midnight in Argentina, independent of the host timezone; month is zero-based. */
+export const businessMonthStart=(year:number,month:number)=>Date.UTC(year,month,1,3);
+export const nextMonthStart=(ms:number,n=1)=>{const p=businessParts(ms);return businessMonthStart(p.year,p.month-1+n);};
 export const DAY_MS = 86_400_000;
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -10,11 +15,10 @@ export interface Ejercicio {
 
 /** Ejercicio ganadero que contiene la fecha (por defecto julio a junio). */
 export function ejercicioDe(ms: number, mesInicio = 7): Ejercicio {
-  const d = new Date(ms);
-  const m = d.getMonth() + 1;
-  const anioInicio = m >= mesInicio ? d.getFullYear() : d.getFullYear() - 1;
-  const inicio = new Date(anioInicio, mesInicio - 1, 1).getTime();
-  const fin = new Date(anioInicio + 1, mesInicio - 1, 1).getTime() - 1;
+  const {year,month:m} = businessParts(ms);
+  const anioInicio = m >= mesInicio ? year : year - 1;
+  const inicio = businessMonthStart(anioInicio, mesInicio - 1);
+  const fin = businessMonthStart(anioInicio + 1, mesInicio - 1) - 1;
   const label = mesInicio === 1 ? `${anioInicio}` : `${anioInicio}-${String(anioInicio + 1).slice(2)}`;
   return { label, inicio, fin };
 }
@@ -23,10 +27,10 @@ export function ejercicioAnterior(e: Ejercicio, mesInicio = 7): Ejercicio {
   return ejercicioDe(e.inicio - 1, mesInicio);
 }
 
-/** 'YYYY-MM' en hora local. */
+/** 'YYYY-MM' en Argentina. */
 export function mesKey(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const {year,month}=businessParts(ms);
+  return `${year}-${String(month).padStart(2,'0')}`;
 }
 
 export function mesLabel(key: string): string {
@@ -36,11 +40,11 @@ export function mesLabel(key: string): string {
 
 /** Últimos n meses terminando en el mes de `hasta`, de más viejo a más nuevo. */
 export function ultimosMeses(n: number, hasta: number): { key: string; fin: number }[] {
-  const d = new Date(hasta);
+  const {year,month}=businessParts(hasta);
   const out: { key: string; fin: number }[] = [];
   for (let i = n - 1; i >= 0; i--) {
-    const inicioMes = new Date(d.getFullYear(), d.getMonth() - i, 1);
-    const fin = new Date(d.getFullYear(), d.getMonth() - i + 1, 1).getTime() - 1;
+    const inicioMes = new Date(businessMonthStart(year, month-1-i));
+    const fin = businessMonthStart(year, month-i) - 1;
     out.push({ key: mesKey(inicioMes.getTime()), fin });
   }
   return out;
