@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
-import {command,entry,pool,DATE} from '../db/fixtures';
+import {browserDatabase,DATE} from './database';
+const {pool,command,entry}=browserDatabase();
 test.afterAll(()=>pool.end());
 test('animal history displays a fixed withdrawal after moving to another group',async({page})=>{
  const tag=`RET-${randomUUID().slice(0,8)}`.toUpperCase(),drug=randomUUID(),lot=randomUUID();

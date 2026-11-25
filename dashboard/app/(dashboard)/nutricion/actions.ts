@@ -1,10 +1,11 @@
 'use server';
+import {applyBatch} from '@/lib/commands/batch';
 import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
 import {runOperation} from '@/lib/commands/rpc';
 import {operationMessage} from '@/lib/commands/message';
-import { check, crearAccion, fechaOperacionMs } from '@/lib/db/actions';
+import { crearAccion, fechaOperacionMs } from '@/lib/db/actions';
 
 const RUTAS = ['/nutricion', '/costos', '/'];
 
@@ -22,7 +23,7 @@ export const guardarFormula = crearAccion(
 export const crearRacion = crearAccion(
   z.object({ nombre: z.string().trim().min(1), descripcion: z.string().trim().optional() }),
   async (d, supabase) => {
-    check(await supabase.from('raciones').insert({ nombre: d.nombre, descripcion: d.descripcion ?? null, activa: true }));
+    await applyBatch(supabase,[{table:'raciones',mode:'insert',data:{nombre:d.nombre,descripcion:d.descripcion??null,activa:true}}]);
     return `Ración ${d.nombre} creada`;
   },
   { name: 'nutricion.crearRacion', revalidate: RUTAS },
@@ -34,7 +35,7 @@ export const guardarSuplemento = crearAccion(
     nombre: z.string().trim().min(1),
     tipo: z.enum(['MAIZ', 'SILO', 'HENO', 'PELLET', 'UREA', 'OTRO']),
     materia_seca_pct: z.coerce.number().min(0).max(100),
-    proteina_bruta_pct: z.coerce.number().min(0).optional(),
+    proteina_bruta_pct: z.coerce.number().min(0).max(100).optional(),
     precio_por_tonelada: z.coerce.number().min(0).optional(),
     stock_kg: z.coerce.number().min(0).optional(),
     stock_minimo_kg: z.coerce.number().min(0).optional(),
@@ -49,7 +50,7 @@ export const guardarSuplemento = crearAccion(
       stock_minimo_kg: d.stock_minimo_kg ?? null,
       proveedor: d.proveedor ?? null,
     };
-    check(id ? await supabase.from('suplementos').update(fila).eq('id', id) : await supabase.from('suplementos').insert(fila));
+    await applyBatch(supabase,[{table:'suplementos',mode:id?'update':'insert',id,data:fila}]);
     return `${d.nombre} guardado`;
   },
   { name: 'nutricion.guardarSuplemento', revalidate: RUTAS },

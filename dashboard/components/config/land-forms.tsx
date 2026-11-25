@@ -12,7 +12,7 @@ export function PotreroForm({ potrero }: { potrero?: Potrero }) {
       triggerVariant={potrero ? 'ghost' : 'outline'}
       action={guardarPotrero}
     >
-      {potrero && <input type="hidden" name="id" value={potrero.id} />}
+      {potrero && <><input type="hidden" name="id" value={potrero.id} /><input type="hidden" name="expected_version" value={potrero.server_updated_at??0}/></>}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Nombre">
           <Input name="nombre" defaultValue={potrero?.nombre} required />

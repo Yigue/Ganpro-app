@@ -1,4 +1,5 @@
-import type { Lote, MovimientoFinanciero, OperationCatalog, OperationLog, Animal } from '@/lib/db/types';
+import type { Lote, MovimientoFinanciero, OperationCatalog, OperationLog, Animal,Evento,AnimalMovement } from '@/lib/db/types';
+import {stockExposure,historicalLot} from './stock-exposure';
 import { DAY_MS } from './fechas';
 import { tipoCosto } from './finanzas';
 
@@ -12,13 +13,14 @@ export interface CostoLote {
   total: number;
   cabezas: number;
   porCabeza: number | null;
+  cabezasDia:number;
 }
 
 /**
  * Costo por lote en el período. Sanidad y nutrición salen de los gastos cargados;
  * Las aplicaciones se suman salvo que un consumo vinculado ya registre su costo.
  * No se deduplican hechos distintos por compartir categoría, fecha o importe.
- * El alquiler usa costo_alquiler_ha (ARS/ha/año) prorrateado por días.
+ * El alquiler real procede de gastos registrados; tarifas actuales no reescriben períodos históricos.
  */
 export function costosPorLote(params: {
   lotes: Lote[];
@@ -28,12 +30,18 @@ export function costosPorLote(params: {
   catalogo: Map<string, OperationCatalog>;
   desde: number;
   hasta: number;
+  eventos?:Evento[];
+  movimientos?:AnimalMovement[];
 }): CostoLote[] {
   const { lotes, animals, movs, logs, desde, hasta } = params;
-  const dias = Math.max(1, (hasta - desde) / DAY_MS);
+  const dias = (hasta+1-desde)/DAY_MS;
+  const exposure=stockExposure(animals,params.eventos??[],params.movimientos??[],desde,hasta);
+  const delAnimal=new Map(animals.map(a=>[a.id,a]));
+  const expenseLot=(m:MovimientoFinanciero)=>{const animal=m.animal_id?delAnimal.get(m.animal_id):undefined;return m.lote_id??(animal?historicalLot(animal,params.movimientos??[],m.fecha):null);};
   return lotes.map((lote) => {
-    const cabezas = animals.filter((a) => a.estado === 'ACTIVO' && a.lote_id === lote.id).length;
-    const delLote = movs.filter((m) => m.tipo === 'GASTO' && m.lote_id === lote.id && m.fecha >= desde && m.fecha <= hasta);
+    const cabezasDia=exposure.byLot.get(lote.id)??0;
+    const cabezas=dias>0?cabezasDia/dias:0;
+    const delLote = movs.filter((m) => m.tipo === 'GASTO' && expenseLot(m) === lote.id && m.fecha >= desde && m.fecha <= hasta);
     const suma = (cat: string) => delLote.filter((m) => m.categoria === cat).reduce((a, m) => a + m.monto, 0);
 
     const aplicacionesRegistradas = new Set(movs.filter(m => m.tipo === 'GASTO' && m.aplicacion_id).map(m => m.aplicacion_id));
@@ -42,12 +50,12 @@ export function costosPorLote(params: {
       .reduce((total, log) => total + (log.costo_total ?? 0), 0);
     const nutricion = suma('NUTRICION');
     const alquilerCargado = suma('ALQUILER');
-    const alquiler = alquilerCargado || ((lote.costo_alquiler_ha ?? 0) * (lote.hectareas ?? 0) * dias) / 365;
+    const alquiler = alquilerCargado;
     const otrosDirectos = delLote
       .filter((m) => !['SANIDAD', 'NUTRICION', 'ALQUILER'].includes(m.categoria) && tipoCosto(m.categoria) === 'directo')
       .reduce((a, m) => a + m.monto, 0);
     const total = sanidad + nutricion + alquiler + otrosDirectos;
-    return { loteId: lote.id, nombre: lote.nombre, sanidad, nutricion, alquiler, otrosDirectos, total, cabezas, porCabeza: cabezas ? total / cabezas : null };
+    return { loteId: lote.id, nombre: lote.nombre, sanidad, nutricion, alquiler, otrosDirectos, total, cabezas, cabezasDia,porCabeza: cabezas ? total / cabezas : null };
   });
 }
 

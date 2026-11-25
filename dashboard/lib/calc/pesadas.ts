@@ -1,3 +1,4 @@
+import {herdGain} from '../../../src/shared/utils/herdMetrics';
 import type { Animal, Evento } from '@/lib/db/types';
 import { DAY_MS } from './fechas';
 
@@ -38,22 +39,24 @@ export interface GdpLote {
   loteId: string | null;
   animales: number;
   gdpPromedio: number | null;
+  animalesConPesadas:number;
 }
 
-export function gdpPorLote(animals: Animal[], pesajes: Map<string, Pesaje[]>): GdpLote[] {
-  const grupos = new Map<string | null, number[]>();
+export function gdpPorLote(animals: Animal[], pesajes: Map<string, Pesaje[]>,now=Date.now()): GdpLote[] {
+  const grupos = new Map<string | null, Animal[]>();
   const conteo = new Map<string | null, number>();
   for (const a of animals) {
     conteo.set(a.lote_id, (conteo.get(a.lote_id) ?? 0) + 1);
-    const g = gdp(pesajes.get(a.id) ?? []);
-    if (g == null) continue;
     const list = grupos.get(a.lote_id) ?? [];
-    list.push(g);
+    list.push(a);
     grupos.set(a.lote_id, list);
   }
   return [...conteo.entries()].map(([loteId, animales]) => {
     const list = grupos.get(loteId) ?? [];
-    return { loteId, animales, gdpPromedio: list.length ? list.reduce((a, b) => a + b, 0) / list.length : null };
+    const since=now-90*DAY_MS;
+    const points=list.flatMap(a=>(pesajes.get(a.id)??[]).filter(p=>p.timestamp>=since&&p.timestamp<=now).map(p=>({...p,animalId:a.id})));
+    const gain=herdGain(points);
+    return { loteId, animales, gdpPromedio: gain.dailyGain, animalesConPesadas:gain.animals };
   });
 }
 
@@ -74,7 +77,8 @@ export function kgGanados(pesajes: Map<string, Pesaje[]>, desde: number, hasta: 
   for (const list of pesajes.values()) {
     const enRango = list.filter((p) => p.timestamp >= desde && p.timestamp <= hasta);
     if (enRango.length < 2) continue;
-    total += Math.max(0, enRango[enRango.length - 1].valor - enRango[0].valor);
+    const summary=herdGain(enRango.map(p=>({...p,animalId:"subject"})));
+    if(summary.animals)total += summary.dailyGain!*summary.animalDays;
   }
   return total;
 }

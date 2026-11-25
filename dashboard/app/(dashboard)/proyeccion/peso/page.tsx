@@ -23,7 +23,7 @@ export default async function PesoPage({ searchParams }: { searchParams: Promise
 
   const pesajes = pesajesPorAnimal(eventos);
   const vivos = activos(animals).filter((a) => a.categoria !== 'Toro');
-  const gdpLotes = new Map(gdpPorLote(vivos, pesajes).map((g) => [g.loteId, g.gdpPromedio]));
+  const gdpLotes = new Map(gdpPorLote(vivos, pesajes).map((g) => [g.loteId, g]));
   const potrerosById = byId(potreros);
 
   const datos: LotePeso[] = lotes
@@ -36,7 +36,8 @@ export default async function PesoPage({ searchParams }: { searchParams: Promise
         id: l.id,
         nombre: l.nombre,
         recurso: potreroPrincipal ? (potrerosById.get(potreroPrincipal)?.recurso_forrajero ?? null) : null,
-        gdpHistorica: gdpLotes.get(l.id) ?? null,
+        gdpHistorica: gdpLotes.get(l.id)?.gdpPromedio ?? null,
+        animalesConPesadas:gdpLotes.get(l.id)?.animalesConPesadas??0,
         animales: delLote
           .map((a) => {
             const p = pesajes.get(a.id) ?? [];

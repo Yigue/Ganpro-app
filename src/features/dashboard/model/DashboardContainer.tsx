@@ -15,7 +15,7 @@ export const DashboardContainer = withObservables(
       .get<EventoModel>('eventos')
       .query(
         Q.where('tipo', EVENTO_TIPO.PESAJE),
-        ...(selectedLoteId ? [Q.on('animals', 'lote_id', selectedLoteId)] : []),
+        Q.on('animals',[Q.where('estado','ACTIVO'),Q.where('categoria',Q.notEq('Toro')),...(selectedLoteId?[Q.where('lote_id',selectedLoteId)]:[])]),
         Q.where('timestamp', Q.gte(Date.now() - 90 * 86400000)),
         Q.where('timestamp', Q.lte(Date.now())),
         Q.sortBy('timestamp', Q.asc)

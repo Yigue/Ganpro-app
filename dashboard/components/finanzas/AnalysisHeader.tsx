@@ -14,8 +14,8 @@ export function AnalysisHeader({data}:{data:FinancialAnalysis}){const {dolarMep,
             <PeriodoTabs
               activa={usd ? 'usd' : 'ars'}
               opciones={[
-                { key: 'ars', label: 'Pesos', href: '/finanzas' },
-                { key: 'usd', label: 'Dólares', href: '/finanzas?moneda=usd' },
+                { key: 'ars', label: 'Pesos', href: '/finanzas/analisis' },
+                { key: 'usd', label: 'Dólares', href: '/finanzas/analisis?moneda=usd' },
               ]}
             />
             {editable && <MovimientoFinancieroForm lotes={lotes} />}
@@ -25,11 +25,11 @@ export function AnalysisHeader({data}:{data:FinancialAnalysis}){const {dolarMep,
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Ingresos" value={fmt(mbActual.ingresos)} hint={`Ejercicio ${actual.label}`} />
         <StatCard label="Gastos" value={fmt(mbActual.costosDirectos + mbActual.estructura)} hint={`Ejercicio ${actual.label}`} />
-        <StatCard label="Resultado parcial" value={fmt(mbActual.margenBruto)} tone={mbActual.margenBruto >= 0 ? 'success' : 'danger'} hint="Ventas − costos directos" />
+        <StatCard label="Resultado parcial" value={fmt(mbActual.resultado)} tone={mbActual.resultado >= 0 ? 'success' : 'danger'} hint="Ingresos − costos directos − estructura; sin ajuste de inventario" />
         <StatCard label="Por cobrar" value={fmt(pendientes.reduce((a, p) => a + p.monto, 0))} hint={`${pendientes.length} comprobantes con saldo pendiente`} />
         <StatCard label="Valor del rodeo" value={fmt(valorRodeo)} hint={usd ? fmtARS(valorRodeo) : fmtUSD(dolar && valorRodeo != null ? valorRodeo / dolar : null)} />
       </div>
-      <Section title="Ingresos y gastos por mes" description={usd ? 'En dólares a la cotización oficial de cada mes' : 'En pesos corrientes'}>
+      <Section title="Ingresos y gastos por mes" description={usd ? 'En dólares a la cotización oficial disponible para cada comprobante' : 'En pesos corrientes'}>
         <BarChartView data={chart} xKey="label" series={[{ key: 'Ingresos' }, { key: 'Gastos' }]} compactY height={300} />
       </Section>
       </>;}

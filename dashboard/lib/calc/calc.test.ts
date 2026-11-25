@@ -9,7 +9,7 @@ import { composicionRacion } from './nutricion';
 import { dolarEn, margenBruto, valuacionRodeo, porMes } from './finanzas';
 import { simularCria } from './costos';
 
-const ahora = new Date(2026, 10, 1).getTime();
+const ahora = Date.parse('2026-11-01T12:00:00-03:00');
 
 const animal = (p: Partial<Animal>): Animal => ({
   id: p.id ?? 'a',

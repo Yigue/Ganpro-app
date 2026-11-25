@@ -8,10 +8,10 @@ import { ejercicioAnterior } from '@/lib/calc/fechas';
 import { fmtARS,fmtNum } from '@/lib/calc/format';
 import type { PageData } from '@/lib/db/page-costos';
 import Link from 'next/link';
-export function CostosView0({data}:{data:PageData}){const {ej,est,actual,periodo,directos,estructura,total,cabezas,kg,terneros,porCategoria,lotesCostos,NOMBRE}=data;return <><Link className="text-sm text-primary underline" href="/gestion?vista=inventarios">Cortes de inventario y resultados</Link>
+export function CostosView0({data}:{data:PageData}){const {ej,est,actual,periodo,directos,estructura,total,cabezas,kg,terneros,porCategoria,lotesCostos,NOMBRE,exposure,sinAsignar}=data;return <><Link className="text-sm text-primary underline" href="/gestion?vista=inventarios">Cortes de inventario y resultados</Link>
 <PageHeader
         title="Costos"
-        description={`Ejercicio ${periodo.label} (${new Date(periodo.inicio).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })} a ${new Date(periodo.fin).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })})`}
+        description={`Ejercicio ${periodo.label} (${new Date(periodo.inicio).toLocaleDateString('es-AR', { month: 'short', year: 'numeric',timeZone:'America/Argentina/Buenos_Aires' })} a ${new Date(periodo.fin).toLocaleDateString('es-AR', { month: 'short', year: 'numeric',timeZone:'America/Argentina/Buenos_Aires' })})`}
         actions={
           <PeriodoTabs
             activa={ej === 'anterior' ? 'anterior' : 'actual'}
@@ -22,12 +22,13 @@ export function CostosView0({data}:{data:PageData}){const {ej,est,actual,periodo
           />
         }
       />
+<p className="text-sm text-muted-foreground">{exposure.legacyAnimals} animales con historia inicial incompleta; las permanencias se reconstruyen con los registros disponibles. El costo por destete es un cociente del costo directo total, sin asignación específica a cría.</p>
 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Costos directos" value={fmtARS(directos)} hint="Sanidad, sal, suplemento, mano de obra, alquiler" />
         <StatCard label="Estructura" value={fmtARS(estructura)} hint="Impuestos, mantenimiento, amortizaciones" />
-        <StatCard label="Por cabeza" value={fmtARS(cabezas ? total / cabezas : null)} hint={`${cabezas} cabezas activas`} />
-        <StatCard label="Por kg producido" value={fmtARS(costoPorKg(total, kg))} hint={`${fmtNum(kg)} kg ganados según pesadas`} />
-        <StatCard label="Por ternero" value={fmtARS(terneros ? directos / terneros : null)} hint={`Costos directos / ${terneros} terneros`} />
+        <StatCard label="Por cabeza promedio" value={fmtARS(cabezas ? total / cabezas : null)} hint={`${fmtNum(cabezas,1)} cabezas promedio · ${fmtNum(exposure.animalDays)} cabezas-día`} />
+        <StatCard label="Por kg neto registrado" value={fmtARS(costoPorKg(total, kg))} hint={`${fmtNum(kg)} kg netos entre pesadas`} />
+        <StatCard label="Por destete registrado" value={fmtARS(terneros ? directos / terneros : null)} hint={`Costos directos / ${terneros} destetes del período`} />
       </div>
 <div className="grid gap-6 lg:grid-cols-3">
         <Section title="Composición del gasto" className="lg:col-span-1">
@@ -58,12 +59,13 @@ export function CostosView0({data}:{data:PageData}){const {ej,est,actual,periodo
           </Table>
         </Section>
       </div>
-<Section title="Costo por lote" description="Si no hay gasto de sanidad cargado para el lote, se estima con las aplicaciones y el costo por dosis. El alquiler se prorratea desde costo por ha." flush>
+<p className="text-sm text-muted-foreground">Costo directo sin asignar a un lote: {fmtARS(sinAsignar)}. La variación neta de pesadas representa la muestra disponible, no el balance total de carne.</p>
+<Section title="Costo por lote" description="Cabezas promedio por permanencia registrada. Alquiler sólo de gastos cargados; tarifas del lote son presupuestos. Los costos sin lote quedan incluidos en el total general." flush>
         <Table>
           <THead>
             <tr>
               <TH>Lote</TH>
-              <TH className="text-right">Cabezas</TH>
+              <TH className="text-right">Cabezas promedio</TH>
               <TH className="text-right">Sanidad</TH>
               <TH className="text-right">Nutrición</TH>
               <TH className="text-right">Alquiler</TH>
@@ -76,7 +78,7 @@ export function CostosView0({data}:{data:PageData}){const {ej,est,actual,periodo
             {lotesCostos.map((l) => (
               <TR key={l.loteId}>
                 <TD className="font-medium">{l.nombre}</TD>
-                <TD className="text-right tabular-nums">{l.cabezas}</TD>
+                <TD className="text-right tabular-nums">{fmtNum(l.cabezas,1)}</TD>
                 <TD className="text-right tabular-nums">{fmtARS(l.sanidad)}</TD>
                 <TD className="text-right tabular-nums">{fmtARS(l.nutricion)}</TD>
                 <TD className="text-right tabular-nums">{fmtARS(l.alquiler)}</TD>

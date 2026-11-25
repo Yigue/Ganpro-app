@@ -88,3 +88,5 @@ para detectar instalaciones parciales. Las consultas de clima son de sólo lectu
 con errores seguros y referencia en logs, y no producen comandos de inventario.
 Ver [STOCK_FIELD_WORKFLOWS.md](STOCK_FIELD_WORKFLOWS.md) para flujos, condiciones
 comerciales, calendario anual, recomendaciones climáticas y migraciones 57–60.
+
+Las altas de catálogo, programación, raciones, suplementos y precios usan `batch` para conservar el recibo al reenviar. `repro.service` y `config.paddock` agregan validación transaccional; requieren migraciones 61–62. El corte de tesorería es de sólo lectura y no genera asientos. Ver [correcciones analíticas](producto/13-correcciones-analisis.md).

@@ -17,7 +17,7 @@ try{
  for(const name of files)digest.update(name).update(await readFile(new URL(name,migrations)));
  const capabilities=await client.query(await readFile(new URL('../supabase/diagnostics/stock-operations.sql',import.meta.url),'utf8'));
  const functions=await client.query(`SELECT signature,to_regprocedure(signature) IS NOT NULL presente
- FROM unnest(ARRAY['public.ganpro_ledger_snapshot(text)','public.ganpro_management_snapshot()',
+ FROM unnest(ARRAY['public.ganpro_ledger_snapshot(text)','public.ganpro_management_snapshot()','public.ganpro_treasury_snapshot(bigint)','public.ganpro_analysis_capabilities()',
  'public.ganpro_command(text,uuid,jsonb)','public.ganpro_animals_at(bigint)']) signature`);
  const required={animals:['id','id_caravana','rfid','estado','sexo','categoria','lote_id','potrero_id','peso_actual'],
  operation_logs:['id','receptores_fijados','cantidad_animales'],aplicacion_animales:['aplicacion_id','animal_id'],

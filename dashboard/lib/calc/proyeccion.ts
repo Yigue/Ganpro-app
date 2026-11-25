@@ -1,3 +1,4 @@
+import {businessParts} from './fechas';
 import { DAY_MS } from './fechas';
 import { tasaCrecimiento } from './nutricion';
 
@@ -134,7 +135,7 @@ export function proyectarPeso(params: {
   let peso = params.pesoInicial;
   for (let d = 1; d <= params.dias; d++) {
     const fecha = params.desde + d * DAY_MS;
-    const f = params.estacional ? factorEstacional(params.recurso ?? null, new Date(fecha).getMonth()) : 1;
+    const f = params.estacional ? factorEstacional(params.recurso ?? null, businessParts(fecha).month-1) : 1;
     peso += params.gdp * f;
     out.push({ fecha, peso });
   }
@@ -233,7 +234,7 @@ export function estacionalidad(serie: { fecha: number; valor: number | null }[])
   const n = Array(12).fill(0);
   for (const p of serie) {
     if (p.valor == null) continue;
-    const m = new Date(p.fecha).getMonth();
+    const m = businessParts(p.fecha).month-1;
     sumas[m] += p.valor;
     n[m]++;
   }

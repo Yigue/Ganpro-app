@@ -15,6 +15,13 @@ export async function runOperation(client: ServerClient, name: string, data: unk
     if(!parsed.success)throw new DataError('INVALID_OUTPUT');
     if(parsed.data.version<60||!parsed.data.intake||!parsed.data.movement||!parsed.data.lots)throw new DomainError('SETUP_REQUIRED');
   }
+  if(['repro.service','config.paddock'].includes(name)){
+    const status=await client.rpc('ganpro_analysis_capabilities');
+    if(status.error){if(status.error.code==='PGRST202')throw new DomainError('SETUP_REQUIRED');throw databaseError(status.error);}
+    const parsed=z.object({version:z.number(),service:z.boolean(),paddock:z.boolean(),treasury:z.boolean()}).safeParse(status.data);
+    if(!parsed.success)throw new DataError('INVALID_OUTPUT');
+    if(parsed.data.version<62||!parsed.data.service||!parsed.data.paddock||!parsed.data.treasury)throw new DomainError('SETUP_REQUIRED');
+  }
   const result = await client.rpc('ganpro_command', { p_name: name, p_key: key, p_data: data });
   if (result.error) throw databaseError(result.error);
   return result.data as unknown;

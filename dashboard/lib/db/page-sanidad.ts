@@ -1,5 +1,5 @@
 import { type ItemCalendario } from '@/components/sanidad/calendario-section';
-import { ejercicioDe,mesKey,ultimosMeses } from '@/lib/calc/fechas';
+import { ejercicioDe,mesKey,ultimosMeses,nextMonthStart } from '@/lib/calc/fechas';
 import { fmtDate } from '@/lib/calc/format';
 import { animalesEnCarencia,proximasOperaciones } from '@/lib/calc/sanidad';
 import { canEdit,getSessionPerfil } from '@/lib/db/auth';
@@ -28,7 +28,7 @@ const proximas = proximasOperaciones(scheduled, ahora, 30);
 const costoEjercicio = logs
     .filter((l) => l.fecha_aplicacion >= ejercicio.inicio)
     .reduce((acc, l) => acc + (l.costo_total ?? 0), 0);
-const fin = new Date(new Date(ahora).getFullYear(), new Date(ahora).getMonth() + 9, 1).getTime();
+const fin = nextMonthStart(ahora,9);
 const meses = ultimosMeses(12, fin).map((m) => m.key);
 const items: Record<string, ItemCalendario[]> = {};
 const push = (it: ItemCalendario) => {

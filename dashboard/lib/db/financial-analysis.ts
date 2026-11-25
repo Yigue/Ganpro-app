@@ -1,13 +1,13 @@
 import 'server-only';
-import {getLedger} from '@/lib/db/ledger';
-import {businessToday} from '@/lib/calc/business-date';
-import { ejercicioAnterior, ejercicioDe, mesKey, mesLabel, ultimosMeses } from '@/lib/calc/fechas';
-import { dolarEn, enRango, flujoProyectado, margenBruto, porMes, precioVigente, valuacionRodeo } from '@/lib/calc/finanzas';
+import {getTreasury} from '@/lib/db/treasury';
+import {projectTreasury} from '@/lib/calc/treasury';
+import { ejercicioAnterior, ejercicioDe, mesKey, mesLabel, ultimosMeses,nextMonthStart } from '@/lib/calc/fechas';
+import { dolarEn, enRango, margenBruto, porMes, precioVigente, valuacionRodeo } from '@/lib/calc/finanzas';
 import { fmtARS, fmtUSD } from '@/lib/calc/format';
 import { canEdit, getSessionPerfil } from '@/lib/db/auth';
 import { getAnimals, getCategoriasConfig, getEstablecimiento, getLotes, getMovimientosFinancieros, getPrecios } from '@/lib/db/client';
 export async function financialAnalysis(searchParams:Promise<{moneda?:string}>){
-  const [{ moneda }, movs, precios, animals, config, lotes, est, perfil, ledger] = await Promise.all([
+  const [{ moneda }, movs, precios, animals, config, lotes, est, perfil, treasury] = await Promise.all([
     searchParams,
     getMovimientosFinancieros(),
     getPrecios(),
@@ -16,11 +16,11 @@ export async function financialAnalysis(searchParams:Promise<{moneda?:string}>){
     getLotes(),
     getEstablecimiento(),
     getSessionPerfil(),
-    getLedger(businessToday().slice(0,7)),
+    getTreasury(),
   ]);
 
   const usd = moneda === 'usd';
-  const ahora = Date.now();
+  const ahora = treasury.as_of;
   const dolar = dolarEn(precios, ahora);
   const dolarMep = dolarEn(precios, ahora, 'dolar_mep');
   const fmt = (v: number | null | undefined) => (usd ? fmtUSD(v != null && dolar ? v / dolar : null) : fmtARS(v));
@@ -38,10 +38,9 @@ export async function financialAnalysis(searchParams:Promise<{moneda?:string}>){
     Gastos: usd ? m.gastosUSD : m.gastos,
   }));
 
-  const balances=new Map(ledger.documentos.map(d=>[d.id,d]));
-  const pendientes=movs.filter(m=>m.tipo==='INGRESO'&&Number(balances.get(m.id)?.pendiente??0)>0).map(m=>({...m,monto:Number(balances.get(m.id)!.pendiente),fecha_cobro:balances.get(m.id)!.vencimiento}));
-  const futuros = Array.from({ length: 6 }, (_, i) => mesKey(new Date(new Date(ahora).getFullYear(), new Date(ahora).getMonth() + i + 1, 1).getTime()));
-  const flujo = flujoProyectado(mensual, pendientes, futuros);
+  const pendientes=treasury.documentos.filter(d=>d.tipo==='INGRESO'&&Number(d.pendiente)>0).map(d=>({...d,monto:Number(d.pendiente),fecha_cobro:d.vencimiento}));
+  const futuros = Array.from({ length: 6 }, (_, i) => mesKey(nextMonthStart(ahora,i)));
+  const flujo = projectTreasury(treasury,futuros,treasury.as_of);
 
   const precio = precioVigente(precios);
   const valuacion = valuacionRodeo(animals, config, precio);
@@ -49,7 +48,7 @@ export async function financialAnalysis(searchParams:Promise<{moneda?:string}>){
   const editable = canEdit(perfil?.rol);
 
   const filasMB = [
-    { label: 'Ingresos por ventas', a: mbActual.ingresos, b: mbAnterior.ingresos },
+    { label: 'Ingresos registrados', a: mbActual.ingresos, b: mbAnterior.ingresos },
     { label: 'Diferencia de inventario', a: mbActual.difInventario, b: mbAnterior.difInventario },
     { label: 'Costos directos', a: -mbActual.costosDirectos, b: -mbAnterior.costosDirectos },
     { label: 'Margen parcial sin ajuste de inventario', a: mbActual.margenBruto, b: mbAnterior.margenBruto, bold: true },
@@ -58,6 +57,6 @@ export async function financialAnalysis(searchParams:Promise<{moneda?:string}>){
   ];
 
 
-return {dolarMep,precio,movs,usd,fmt,actual,anterior,mbActual,mbAnterior,chart,pendientes,flujo,valuacion,valorRodeo,dolar,editable,lotes,filasMB,ahora};
+return {treasury,dolarMep,precio,movs,usd,fmt,actual,anterior,mbActual,mbAnterior,chart,pendientes,flujo,valuacion,valorRodeo,dolar,editable,lotes,filasMB,ahora};
 }
 export type FinancialAnalysis=Awaited<ReturnType<typeof financialAnalysis>>;

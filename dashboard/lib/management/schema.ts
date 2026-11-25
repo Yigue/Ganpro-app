@@ -16,7 +16,7 @@ export const managementSchema=z.object({
  insumos:z.array(z.object({id,nombre:id,tipo:id,unidad:id,cantidad:money,valor:money,suplemento_id:id.nullable(),operation_id:id.nullable()})),
  partidas:z.array(z.object({id,insumo_id:id,nombre:id,cantidad:money,caducidad:ts.nullable()})),
  consumos:z.array(z.object({id,insumo_id:id,cantidad:money,valor:money,fecha:ts,lote_id:id.nullable(),potrero_id:id.nullable(),origen:id,referencia_id:id.nullable().optional()})),
- ciclos:z.array(z.object({id,madre_id:id,padre_id:id.nullable(),servicio_id:id,fecha_servicio:ts,estado:id,ternero_id:id.nullable(),fecha_parto:ts.nullable(),fecha_destete:ts.nullable(),peso_destete:z.coerce.number().finite().nullable()})),
+ ciclos:z.array(z.object({id,madre_id:id,padre_id:id.nullable(),servicio_id:id,fecha_servicio:ts,fecha_tacto:ts.nullable().optional(),estado:id,ternero_id:id.nullable(),fecha_parto:ts.nullable(),fecha_destete:ts.nullable(),peso_destete:z.coerce.number().finite().nullable()})),
  pastoreo:z.array(z.object({id,lote_id:id,potrero_id:id,entrada:ts,salida:ts,estado:id,descanso_dias:z.number(),forraje_kg_ms_ha:z.coerce.number(),remanente_kg_ms_ha:z.coerce.number(),consumo_ev_dia:z.coerce.number(),salida_real:ts.nullable()})),
  cierres:z.array(z.object({id,fecha:ts,cabezas:z.number(),kg:money,valor_animales:money,valor_insumos:money,animales:z.array(z.object({id,peso:money,categoria:id,precio:money,valor:money})),resultado:z.object({variacion_animales:money,produccion_kg:money.nullable(),consumos:money,margen:money}).nullable()})),
  bancos:z.array(z.object({id,extracto_id:id,cuenta_id:id,fecha:ts,referencia:id,descripcion:id,monto:money,asiento_id:id.nullable()})),

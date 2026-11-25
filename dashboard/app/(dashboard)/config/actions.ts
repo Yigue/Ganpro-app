@@ -1,4 +1,5 @@
 'use server';
+import {applyBatch} from '@/lib/commands/batch';
 import {InputError} from '@/lib/commands/errors';
 
 import { z } from 'zod';
@@ -37,21 +38,7 @@ export const guardarEstablecimiento = crearAccion(
   { name: 'config.guardarEstablecimiento', roles: ['admin'], revalidate: ['/', '/config'] },
 );
 
-export const guardarPotrero = crearAccion(
-  z.object({
-    id: z.string().optional(),
-    nombre: z.string().trim().min(1),
-    hectareas: num,
-    recurso_forrajero: z.string().trim().optional(),
-    capacidad_ev: num,
-  }),
-  async ({ id, ...d }, supabase) => {
-    const fila = { nombre: d.nombre, hectareas: d.hectareas ?? null, recurso_forrajero: d.recurso_forrajero ?? null, capacidad_ev: d.capacidad_ev ?? null };
-    check(id ? await supabase.from('potreros').update(fila).eq('id', id) : await supabase.from('potreros').insert(fila));
-    return `Potrero ${d.nombre} guardado`;
-  },
-  { name: 'config.guardarPotrero', revalidate: ['/config', '/nutricion', '/'] },
-);
+export const guardarPotrero=crearAccion(z.object({id:z.string().optional(),expected_version:z.coerce.number().int().optional(),nombre:z.string().trim().min(1).max(200),hectareas:num,recurso_forrajero:z.string().trim().optional(),capacidad_ev:num}),async(d,c)=>operationMessage(await runOperation(c,'config.paddock',d)),{name:'config.paddock',revalidate:['/config','/mapa','/nutricion','/']});
 
 export const guardarLote=crearAccion(z.object({id:z.string().optional(),expected_version:z.coerce.number().int().nonnegative().optional(),nombre:z.string().trim().min(1).max(200),descripcion:z.string().trim().max(1000).optional(),ubicacion:z.string().trim().optional(),hectareas:num,costo_alquiler_ha:num}),async(d,c)=>operationMessage(await runOperation(c,'stock.lot-save',d)),{name:'stock.lot-save',revalidate:['/config','/stock','/stock/manga','/movimientos','/gestion','/mapa','/reproduccion','/costos','/']});
 
@@ -94,7 +81,7 @@ export const cargarPrecios = crearAccion(
   }),
   async ({ fecha, ...precios }, supabase) => {
     const fila = Object.fromEntries(Object.entries(precios).map(([k, v]) => [k, v ?? null]));
-    check(await supabase.from('precios_mercado').insert({ ...fila, fecha: fechaMs(fecha), fuente: 'MANUAL' }));
+    await applyBatch(supabase,[{table:'precios_mercado',mode:'insert',data:{...fila,fecha:fechaMs(fecha),fuente:'MANUAL'}}]);
     return 'Precios cargados';
   },
   { name: 'config.cargarPrecios', revalidate: ['/config', '/finanzas', '/'] },

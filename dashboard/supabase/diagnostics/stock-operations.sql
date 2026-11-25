@@ -7,6 +7,8 @@ WITH functions AS (
  AND p.prokind='f'
 )
 SELECT
+ to_regprocedure('public.ganpro_analysis_capabilities()') IS NOT NULL AS analisis_62_instalado,
+ to_regprocedure('public.ganpro_treasury_snapshot(bigint)') IS NOT NULL AS tesoreria_61_instalada,
  to_regprocedure('public.ganpro_stock_capabilities()') IS NOT NULL AS contrato_60_instalado,
  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='inventario_cierres' AND column_name='receipt_tick') AS base_44_instalada,
  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='animals' AND column_name='visual_pendiente') AS stock_sin_caravana_instalado,

@@ -126,6 +126,27 @@ BEGIN
 END
 $preflight$;
 """]
-parts.extend(section(p) for p in files if number(p)>=57)
+parts.extend(section(p) for p in files if 57<=number(p)<=60)
 parts.append("\nNOTIFY pgrst, 'reload schema';\nCOMMIT;\n")
 out=root.parent/'upgrade-56-to-60.sql';out.write_text(''.join(parts));print(out,out.stat().st_size)
+
+# Keep the 56–60 bundle stable; analytical contracts are a separate atomic upgrade.
+parts=["""-- GANPRO: base 01–60 completas. Ejecutar TODO junto; sin seed ni reset.
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SET LOCAL statement_timeout='180s';
+SELECT pg_advisory_xact_lock(20261109,1);
+DO $preflight$ BEGIN
+ IF to_regprocedure('public.ganpro_stock_capabilities()') IS NULL OR to_regprocedure('public.ganpro_lot_save(jsonb)') IS NULL
+ OR to_regprocedure('public.ganpro_paid(text,bigint)') IS NULL OR to_regprocedure('public.ganpro_animals_at(bigint)') IS NULL
+ OR to_regprocedure('public.ganpro_finance_settle_v56(jsonb)') IS NULL OR to_regclass('public.asientos_caja') IS NULL THEN
+  RAISE EXCEPTION 'Se requieren las migraciones 01–60 completas. No se modificó nada.';
+ END IF;
+ IF to_regprocedure('public.ganpro_treasury_snapshot(bigint)') IS NOT NULL OR to_regprocedure('public.ganpro_service_create(jsonb)') IS NOT NULL OR to_regprocedure('public.ganpro_analysis_capabilities()') IS NOT NULL THEN
+  RAISE EXCEPTION 'Ya existen cambios 61+. Revisar migraciones aplicadas; no se modificó nada.';
+ END IF;
+END $preflight$;
+"""]
+parts.extend(section(p) for p in files if 61<=number(p)<=62)
+parts.append("\nNOTIFY pgrst, 'reload schema';\nCOMMIT;\n")
+out=root.parent/'upgrade-60-to-62.sql';out.write_text(''.join(parts));print(out,out.stat().st_size)

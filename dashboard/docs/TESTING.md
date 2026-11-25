@@ -100,3 +100,9 @@ entorno de pruebas; no es una variable requerida por el producto en Vercel.
 
 78 unitarias, 53 PostgreSQL/RLS y 10 Playwright aprobadas; lint, tipos y build Next aprobados.
 Ver [detalle y límites](producto/12-verificacion.md). No se ejecutaron cambios en Supabase/Vercel productivos ni una compilación nativa completa.
+
+## Correcciones analíticas (24/11/2026)
+
+89 unitarias, 59 PostgreSQL/RLS y 12 Playwright aprobadas; lint, tipos y build Next aprobados.
+`npm run test:db:upgrade` verifica 60→62 en una base temporal local creada por el ensayo y eliminada al finalizar; nunca resetea la base indicada por la variable de conexión.
+Ver [alcance y actualización](producto/13-correcciones-analisis.md). No se ejecutaron migraciones en Supabase productivo ni una compilación nativa completa.

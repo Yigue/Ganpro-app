@@ -1,5 +1,6 @@
 'use client';
 
+import {businessToday} from '@/lib/calc/business-date';
 import { useMemo, useState } from 'react';
 import { LineChartView } from '@/components/charts/charts';
 import { Field, Input, Select } from '@/components/ui/input';
@@ -25,6 +26,7 @@ export interface LotePeso {
   nombre: string;
   recurso: string | null;
   gdpHistorica: number | null;
+  animalesConPesadas:number;
   animales: AnimalPeso[];
 }
 
@@ -51,12 +53,12 @@ export function ProyeccionPeso({
 }) {
   const [s, setS] = useState<SupuestosPeso>(inicial);
   const lote = lotes.find((l) => l.id === s.loteId) ?? lotes[0];
-  const hoy = useMemo(() => new Date(new Date().toDateString()).getTime(), []);
-  const venta = new Date(`${s.fechaVenta}T12:00:00`).getTime();
+  const hoy = useMemo(() => Date.parse(businessToday()+'T00:00:00-03:00'), []);
+  const venta = new Date(`${s.fechaVenta}T12:00:00-03:00`).getTime();
 
   const calc = useMemo(() => {
-    if (!lote || !lote.animales.length) return null;
-    const gdpLote = s.modo === 'manual' ? s.gdpManual : (lote.gdpHistorica ?? s.gdpManual);
+    if (!lote || !lote.animales.length || (s.modo==='historica'&&lote.gdpHistorica==null)) return null;
+    const gdpLote = s.modo === 'manual' ? s.gdpManual : lote.gdpHistorica!;
     const dias = Math.max(30, Math.ceil((Math.max(venta, hoy) - hoy) / DAY_MS) + 365);
     const pesoProm = lote.animales.reduce((a, x) => a + x.peso, 0) / lote.animales.length;
     const desde = Math.round(lote.animales.reduce((a, x) => a + x.fecha, 0) / lote.animales.length);
@@ -116,7 +118,7 @@ export function ProyeccionPeso({
           </Field>
           <Field label="Ganancia diaria">
             <Select value={s.modo} onChange={(e) => setS({ ...s, modo: e.target.value as SupuestosPeso['modo'] })}>
-              <option value="historica">Histórica ({lote?.gdpHistorica != null ? `${fmtNum(lote.gdpHistorica, 2)} kg/d` : 'sin datos'})</option>
+              <option value="historica">Grupal 90 días ({lote?.gdpHistorica != null ? `${fmtNum(lote.gdpHistorica, 2)} kg/d` : 'sin datos'})</option>
               <option value="manual">Elegida</option>
             </Select>
           </Field>
@@ -135,9 +137,10 @@ export function ProyeccionPeso({
           Curva estacional según el recurso del potrero ({lote?.recurso ?? 'campo natural'}): menos ganancia en invierno, más en primavera
         </label>
       </Section>
+      <p className="text-sm text-muted-foreground">{lote?.animalesConPesadas??0} animales con pares comparables en 90 días. Los pesos antiguos no distinguen aún medición de estimación; la proyección es un escenario.</p>
       {!calc ? (
         <Section title="Sin pesadas">
-          <p className="text-sm text-muted-foreground">El lote no tiene animales activos con pesadas. Cargalas desde la app o con el CSV del bastón.</p>
+          <p className="text-sm text-muted-foreground">Faltan pesadas comparables para una GDP grupal de los últimos 90 días. Cargá pesadas o elegí el modo manual para simular con un supuesto explícito.</p>
         </Section>
       ) : (
         <>

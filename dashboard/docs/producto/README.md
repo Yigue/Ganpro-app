@@ -63,7 +63,7 @@ No se fijan fechas ni costos de desarrollo sin refinar el backlog, revisar dispo
 
 ## Avance de implementación
 
-Consultar [ejecución por etapa](11-ejecucion.md) y [verificación](12-verificacion.md) para distinguir cambios entregados de propuestas pendientes.
+Consultar [correcciones del análisis del 24/11](13-correcciones-analisis.md), [ejecución por etapa](11-ejecucion.md) y [verificación](12-verificacion.md) para distinguir cambios entregados de propuestas pendientes.
 
 ## Cómo leer el plan
 

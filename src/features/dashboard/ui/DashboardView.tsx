@@ -50,7 +50,7 @@ export function DashboardView({
               <Text style={styles.gdpValue}>{gdp.toFixed(2)} kg/día</Text>
             )}
           </View>
-          <Text style={styles.eventoAnimal}>{gain.animals} animales con al menos dos pesadas. Lote según pertenencia actual.</Text>
+          <Text style={styles.eventoAnimal}>{gain.animals} animales con al menos dos pesadas. Activos sin toros; lote según pertenencia actual.</Text>
           <Text style={styles.eventoAnimal}>Incluye pesos cargados; todavía no distingue pesadas de estimaciones.</Text>
           <Text style={styles.eventoAnimal}>Peso medio por fecha; cambia con los animales pesados.</Text>
           <SimpleLineChart data={chartData} />

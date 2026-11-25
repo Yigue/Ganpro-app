@@ -1,7 +1,7 @@
 import { EscenariosList } from '@/components/proyeccion/escenarios-list';
 import { PlanCompraVenta, type DatosPlan } from '@/components/proyeccion/plan-compraventa';
 import { PageHeader, Section } from '@/components/ui/section';
-import { mesKey, ultimosMeses } from '@/lib/calc/fechas';
+import { mesKey, ultimosMeses,nextMonthStart } from '@/lib/calc/fechas';
 import { porMes, precioVigente } from '@/lib/calc/finanzas';
 import { fmtARS } from '@/lib/calc/format';
 import type { LineaPlan } from '@/lib/calc/proyeccion';
@@ -32,7 +32,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const historico = porMes(movs.filter((m) => !['COMPRA'].includes(m.categoria)), meses, precios);
   const gastoMensual = Math.round(historico.reduce((a, m) => a + m.gastos, 0) / Math.max(1, historico.length));
   const capacidad = potreros.reduce((a, p) => a + (p.capacidad_ev ?? 0), 0);
-  const sig = new Date(new Date(ahora).getFullYear(), new Date(ahora).getMonth() + 1, 1).getTime();
+  const sig = nextMonthStart(ahora);
   const supuestos = (actual?.supuestos ?? {}) as { horizonte?: number; mesInicio?: string };
 
   const datos: DatosPlan = {

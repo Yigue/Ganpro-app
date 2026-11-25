@@ -1,7 +1,7 @@
 # Ejecución del plan
 
 Alcance confirmado: toda la hacienda es propia; capitalización y propiedad de terceros quedan fuera de V1.
-Actualización: 18/11/2026. Proyecto: Ganpro-app; no se modificó Campo-app.
+Actualización: 24/11/2026. Proyecto: Ganpro-app; no se modificó Campo-app.
 Este registro distingue avance de código, verificación local y aceptación con datos reales.
 El diagnóstico inicial conserva como referencia el commit 822839b; las correcciones siguientes son posteriores.
 
@@ -12,7 +12,7 @@ El diagnóstico inicial conserva como referencia el commit 822839b; las correcci
 | S0 — Línea de base | Diagnóstico reproducible de sólo lectura, huella de migraciones, funciones/columnas y controles agregados | Ejecutarlo contra la base real con lectura completa; conciliar padrón, saldos y responsabilidades |
 | S1 — Integridad | Retiro en ficha, fecha efectiva/reenvío, límites de fechas, costos sanitarios y cálculo móvil corregidos | Procedencia de pesos, contrato móvil completo, datos históricos ambiguos y aceptación del despliegue |
 | S2 — Operación diaria | Formularios bloquean cierre durante confirmación y conservan clave/hora al reenviar | Completar borradores, terceros/liquidaciones, cola móvil e identidad por dispositivo |
-| S3 — Ciclo de negocio | Conserva capacidades existentes; sin cierre nuevo de esta etapa | Cohortes, costos históricos, valuación, tesorería y decisiones de negocio de S0 |
+| S3 — Ciclo de negocio | Cohortes por servicio, permanencia histórica y tesorería comprometida; ver 13-correcciones-analisis.md | Cohortes, costos históricos, valuación, tesorería y decisiones de negocio de S0 |
 | S4 — Análisis | Corregida la mezcla de sujetos en la métrica móvil; no representa el catálogo completo | Métricas comunes, investigación con fuentes y escenarios reproducibles |
 | S5 — Piloto | Regresiones locales añadidas | Teléfonos reales, Auth/Storage reales, restauración y aceptación de responsables |
 
